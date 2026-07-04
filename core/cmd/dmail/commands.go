@@ -126,10 +126,18 @@ func init() {
 }
 
 func defaultShellDir() string {
-	for _, dir := range []string{
+	dataHome := os.Getenv("XDG_DATA_HOME")
+	if dataHome == "" {
+		if home, err := os.UserHomeDir(); err == nil {
+			dataHome = home + "/.local/share"
+		}
+	}
+	candidates := []string{
+		dataHome + "/quickshell/dankmail",
 		"/usr/local/share/quickshell/dankmail",
 		"/usr/share/quickshell/dankmail",
-	} {
+	}
+	for _, dir := range candidates {
 		if _, err := os.Stat(dir); err == nil {
 			return dir
 		}
