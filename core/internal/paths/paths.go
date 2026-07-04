@@ -30,3 +30,7 @@ func SocketPath() string {
 
 // UISettingsPath is the JSON settings file owned by the QML frontend.
 func UISettingsPath() string { return filepath.Join(ConfigDir(), "ui-settings.json") }
+
+// SettingsPath is the daemon's own settings file (notification actions,
+// snooze default, …).
+func SettingsPath() string { return filepath.Join(ConfigDir(), "settings.json") }

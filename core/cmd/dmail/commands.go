@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -118,11 +119,86 @@ func init() {
 				return callSimple("ui.openLink", map[string]any{"id": id})
 			}},
 		accountCmd(),
+		configCmd(),
 		&cobra.Command{Use: "version", Short: "Print version information",
 			Run: func(cmd *cobra.Command, args []string) {
 				fmt.Printf("dmail %s (commit %s, built %s)\n", Version, Commit, BuildTime)
 			}},
 	)
+}
+
+// configCmd exposes the daemon settings (applied live, persisted to
+// ~/.config/dankmail/settings.json).
+func configCmd() *cobra.Command {
+	cmd := &cobra.Command{Use: "config", Short: "Show or change daemon settings"}
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "show",
+		Short: "Print current settings",
+		RunE: func(c *cobra.Command, args []string) error {
+			cli, err := dial()
+			if err != nil {
+				return err
+			}
+			defer cli.Close()
+			raw, err := cli.Call("settings.get", nil)
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(raw))
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "notify-actions <a,b,c>",
+		Short: "Set notification buttons (valid: read, archive, trash, snooze, open; most servers show max 3)",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			var actions []any
+			for _, a := range strings.Split(args[0], ",") {
+				if a = strings.TrimSpace(a); a != "" {
+					actions = append(actions, a)
+				}
+			}
+			cli, err := dial()
+			if err != nil {
+				return err
+			}
+			defer cli.Close()
+			raw, err := cli.Call("settings.set", map[string]any{"notifyActions": actions})
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(raw))
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "snooze-minutes <n>",
+		Short: "Set the snooze duration used by the notification button",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			var mins int
+			if _, err := fmt.Sscanf(args[0], "%d", &mins); err != nil || mins <= 0 {
+				return fmt.Errorf("snooze-minutes takes a positive integer")
+			}
+			cli, err := dial()
+			if err != nil {
+				return err
+			}
+			defer cli.Close()
+			raw, err := cli.Call("settings.set", map[string]any{"snoozeMinutes": mins})
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(raw))
+			return nil
+		},
+	})
+
+	return cmd
 }
 
 func defaultShellDir() string {

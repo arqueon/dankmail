@@ -184,6 +184,29 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		return "ok", nil
 	})
 
+	srv.Register("settings.get", func(ctx context.Context, _ map[string]any) (any, error) {
+		return d.settings.Get(), nil
+	})
+	srv.Register("settings.set", func(ctx context.Context, p map[string]any) (any, error) {
+		s := d.settings.Get()
+		if raw, ok := p["notifyActions"].([]any); ok {
+			s.NotifyActions = nil
+			for _, v := range raw {
+				if a, ok := v.(string); ok {
+					s.NotifyActions = append(s.NotifyActions, a)
+				}
+			}
+		}
+		if mins, ok := p["snoozeMinutes"].(float64); ok {
+			s.SnoozeMinutes = int(mins)
+		}
+		if err := d.settings.Update(s); err != nil {
+			return nil, err
+		}
+		d.bus.Publish("settings.changed", nil)
+		return d.settings.Get(), nil
+	})
+
 	srv.Register("system.status", func(ctx context.Context, _ map[string]any) (any, error) {
 		return server.BuildStatus(ctx, deps)
 	})

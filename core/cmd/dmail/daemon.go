@@ -10,6 +10,7 @@ import (
 	gosync "sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/arqueon/dankmail/core/api/server"
 	"github.com/arqueon/dankmail/core/config"
@@ -19,6 +20,7 @@ import (
 	"github.com/arqueon/dankmail/core/internal/notify"
 	"github.com/arqueon/dankmail/core/internal/paths"
 	"github.com/arqueon/dankmail/core/internal/rules"
+	"github.com/arqueon/dankmail/core/internal/settings"
 	dsync "github.com/arqueon/dankmail/core/internal/sync"
 	"github.com/arqueon/dankmail/core/repo"
 )
@@ -33,6 +35,7 @@ type daemon struct {
 	registry *registry
 	notifier notify.Notifier
 	policies rules.Policies
+	settings *settings.Store
 
 	dnd    atomic.Bool
 	reload chan struct{}
@@ -78,6 +81,7 @@ func runDaemon(shellDir string, hidden bool) error {
 		registry: newRegistry(cfg, db),
 		notifier: notify.NewBest(),
 		policies: rules.DefaultPolicies(),
+		settings: settings.NewStore(paths.SettingsPath()),
 		reload:   make(chan struct{}, 1),
 		exit:     cancel,
 		flows:    newFlowRegistry(),
@@ -198,8 +202,12 @@ func (d *daemon) engineLoop(ctx context.Context) {
 	}
 }
 
-// requestReload asks engineLoop for a registry rebuild + engine restart.
+// requestReload asks engineLoop for a registry rebuild + engine restart,
+// re-reading the settings file along the way.
 func (d *daemon) requestReload() {
+	if err := d.settings.Reload(); err != nil {
+		slog.Warn("settings reload failed", "err", err)
+	}
 	select {
 	case d.reload <- struct{}{}:
 	default:
@@ -246,12 +254,8 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 			Summary:   str("from"),
 			Body:      str("subject") + " — " + str("snippet"),
 			Urgency:   notify.UrgencyNormal,
-			Actions: []notify.Action{
-				{Key: "read", Label: "Marcar leído"},
-				{Key: "archive", Label: "Archivar"},
-				{Key: "open", Label: "Abrir en web"},
-			},
-			OnAction: func(key string) { d.notificationAction(key, ev.Payload) },
+			Actions:   d.notifyActions(),
+			OnAction:  func(key string) { d.notificationAction(key, ev.Payload) },
 		}
 		if _, err := d.notifier.Send(n); err != nil {
 			slog.Debug("notification failed", "err", err)
@@ -280,9 +284,30 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 	}
 }
 
+// notifyActions maps the configured action keys (settings.json →
+// notifyActions) to labeled buttons. Order is preserved; note most
+// notification servers cap the visible buttons (commonly 3).
+func (d *daemon) notifyActions() []notify.Action {
+	labels := map[string]string{
+		"read":    "Marcar leído",
+		"archive": "Archivar",
+		"trash":   "Borrar",
+		"snooze":  "Posponer",
+		"open":    "Abrir en web",
+	}
+	var out []notify.Action
+	for _, key := range d.settings.Get().NotifyActions {
+		if label, ok := labels[key]; ok {
+			out = append(out, notify.Action{Key: key, Label: label})
+		}
+	}
+	return out
+}
+
 // notificationAction routes inline notification buttons into the op
 // queue / browser, using a background context: the notification may
-// outlive the event that created it.
+// outlive the event that created it. "Borrar" is trash — never a
+// permanent delete (spec: nunca destructivo).
 func (d *daemon) notificationAction(key string, payload map[string]any) {
 	accountID, _ := payload["accountId"].(string)
 	threadID, _ := payload["threadId"].(string)
@@ -295,6 +320,21 @@ func (d *daemon) notificationAction(key string, payload map[string]any) {
 		_ = d.enqueueByProviderIDs(ctx, accountID, dsync.OpMarkRead, []string{threadID})
 	case "archive":
 		_ = d.enqueueByProviderIDs(ctx, accountID, dsync.OpArchive, []string{threadID})
+	case "trash":
+		_ = d.enqueueByProviderIDs(ctx, accountID, dsync.OpTrash, []string{threadID})
+	case "snooze":
+		id, err := parseUUID(accountID)
+		if err != nil {
+			return
+		}
+		mins := d.settings.Get().SnoozeMinutes
+		_ = d.queue.Enqueue(ctx, dsync.Op{
+			AccountID: id, Type: dsync.OpSnooze, ThreadIDs: []string{threadID},
+			Payload: dsync.OpPayload{Snooze: &dsync.SnoozePayload{
+				Until:      time.Now().Add(time.Duration(mins) * time.Minute),
+				MarkUnread: true,
+			}},
+		})
 	case "open":
 		d.openThreadInBrowser(accountID, threadID)
 	}
