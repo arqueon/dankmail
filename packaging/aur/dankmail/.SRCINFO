@@ -11,6 +11,6 @@ pkgbase = dankmail
 	depends = xdg-utils
 	optdepends = gnome-keyring: Secret Service storage for tokens and passwords
 	source = dankmail-0.1.0.tar.gz::https://github.com/arqueon/dankmail/archive/refs/tags/v0.1.0.tar.gz
-	sha256sums = 4aeae2938510827ae70a60fda0d1b33487a9d6dcbcc4a530b088c39fd0713dbc
+	sha256sums = 257ac58ccac94cb8d86f88e6579c0e5c2f6a96ad5e7c824300a16548e6b18a40
 
 pkgname = dankmail
