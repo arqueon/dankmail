@@ -1,0 +1,6 @@
+core/bin/
+core/coverage.out
+*.db
+*.db-wal
+*.db-shm
+.claude/

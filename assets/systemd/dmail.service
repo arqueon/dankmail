@@ -1,0 +1,15 @@
+[Unit]
+Description=Dank Mail
+Documentation=https://github.com/arqueon/dankmail
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/dmail run --hidden
+Restart=on-failure
+RestartSec=2
+Slice=app.slice
+
+[Install]
+WantedBy=graphical-session.target

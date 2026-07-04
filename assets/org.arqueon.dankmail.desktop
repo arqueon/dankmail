@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Dank Mail
+Comment=Mail notifier and triage for your desktop
+Exec=dmail show
+Icon=dankmail
+Terminal=false
+Categories=Network;Email;
+StartupNotify=false
