@@ -7,37 +7,120 @@
 > Functionally inspired by Checker Plus for Gmail, but native,
 > browser-independent, and with generic IMAP support.
 
-**Status: working (ring 1).** Gmail accounts sync, notify and triage
-end to end. Generic IMAP accounts can be added and verified (their
-sync engine lands in ring 2). See the
-[architecture](docs/architecture.md) and the delivery rings for the
-roadmap.
+**Status: working (ring 1 complete + most of ring 2's UI).** Gmail
+accounts sync, notify and triage end to end. Generic IMAP accounts can
+be added and verified (their sync engine lands in ring 2). See
+[docs/architecture.md](docs/architecture.md) for the design and the
+delivery rings.
 
-## What it is / isn't
+Triage, not management: anything the features below don't cover opens
+your webmail via deep link. "Delete" always means *move to trash* —
+permanent deletion is not implemented, by design.
 
-Triage only: read, star, archive, trash, snooze, plain-text preview
-with quote formatting. No attachments, no HTML rendering, no folder
-management — those open your webmail via deep link. "Delete" always
-means *move to trash*; permanent deletion is not implemented, by
-design.
+## Features
 
-- **Daemon first**: runs as a systemd user service; closing the window
-  never stops sync or notifications, and `dmail show` brings it back.
-- **Native notifications** with configurable inline actions
-  (read / archive / trash / snooze / open in web).
-- **Minimal OAuth scopes** for Gmail (`gmail.modify` + `gmail.send`,
-  never full mailbox access), with a built-in wizard that walks you
-  through creating your own OAuth client — or just feed it the
-  downloaded `client_secret_*.json`.
-- **Secrets in the system keyring** (tokens, passwords, your OAuth
-  client). Never in files.
-- **Scriptable**: unix-socket IPC + `dmail` CLI
-  (`status`, `list --json`, `sync`, `dnd`, `toggle`, …) and a
-  localhost HTTP API for widgets and bars.
+### Daemon first
+- Runs as a **systemd user service**; sync and notifications never
+  depend on a window being open.
+- The daemon **owns the UI lifecycle**: closing the window (or the
+  whole Quickshell process) changes nothing; `dmail show`, the tray, or
+  the bar plugin bring it back on demand.
+- Tray icon with unread tooltip and a menu that separates *close the
+  interface* from *stop dankmail completely*.
+
+### Sync engine
+- **Gmail via the official API** (not IMAP): initial sync + incremental
+  History-API sync with cursor, automatic full resync when the cursor
+  expires.
+- **Optimistic operation queue**: every action applies locally at once,
+  then executes remotely with retries and exponential backoff; typed
+  errors decide retry vs. permanent (permanent failures revert the
+  local change and notify); auth errors pause the account until
+  re-consent. Homogeneous operations coalesce into batches.
+- **Reconciliation invariant**: the server is the authority, except
+  threads with in-flight operations, which stay frozen until resolved.
+- **Retention janitor**: cache pruned beyond 30 days (configurable) —
+  starred and snoozed threads exempt.
+
+### Notifications
+- Native D-Bus notifications with **configurable inline actions**
+  (mark read / archive / trash / snooze / open in web — pick and order
+  them), `notify-send` fallback.
+- **Configurable snooze meaning** for one-click contexts: in 1 hour,
+  this evening, tomorrow, later this week, this weekend, next week, or
+  fixed minutes.
+- Do-not-disturb toggle (tray, window, plugin, CLI).
+- Alerts for permanently failed operations and accounts needing
+  re-authentication; a notice when a snoozed thread wakes.
+
+### Triage window (Quickshell/QML, DMS aesthetic)
+- **Gmail-style unified list** across accounts: sender avatars with
+  stable per-sender colors, bold-unread emphasis, per-account color
+  bars and filter dots, unread/starred filters, attachment paperclips.
+- **Plain-text preview** that stays plain but reads rich: quote chains
+  rendered as indented colored blocks, the HTML→text distiller's light
+  markdown rendered (labeled links, bold, headings), URLs clickable,
+  **HTML-only mail distilled to text** instead of showing empty.
+- **Attachments as metadata chips** (name, type, size — content never
+  downloaded; opening goes to the webmail).
+- **Quick reply** under the preview: plain text, Ctrl+Enter sends,
+  reply-all as a toggle, correct threading (In-Reply-To/References).
+- **Compose** with sender-account selector and **contact
+  autocomplete**: correspondents inferred from your mail plus Google
+  Contacts / Gmail's autocomplete pool via the People API (optional,
+  read-only scopes).
+- **Search, three levels deep**: instant filter over the local cache →
+  one click sweeps your **entire mailbox history** server-side (Gmail
+  search syntax works: `from:`, `has:attachment`, `before:` …) and
+  ingests results for local triage → one more click continues in the
+  webmail.
+- **Snooze** with quick options and a **calendar + time picker**;
+  snoozes survive daemon restarts and cancel automatically if the
+  thread changes remotely.
+- **Settings window**: notification buttons, snooze preset, chained
+  actions, account management — everything applies live.
+- **Chained actions** (configurable): open-preview→mark read,
+  reply→mark read, trash→mark read, star→back to inbox.
+- Spanish and English out of the box; follows DankMaterialShell's
+  dynamic Material colors.
+
+### Accounts
+- **Multi-account** by design: unified chronological inbox with color
+  identity, per-account filtering, deep links that select the right
+  Gmail session (`authuser`).
+- **Guided Gmail wizard**: the daemon serves a step-by-step Google
+  Cloud walkthrough (with direct links and the classic pitfalls called
+  out); paste the Client ID/Secret or just the downloaded
+  `client_secret_*.json`. Minimal mail scopes — `gmail.modify` +
+  `gmail.send`, **never** full mailbox access.
+- **IMAP accounts** (iCloud, Yahoo, Fastmail, Proton via Bridge,
+  custom) with presets and a **real connection test** before anything
+  is stored; they park until the ring-2 IMAP engine. Microsoft via
+  Graph API is planned (see
+  [docs/design/providers-roadmap.md](docs/design/providers-roadmap.md)).
+- **Secrets live in the system keyring**: tokens, passwords, and your
+  own OAuth client (so refresh works no matter how the daemon starts).
+
+### Scriptable
+- **Unix-socket IPC** (line-JSON) with the full surface: threads, ops,
+  search, contacts, settings, DND, UI control (`ui.showThread`,
+  `ui.compose`…), plus a subscription stream of daemon events.
+- **CLI**: `dmail status | list --json | sync | dnd | toggle | open |
+  config | account …`.
+- **Localhost HTTP API** for widgets and bars.
+
+### DankMaterialShell plugin
+- [`dms-dankmail`](https://github.com/arqueon/dms-dankmail)
+  (`dankmailUnread`): live unread badge over the IPC socket — no
+  polling — with a popout showing the latest inbox mail with
+  per-message actions (read / archive / trash / snooze / open); click
+  a mail to jump to it in the triage window; compose, sync and DND
+  from the popout header.
 
 ## Install
 
-From source (Arch/CachyOS-friendly; AUR package planned):
+From source (Arch/CachyOS-friendly; AUR package prepared in
+`packaging/aur/`):
 
 ```sh
 git clone https://github.com/arqueon/dankmail && cd dankmail
@@ -53,30 +136,21 @@ session (DankMaterialShell covers both).
 
 ## Accounts
 
-- **Gmail**: tray → Open Dank Mail → add-account button. The wizard
-  serves the step-by-step Google Cloud setup with direct links, then
-  runs the OAuth consent. CLI: `dmail account add-gmail
-  --client-json ~/Downloads/client_secret_*.json`.
-- **IMAP** (iCloud, Yahoo, Fastmail, Proton via Bridge, custom):
-  presets in the same wizard; the connection is tested before anything
-  is stored. CLI: `dmail account add-imap you@icloud.com --preset icloud`.
+- **Gmail**: window → add-account button; the wizard walks you through
+  everything. CLI: `dmail account add-gmail --client-json
+  ~/Downloads/client_secret_*.json`. See
+  [docs/gmail-setup.md](docs/gmail-setup.md).
+- **IMAP**: presets in the same wizard, or `dmail account add-imap
+  you@icloud.com --preset icloud`.
 
-See [docs/gmail-setup.md](docs/gmail-setup.md) and
-[docs/design/providers-roadmap.md](docs/design/providers-roadmap.md)
-(Microsoft via Graph API is planned; Proton works through Bridge).
+## Notes
 
-## Layout
-
-- `core/` — Go daemon: `cmd/dmail` (CLI), `internal/` (providers, sync
-  queue with optimistic UI, notify, ipc, oauth, rules), `api/`
-  (localhost HTTP), `ent/` (SQLite schema).
-- `quickshell/` — QML UI: triage window, account wizard, tray;
-  es + en translations.
-- `assets/` — desktop entry and systemd user unit.
-
-Note on snooze: it is simulated locally (archive + scheduled wake), so
-it won't show in Gmail's own "Snoozed" view and waking requires the
-daemon to be running.
+- Snooze is simulated locally (archive + scheduled wake): it won't
+  show in Gmail's own "Snoozed" view — snoozed mail sits in "All
+  Mail" meanwhile — and waking requires the daemon to be running
+  (overdue snoozes are picked up on the next start).
+- New-mail latency follows the polling interval (default 60 s per
+  account); real push is a ring-3 item.
 
 ## License
 
