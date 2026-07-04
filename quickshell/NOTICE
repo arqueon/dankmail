@@ -1,0 +1,9 @@
+Parts of this Quickshell configuration (Widgets/, Common/DankSocket.qml,
+Common/Paths.qml, Common/Anims.qml, bundled fonts, and the overall
+structure) are adapted from dankcalendar:
+
+  https://github.com/AvengeMedia/dankcalendar
+  MIT License, Copyright (c) 2025-2026 Avenge Media LLC
+
+Bundled fonts keep their own licenses (Inter: OFL; Material Symbols:
+Apache-2.0; Fira Code Nerd Font: OFL).

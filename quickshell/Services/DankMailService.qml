@@ -1,19 +1,379 @@
 pragma Singleton
+pragma ComponentBehavior: Bound
+
 import QtQuick
+import Quickshell
+import Quickshell.Io
+import qs.Common
+import qs.Services
 
-// Bridge to the dmail daemon, mirroring dankcalendar's DankCalService:
-//  - one unix-socket connection (Common/DankSocket) for IPC mutations
-//    (ops.*, dnd.*, ui.*) with the Capabilities handshake;
-//  - one subscription connection for daemon events (sync.updated,
-//    unread.changed, op.failed, snooze.woke);
-//  - HTTP reads against the localhost API (address via env DMAIL_API_ADDR)
-//    for thread lists and previews.
-// Exposes: accounts, threads model, unread counters, and signals the
-// Modules re-render on.
-QtObject {
-    id: service
+// Bridge to the dmail daemon over its unix IPC socket, mirroring
+// dankcalendar's DankCalService: one request/response connection with a
+// pending-callback map, one subscription connection for daemon events.
+// All reads and mutations go over IPC (the HTTP API stays for scripting).
+Singleton {
+    id: root
 
-    // TODO(anillo1): socket wiring, models, optimistic-update helpers.
+    readonly property var log: Log.scoped("DankMailService")
+
+    readonly property string socketPath: {
+        const env = Quickshell.env("DMAIL_SOCKET");
+        if (env && env !== "")
+            return env;
+        const runtime = Quickshell.env("XDG_RUNTIME_DIR");
+        return (runtime && runtime !== "" ? runtime : "/tmp") + "/dankmail.sock";
+    }
+
+    property bool connected: false
+    property bool connecting: false
+    property bool subscribed: false
+    property int apiVersion: 0
+    property var capabilities: []
+
     property var accounts: []
-    property int unreadTotal: 0
+    property var threads: []
+    property var currentThread: null
+    property bool threadsLoading: false
+    property bool dndEnabled: false
+
+    // Triage filters (drive refreshThreads).
+    property bool filterUnread: false
+    property bool filterStarred: false
+    property string filterAccount: ""
+
+    readonly property int unreadTotal: {
+        let n = 0;
+        for (const a of accounts)
+            n += a.unread || 0;
+        return n;
+    }
+
+    readonly property var accountPalette: ["#7287fd", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#89dceb"]
+
+    function accountColor(accountId) {
+        for (let i = 0; i < accounts.length; i++) {
+            if (accounts[i].id === accountId)
+                return accountPalette[i % accountPalette.length];
+        }
+        return accountPalette[0];
+    }
+
+    function accountEmail(accountId) {
+        for (const a of accounts) {
+            if (a.id === accountId)
+                return a.email;
+        }
+        return "";
+    }
+
+    property var pendingRequests: ({})
+    property int requestCounter: 0
+
+    signal connectionStateChanged
+    signal windowActionRequested(string action)
+    signal opFailed(string opType, string error)
+
+    Component.onCompleted: socketProbe.running = true
+
+    // Reprobe while the daemon is down so the UI self-heals.
+    Timer {
+        id: probeRetry
+        interval: 3000
+        repeat: false
+        onTriggered: socketProbe.running = true
+    }
+
+    Process {
+        id: socketProbe
+        command: ["test", "-S", root.socketPath]
+        running: false
+        onExited: code => {
+            if (code === 0) {
+                root.connectSocket();
+            } else {
+                probeRetry.restart();
+            }
+        }
+    }
+
+    function connectSocket() {
+        if (connected || connecting)
+            return;
+        connecting = true;
+        requestSocket.connected = true;
+    }
+
+    DankSocket {
+        id: requestSocket
+        path: root.socketPath
+        connected: false
+
+        onConnectionStateChanged: {
+            if (connected) {
+                root.connected = true;
+                root.connecting = false;
+                root.connectionStateChanged();
+                subscribeSocket.connected = true;
+                root.refreshAll();
+            } else {
+                root.connected = false;
+                root.connecting = false;
+                root.connectionStateChanged();
+                probeRetry.restart();
+            }
+        }
+
+        parser: SplitParser {
+            onRead: line => {
+                if (!line || line.length === 0)
+                    return;
+                let response;
+                try {
+                    response = JSON.parse(line);
+                } catch (e) {
+                    root.log.warn("bad response", line.substring(0, 200));
+                    return;
+                }
+                root._handleResponse(response);
+            }
+        }
+    }
+
+    DankSocket {
+        id: subscribeSocket
+        path: root.socketPath
+        connected: false
+
+        onConnectionStateChanged: {
+            root.subscribed = connected;
+            if (connected)
+                subscribeSocket.send({
+                    "id": root._nextId(),
+                    "method": "subscribe"
+                });
+        }
+
+        parser: SplitParser {
+            onRead: line => {
+                if (!line || line.length === 0)
+                    return;
+                let event;
+                try {
+                    event = JSON.parse(line);
+                } catch (e) {
+                    return;
+                }
+                root._handleEvent(event);
+            }
+        }
+    }
+
+    function _nextId() {
+        requestCounter++;
+        return requestCounter;
+    }
+
+    function _handleResponse(response) {
+        // First line of every connection is the capabilities handshake.
+        if (response.apiVersion !== undefined) {
+            apiVersion = response.apiVersion;
+            capabilities = response.features || [];
+            return;
+        }
+        const cb = pendingRequests[response.id];
+        if (cb) {
+            delete pendingRequests[response.id];
+            cb(response);
+        }
+    }
+
+    function _handleEvent(event) {
+        switch (event.topic) {
+        case "threads.changed":
+        case "unread.changed":
+        case "snooze.woke":
+            refreshDebounce.restart();
+            break;
+        case "account.auth":
+            refreshAccounts();
+            break;
+        case "dnd.changed":
+            dndEnabled = !!(event.payload && event.payload.enabled);
+            break;
+        case "ui.show":
+            windowActionRequested("show");
+            break;
+        case "ui.toggle":
+            windowActionRequested("toggle");
+            break;
+        case "op.failed":
+            {
+                const p = event.payload || {};
+                opFailed(p.opType || "", p.error || "");
+                refreshDebounce.restart();
+                break;
+            }
+        }
+    }
+
+    Timer {
+        id: refreshDebounce
+        interval: 300
+        repeat: false
+        onTriggered: {
+            root.refreshAccounts();
+            root.refreshThreads();
+            root.reloadCurrentThread();
+        }
+    }
+
+    function sendRequest(method, params, callback) {
+        if (!connected) {
+            if (callback)
+                callback({
+                    "error": "not connected to dmail daemon"
+                });
+            return;
+        }
+        const id = _nextId();
+        if (callback)
+            pendingRequests[id] = callback;
+        requestSocket.send({
+            "id": id,
+            "method": method,
+            "params": params || {}
+        });
+    }
+
+    // ---- reads ---------------------------------------------------------
+
+    function refreshAll() {
+        refreshAccounts();
+        refreshThreads();
+        refreshDnd();
+    }
+
+    function refreshAccounts() {
+        sendRequest("accounts.list", null, resp => {
+            if (resp.error) {
+                log.warn("accounts.list:", resp.error);
+                return;
+            }
+            accounts = resp.result || [];
+        });
+    }
+
+    function refreshThreads() {
+        threadsLoading = true;
+        const params = {
+            "inbox": true,
+            "limit": 200
+        };
+        if (filterUnread)
+            params.unread = true;
+        if (filterStarred)
+            params.starred = true;
+        if (filterAccount !== "")
+            params.account = filterAccount;
+        sendRequest("threads.list", params, resp => {
+            threadsLoading = false;
+            if (resp.error) {
+                log.warn("threads.list:", resp.error);
+                return;
+            }
+            threads = resp.result || [];
+        });
+    }
+
+    function loadThread(id, markRead) {
+        sendRequest("threads.get", {
+            "id": id
+        }, resp => {
+            if (resp.error) {
+                log.warn("threads.get:", resp.error);
+                return;
+            }
+            currentThread = resp.result;
+            if (markRead)
+                sendRequest("threads.previewOpened", {
+                    "id": id
+                }, null);
+        });
+    }
+
+    function reloadCurrentThread() {
+        if (currentThread)
+            loadThread(currentThread.id, false);
+    }
+
+    // ---- triage ops (optimistic on the daemon side) ---------------------
+
+    function _op(method, ids) {
+        sendRequest(method, {
+            "ids": ids
+        }, resp => {
+            if (resp.error)
+                log.warn(method + ":", resp.error);
+            refreshDebounce.restart();
+        });
+    }
+
+    function markRead(ids) {
+        _op("ops.markRead", ids);
+    }
+    function markUnread(ids) {
+        _op("ops.markUnread", ids);
+    }
+    function star(ids) {
+        _op("ops.star", ids);
+    }
+    function unstar(ids) {
+        _op("ops.unstar", ids);
+    }
+    function archive(ids) {
+        _op("ops.archive", ids);
+    }
+    function trash(ids) {
+        _op("ops.trash", ids);
+    }
+
+    function snooze(ids, untilDate) {
+        sendRequest("ops.snooze", {
+            "ids": ids,
+            "until": untilDate.toISOString()
+        }, resp => {
+            if (resp.error)
+                log.warn("ops.snooze:", resp.error);
+            refreshDebounce.restart();
+        });
+    }
+
+    function openWeb(id) {
+        sendRequest("ui.openLink", {
+            "id": id
+        }, null);
+    }
+
+    function syncNow() {
+        sendRequest("system.sync", {}, resp => {
+            if (resp.error)
+                log.warn("system.sync:", resp.error);
+        });
+    }
+
+    function refreshDnd() {
+        sendRequest("dnd.status", null, resp => {
+            if (!resp.error && resp.result)
+                dndEnabled = !!resp.result.enabled;
+        });
+    }
+
+    function setDnd(enabled) {
+        sendRequest(enabled ? "dnd.on" : "dnd.off", null, () => refreshDnd());
+    }
+
+    function quit() {
+        sendRequest("system.exit", null, null);
+        Qt.quit();
+    }
 }

@@ -1,1 +1,39 @@
-{}
+{
+  "tray tooltip": {
+    "unread": "sin leer"
+  },
+  "tray menu": {
+    "Open Dank Mail": "Abrir Dank Mail",
+    "Sync now": "Sincronizar ahora",
+    "Enable do-not-disturb": "Activar no molestar",
+    "Disable do-not-disturb": "Desactivar no molestar",
+    "Quit": "Salir"
+  },
+  "filter": {
+    "All": "Todos",
+    "Unread": "No leídos",
+    "Starred": "Destacados"
+  },
+  "header status": {
+    "Daemon offline": "Daemon desconectado"
+  },
+  "thread list": {
+    "(no subject)": "(sin asunto)"
+  },
+  "empty state": {
+    "Inbox zero": "Bandeja en cero",
+    "Daemon offline": "Daemon desconectado"
+  },
+  "empty preview": {
+    "Select a thread": "Selecciona un hilo"
+  },
+  "snooze": {
+    "In 1 hour": "En 1 hora",
+    "This evening": "Esta tarde",
+    "Tomorrow": "Mañana",
+    "Next week": "Próxima semana"
+  },
+  "preview footer": {
+    "Plain-text preview — open in web for the full message.": "Vista previa en texto plano — abre en web para el mensaje completo."
+  }
+}
