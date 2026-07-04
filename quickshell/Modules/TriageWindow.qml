@@ -825,31 +825,35 @@ FloatingWindow {
                                 }
                             }
 
-                            RowLayout {
+                            // The pickers are width-less Items by design
+                            // (dcal pattern): they collapse unless the
+                            // parent sizes them explicitly. Flow wraps
+                            // them on narrow panes instead of clipping.
+                            Flow {
                                 visible: snoozeMenu.showCustom
                                 Layout.fillWidth: true
                                 spacing: Theme.spacingS
 
                                 DankDatePicker {
+                                    width: 210
+                                    height: 40
                                     selectedDate: snoozeMenu.customDate
                                     onDateSelected: value => snoozeMenu.customDate = value
                                 }
 
                                 DankTimePicker {
+                                    width: 140
+                                    height: 40
                                     minutes: snoozeMenu.customMinutes
                                     use24Hour: true
                                     onTimeSelected: value => snoozeMenu.customMinutes = value
                                 }
 
-                                Item {
-                                    Layout.fillWidth: true
-                                }
-
                                 StyledRect {
                                     readonly property bool ready: snoozeMenu.customUntil() > new Date()
                                     width: confirmLabel.implicitWidth + Theme.spacingXL
-                                    height: 32
-                                    radius: 16
+                                    height: 40
+                                    radius: 20
                                     color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
                                     opacity: ready ? 1 : 0.6
 
