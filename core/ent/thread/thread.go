@@ -34,6 +34,8 @@ const (
 	FieldSnoozedUntil = "snoozed_until"
 	// FieldMessageCount holds the string denoting the message_count field in the database.
 	FieldMessageCount = "message_count"
+	// FieldHasAttachments holds the string denoting the has_attachments field in the database.
+	FieldHasAttachments = "has_attachments"
 	// EdgeAccount holds the string denoting the account edge name in mutations.
 	EdgeAccount = "account"
 	// EdgeMessages holds the string denoting the messages edge name in mutations.
@@ -70,6 +72,7 @@ var Columns = []string{
 	FieldLabels,
 	FieldSnoozedUntil,
 	FieldMessageCount,
+	FieldHasAttachments,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "threads"
@@ -110,6 +113,8 @@ var (
 	DefaultLabels []string
 	// DefaultMessageCount holds the default value on creation for the "message_count" field.
 	DefaultMessageCount int
+	// DefaultHasAttachments holds the default value on creation for the "has_attachments" field.
+	DefaultHasAttachments bool
 )
 
 // OrderOption defines the ordering options for the Thread queries.
@@ -163,6 +168,11 @@ func BySnoozedUntil(opts ...sql.OrderTermOption) OrderOption {
 // ByMessageCount orders the results by the message_count field.
 func ByMessageCount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMessageCount, opts...).ToFunc()
+}
+
+// ByHasAttachments orders the results by the has_attachments field.
+func ByHasAttachments(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHasAttachments, opts...).ToFunc()
 }
 
 // ByAccountField orders the results by account field.

@@ -775,3 +775,66 @@ func TestCapabilitiesAndID(t *testing.T) {
 
 // Compile-time check: *Provider satisfies provider.Provider.
 var _ provider.Provider = (*Provider)(nil)
+
+// ---- html fallback + attachment metadata -------------------------------
+
+func TestMessageDeltaHTMLFallbackAndAttachments(t *testing.T) {
+	p := newTestProvider(&fakeAPI{}, Options{})
+	m := &gmailv1.Message{
+		Id:           "m1",
+		InternalDate: 1_700_000_000_000,
+		Payload: &gmailv1.MessagePart{
+			MimeType: "multipart/mixed",
+			Headers: []*gmailv1.MessagePartHeader{
+				{Name: "From", Value: "Ada <ada@example.com>"},
+			},
+			Parts: []*gmailv1.MessagePart{
+				{
+					MimeType: "text/html",
+					Body:     &gmailv1.MessagePartBody{Data: b64("<p>Hola <b>mundo</b></p>")},
+				},
+				{
+					MimeType: "application/pdf",
+					Filename: "informe.pdf",
+					Body:     &gmailv1.MessagePartBody{AttachmentId: "a1", Size: 12345},
+				},
+				{
+					MimeType: "image/png",
+					Filename: "logo.png", // inline signature image: metadata only
+					Body:     &gmailv1.MessagePartBody{AttachmentId: "a2", Size: 999},
+				},
+			},
+		},
+	}
+	d := p.messageDelta(m)
+
+	if !strings.Contains(d.BodyText, "Hola") || !strings.Contains(d.BodyText, "mundo") {
+		t.Errorf("html fallback body = %q, want distilled text", d.BodyText)
+	}
+	if strings.Contains(d.BodyText, "<p>") {
+		t.Errorf("body still contains HTML tags: %q", d.BodyText)
+	}
+	if len(d.Attachments) != 2 {
+		t.Fatalf("attachments = %d, want 2", len(d.Attachments))
+	}
+	if d.Attachments[0].Filename != "informe.pdf" || d.Attachments[0].Size != 12345 || d.Attachments[0].MimeType != "application/pdf" {
+		t.Errorf("attachment[0] = %+v", d.Attachments[0])
+	}
+}
+
+func TestMessageDeltaPlainTextPreferredOverHTML(t *testing.T) {
+	p := newTestProvider(&fakeAPI{}, Options{})
+	m := &gmailv1.Message{
+		Id: "m2",
+		Payload: &gmailv1.MessagePart{
+			MimeType: "multipart/alternative",
+			Parts: []*gmailv1.MessagePart{
+				{MimeType: "text/plain", Body: &gmailv1.MessagePartBody{Data: b64("texto plano")}},
+				{MimeType: "text/html", Body: &gmailv1.MessagePartBody{Data: b64("<p>html</p>")}},
+			},
+		},
+	}
+	if d := p.messageDelta(m); d.BodyText != "texto plano" {
+		t.Errorf("body = %q, want the text/plain part untouched", d.BodyText)
+	}
+}

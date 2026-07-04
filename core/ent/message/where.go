@@ -450,6 +450,16 @@ func BodyTextContainsFold(v string) predicate.Message {
 	return predicate.Message(sql.FieldContainsFold(FieldBodyText, v))
 }
 
+// AttachmentsIsNil applies the IsNil predicate on the "attachments" field.
+func AttachmentsIsNil() predicate.Message {
+	return predicate.Message(sql.FieldIsNull(FieldAttachments))
+}
+
+// AttachmentsNotNil applies the NotNil predicate on the "attachments" field.
+func AttachmentsNotNil() predicate.Message {
+	return predicate.Message(sql.FieldNotNull(FieldAttachments))
+}
+
 // HasThread applies the HasEdge predicate on the "thread" edge.
 func HasThread() predicate.Message {
 	return predicate.Message(func(s *sql.Selector) {

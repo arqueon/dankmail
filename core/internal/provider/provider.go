@@ -88,6 +88,15 @@ type ThreadDelta struct {
 	Messages []MessageDelta
 }
 
+// AttachmentMeta describes an attachment WITHOUT its content: dankmail
+// never downloads attachment bodies (spec §1); the metadata lets the UI
+// show what a message carries so the user can decide to open the webmail.
+type AttachmentMeta struct {
+	Filename string `json:"filename"`
+	MimeType string `json:"mimeType"`
+	Size     int64  `json:"size"` // bytes, provider-reported
+}
+
 // MessageDelta is the remote state of one message.
 type MessageDelta struct {
 	MessageID       string // provider-native message ID
@@ -98,6 +107,8 @@ type MessageDelta struct {
 	Date            int64 // unix seconds
 	Snippet         string
 	BodyText        string // plain text, already truncated by the provider to the configured cap
+	// Attachments carries metadata only — never content.
+	Attachments []AttachmentMeta
 	// ReplyHeaders holds the minimal headers needed to build a threaded
 	// reply later (References, In-Reply-To source). Keyed by canonical
 	// header name.

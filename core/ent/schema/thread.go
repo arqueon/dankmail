@@ -31,6 +31,9 @@ func (Thread) Fields() []ent.Field {
 		// by the daemon scheduler when this time passes. Null = not snoozed.
 		field.Time("snoozed_until").Optional().Nillable(),
 		field.Int("message_count").Default(0),
+		// Any message in the thread carries attachments (paperclip in
+		// the list). Metadata-derived; content never stored.
+		field.Bool("has_attachments").Default(false),
 	}
 }
 

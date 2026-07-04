@@ -55,6 +55,36 @@ FloatingWindow {
         return d;
     }
 
+    function formatSize(bytes) {
+        if (!bytes || bytes <= 0)
+            return "";
+        if (bytes < 1024)
+            return bytes + " B";
+        if (bytes < 1024 * 1024)
+            return (bytes / 1024).toFixed(0) + " KB";
+        return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+    }
+
+    // threadAttachments aggregates unique attachment metadata across the
+    // whole thread (content never leaves the webmail).
+    function threadAttachments() {
+        const t = DankMailService.currentThread;
+        if (!t || !t.messages)
+            return [];
+        const seen = {};
+        const out = [];
+        for (const m of t.messages) {
+            for (const a of (m.attachments || [])) {
+                const key = a.filename + "|" + a.size;
+                if (!seen[key]) {
+                    seen[key] = true;
+                    out.push(a);
+                }
+            }
+        }
+        return out;
+    }
+
     function timeLabel(iso) {
         const d = new Date(iso);
         const now = new Date();
@@ -411,6 +441,13 @@ FloatingWindow {
                             }
 
                             DankIcon {
+                                visible: row.modelData.hasAttachments === true
+                                name: "attach_file"
+                                size: Theme.iconSizeSmall
+                                color: Theme.surfaceTextMedium
+                            }
+
+                            DankIcon {
                                 name: "star"
                                 filled: row.modelData.starred
                                 size: Theme.iconSizeSmall
@@ -556,6 +593,56 @@ FloatingWindow {
                                 font.pixelSize: Theme.fontSizeSmall
                                 color: Theme.surfaceTextAlpha
                                 maximumLineCount: 1
+                            }
+                        }
+                    }
+
+                    // Attachment chips: metadata only; clicking opens the
+                    // thread in the webmail (content stays there, spec §1).
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingS
+                        visible: window.threadAttachments().length > 0
+
+                        Repeater {
+                            model: window.threadAttachments()
+
+                            delegate: StyledRect {
+                                id: attachChip
+                                required property var modelData
+                                width: attachRow.implicitWidth + Theme.spacingL
+                                height: 30
+                                radius: 15
+                                color: Theme.surfaceContainerHigh
+                                border.width: 1
+                                border.color: Theme.outlineMedium
+
+                                RowLayout {
+                                    id: attachRow
+                                    anchors.centerIn: parent
+                                    spacing: Theme.spacingXS
+
+                                    DankIcon {
+                                        name: attachChip.modelData.mimeType && attachChip.modelData.mimeType.startsWith("image/") ? "image" : "description"
+                                        size: Theme.iconSizeSmall
+                                        color: Theme.primary
+                                    }
+
+                                    StyledText {
+                                        text: attachChip.modelData.filename + (window.formatSize(attachChip.modelData.size) !== "" ? "  ·  " + window.formatSize(attachChip.modelData.size) : "")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        maximumLineCount: 1
+                                    }
+                                }
+
+                                StateLayer {
+                                    stateColor: Theme.primary
+                                    onClicked: {
+                                        const t = DankMailService.currentThread;
+                                        if (t)
+                                            DankMailService.openWeb(t.id);
+                                    }
+                                }
                             }
                         }
                     }

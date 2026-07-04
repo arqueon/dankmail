@@ -196,6 +196,20 @@ func (_u *ThreadUpdate) AddMessageCount(v int) *ThreadUpdate {
 	return _u
 }
 
+// SetHasAttachments sets the "has_attachments" field.
+func (_u *ThreadUpdate) SetHasAttachments(v bool) *ThreadUpdate {
+	_u.mutation.SetHasAttachments(v)
+	return _u
+}
+
+// SetNillableHasAttachments sets the "has_attachments" field if the given value is not nil.
+func (_u *ThreadUpdate) SetNillableHasAttachments(v *bool) *ThreadUpdate {
+	if v != nil {
+		_u.SetHasAttachments(*v)
+	}
+	return _u
+}
+
 // SetAccountID sets the "account" edge to the Account entity by ID.
 func (_u *ThreadUpdate) SetAccountID(id uuid.UUID) *ThreadUpdate {
 	_u.mutation.SetAccountID(id)
@@ -355,6 +369,9 @@ func (_u *ThreadUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedMessageCount(); ok {
 		_spec.AddField(thread.FieldMessageCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.HasAttachments(); ok {
+		_spec.SetField(thread.FieldHasAttachments, field.TypeBool, value)
 	}
 	if _u.mutation.AccountCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -615,6 +632,20 @@ func (_u *ThreadUpdateOne) AddMessageCount(v int) *ThreadUpdateOne {
 	return _u
 }
 
+// SetHasAttachments sets the "has_attachments" field.
+func (_u *ThreadUpdateOne) SetHasAttachments(v bool) *ThreadUpdateOne {
+	_u.mutation.SetHasAttachments(v)
+	return _u
+}
+
+// SetNillableHasAttachments sets the "has_attachments" field if the given value is not nil.
+func (_u *ThreadUpdateOne) SetNillableHasAttachments(v *bool) *ThreadUpdateOne {
+	if v != nil {
+		_u.SetHasAttachments(*v)
+	}
+	return _u
+}
+
 // SetAccountID sets the "account" edge to the Account entity by ID.
 func (_u *ThreadUpdateOne) SetAccountID(id uuid.UUID) *ThreadUpdateOne {
 	_u.mutation.SetAccountID(id)
@@ -804,6 +835,9 @@ func (_u *ThreadUpdateOne) sqlSave(ctx context.Context) (_node *Thread, err erro
 	}
 	if value, ok := _u.mutation.AddedMessageCount(); ok {
 		_spec.AddField(thread.FieldMessageCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.HasAttachments(); ok {
+		_spec.SetField(thread.FieldHasAttachments, field.TypeBool, value)
 	}
 	if _u.mutation.AccountCleared() {
 		edge := &sqlgraph.EdgeSpec{

@@ -68,7 +68,7 @@ func (r *Repo) GetThread(ctx context.Context, id int) (*models.ThreadDetail, err
 	}
 	d := &models.ThreadDetail{ThreadSummary: threadSummary(t)}
 	for _, m := range t.Edges.Messages {
-		d.Messages = append(d.Messages, models.MessageView{
+		mv := models.MessageView{
 			ID:                m.ID,
 			ProviderMessageID: m.ProviderMessageID,
 			From:              m.From,
@@ -77,7 +77,13 @@ func (r *Repo) GetThread(ctx context.Context, id int) (*models.ThreadDetail, err
 			Date:              m.Date,
 			Snippet:           m.Snippet,
 			BodyText:          m.BodyText,
-		})
+		}
+		for _, a := range m.Attachments {
+			mv.Attachments = append(mv.Attachments, models.AttachmentView{
+				Filename: a.Filename, MimeType: a.MimeType, Size: a.Size,
+			})
+		}
+		d.Messages = append(d.Messages, mv)
 	}
 	return d, nil
 }
@@ -147,6 +153,7 @@ func threadSummary(t *ent.Thread) models.ThreadSummary {
 		InInbox:          t.InInbox,
 		SnoozedUntil:     t.SnoozedUntil,
 		MessageCount:     t.MessageCount,
+		HasAttachments:   t.HasAttachments,
 	}
 	if t.Edges.Account != nil {
 		s.AccountID = t.Edges.Account.ID.String()

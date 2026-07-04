@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dankmail/core/internal/provider"
 )
 
 // MessageCreate is the builder for creating a Message entity.
@@ -106,6 +107,12 @@ func (_c *MessageCreate) SetNillableBodyText(v *string) *MessageCreate {
 // SetReplyHeaders sets the "reply_headers" field.
 func (_c *MessageCreate) SetReplyHeaders(v map[string]string) *MessageCreate {
 	_c.mutation.SetReplyHeaders(v)
+	return _c
+}
+
+// SetAttachments sets the "attachments" field.
+func (_c *MessageCreate) SetAttachments(v []provider.AttachmentMeta) *MessageCreate {
+	_c.mutation.SetAttachments(v)
 	return _c
 }
 
@@ -279,6 +286,10 @@ func (_c *MessageCreate) createSpec() (*Message, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ReplyHeaders(); ok {
 		_spec.SetField(message.FieldReplyHeaders, field.TypeJSON, value)
 		_node.ReplyHeaders = value
+	}
+	if value, ok := _c.mutation.Attachments(); ok {
+		_spec.SetField(message.FieldAttachments, field.TypeJSON, value)
+		_node.Attachments = value
 	}
 	if nodes := _c.mutation.ThreadIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -457,6 +468,24 @@ func (u *MessageUpsert) UpdateReplyHeaders() *MessageUpsert {
 	return u
 }
 
+// SetAttachments sets the "attachments" field.
+func (u *MessageUpsert) SetAttachments(v []provider.AttachmentMeta) *MessageUpsert {
+	u.Set(message.FieldAttachments, v)
+	return u
+}
+
+// UpdateAttachments sets the "attachments" field to the value that was provided on create.
+func (u *MessageUpsert) UpdateAttachments() *MessageUpsert {
+	u.SetExcluded(message.FieldAttachments)
+	return u
+}
+
+// ClearAttachments clears the value of the "attachments" field.
+func (u *MessageUpsert) ClearAttachments() *MessageUpsert {
+	u.SetNull(message.FieldAttachments)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -620,6 +649,27 @@ func (u *MessageUpsertOne) SetReplyHeaders(v map[string]string) *MessageUpsertOn
 func (u *MessageUpsertOne) UpdateReplyHeaders() *MessageUpsertOne {
 	return u.Update(func(s *MessageUpsert) {
 		s.UpdateReplyHeaders()
+	})
+}
+
+// SetAttachments sets the "attachments" field.
+func (u *MessageUpsertOne) SetAttachments(v []provider.AttachmentMeta) *MessageUpsertOne {
+	return u.Update(func(s *MessageUpsert) {
+		s.SetAttachments(v)
+	})
+}
+
+// UpdateAttachments sets the "attachments" field to the value that was provided on create.
+func (u *MessageUpsertOne) UpdateAttachments() *MessageUpsertOne {
+	return u.Update(func(s *MessageUpsert) {
+		s.UpdateAttachments()
+	})
+}
+
+// ClearAttachments clears the value of the "attachments" field.
+func (u *MessageUpsertOne) ClearAttachments() *MessageUpsertOne {
+	return u.Update(func(s *MessageUpsert) {
+		s.ClearAttachments()
 	})
 }
 
@@ -950,6 +1000,27 @@ func (u *MessageUpsertBulk) SetReplyHeaders(v map[string]string) *MessageUpsertB
 func (u *MessageUpsertBulk) UpdateReplyHeaders() *MessageUpsertBulk {
 	return u.Update(func(s *MessageUpsert) {
 		s.UpdateReplyHeaders()
+	})
+}
+
+// SetAttachments sets the "attachments" field.
+func (u *MessageUpsertBulk) SetAttachments(v []provider.AttachmentMeta) *MessageUpsertBulk {
+	return u.Update(func(s *MessageUpsert) {
+		s.SetAttachments(v)
+	})
+}
+
+// UpdateAttachments sets the "attachments" field to the value that was provided on create.
+func (u *MessageUpsertBulk) UpdateAttachments() *MessageUpsertBulk {
+	return u.Update(func(s *MessageUpsert) {
+		s.UpdateAttachments()
+	})
+}
+
+// ClearAttachments clears the value of the "attachments" field.
+func (u *MessageUpsertBulk) ClearAttachments() *MessageUpsertBulk {
+	return u.Update(func(s *MessageUpsert) {
+		s.ClearAttachments()
 	})
 }
 

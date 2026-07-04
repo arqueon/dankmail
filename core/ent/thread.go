@@ -42,6 +42,8 @@ type Thread struct {
 	SnoozedUntil *time.Time `json:"snoozed_until,omitempty"`
 	// MessageCount holds the value of the "message_count" field.
 	MessageCount int `json:"message_count,omitempty"`
+	// HasAttachments holds the value of the "has_attachments" field.
+	HasAttachments bool `json:"has_attachments,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the ThreadQuery when eager-loading is set.
 	Edges           ThreadEdges `json:"edges"`
@@ -87,7 +89,7 @@ func (*Thread) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case thread.FieldParticipants, thread.FieldLabels:
 			values[i] = new([]byte)
-		case thread.FieldUnread, thread.FieldStarred, thread.FieldInInbox:
+		case thread.FieldUnread, thread.FieldStarred, thread.FieldInInbox, thread.FieldHasAttachments:
 			values[i] = new(sql.NullBool)
 		case thread.FieldID, thread.FieldMessageCount:
 			values[i] = new(sql.NullInt64)
@@ -189,6 +191,12 @@ func (_m *Thread) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.MessageCount = int(value.Int64)
 			}
+		case thread.FieldHasAttachments:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field has_attachments", values[i])
+			} else if value.Valid {
+				_m.HasAttachments = value.Bool
+			}
 		case thread.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field account_threads", values[i])
@@ -276,6 +284,9 @@ func (_m *Thread) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("message_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MessageCount))
+	builder.WriteString(", ")
+	builder.WriteString("has_attachments=")
+	builder.WriteString(fmt.Sprintf("%v", _m.HasAttachments))
 	builder.WriteByte(')')
 	return builder.String()
 }

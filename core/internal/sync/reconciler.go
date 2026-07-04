@@ -195,16 +195,30 @@ func upsertThread(ctx context.Context, tx *ent.Tx, accountID uuid.UUID, d provid
 
 	var arrivals []map[string]any
 	for _, m := range d.Messages {
-		exists, err := tx.Message.Query().
+		existing, err := tx.Message.Query().
 			Where(
 				message.HasThreadWith(thread.IDEQ(row.ID)),
 				message.ProviderMessageIDEQ(m.MessageID),
 			).
-			Exist(ctx)
-		if err != nil {
+			First(ctx)
+		if err != nil && !ent.IsNotFound(err) {
 			return nil, err
 		}
-		if exists {
+		if existing != nil {
+			// Backfill attachment metadata for messages ingested before
+			// the feature existed (full resyncs re-deliver them).
+			if len(m.Attachments) > 0 && len(existing.Attachments) == 0 {
+				if _, err := tx.Message.UpdateOne(existing).
+					SetAttachments(m.Attachments).
+					Save(ctx); err != nil {
+					return nil, err
+				}
+				if !row.HasAttachments {
+					if row, err = tx.Thread.UpdateOne(row).SetHasAttachments(true).Save(ctx); err != nil {
+						return nil, err
+					}
+				}
+			}
 			continue
 		}
 		if _, err := tx.Message.Create().
@@ -218,8 +232,14 @@ func upsertThread(ctx context.Context, tx *ent.Tx, accountID uuid.UUID, d provid
 			SetSnippet(m.Snippet).
 			SetBodyText(m.BodyText).
 			SetReplyHeaders(replyHeaders(m)).
+			SetAttachments(m.Attachments).
 			Save(ctx); err != nil {
 			return nil, err
+		}
+		if len(m.Attachments) > 0 && !row.HasAttachments {
+			if row, err = tx.Thread.UpdateOne(row).SetHasAttachments(true).Save(ctx); err != nil {
+				return nil, err
+			}
 		}
 		if notify {
 			arrivals = append(arrivals, map[string]any{

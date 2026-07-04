@@ -17,6 +17,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/pendingop"
 	"github.com/arqueon/dankmail/core/ent/predicate"
 	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dankmail/core/internal/provider"
 	"github.com/google/uuid"
 )
 
@@ -1098,6 +1099,8 @@ type MessageMutation struct {
 	snippet             *string
 	body_text           *string
 	reply_headers       *map[string]string
+	attachments         *[]provider.AttachmentMeta
+	appendattachments   []provider.AttachmentMeta
 	clearedFields       map[string]struct{}
 	thread              *int
 	clearedthread       bool
@@ -1558,6 +1561,71 @@ func (m *MessageMutation) ResetReplyHeaders() {
 	m.reply_headers = nil
 }
 
+// SetAttachments sets the "attachments" field.
+func (m *MessageMutation) SetAttachments(pm []provider.AttachmentMeta) {
+	m.attachments = &pm
+	m.appendattachments = nil
+}
+
+// Attachments returns the value of the "attachments" field in the mutation.
+func (m *MessageMutation) Attachments() (r []provider.AttachmentMeta, exists bool) {
+	v := m.attachments
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAttachments returns the old "attachments" field's value of the Message entity.
+// If the Message object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MessageMutation) OldAttachments(ctx context.Context) (v []provider.AttachmentMeta, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAttachments is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAttachments requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAttachments: %w", err)
+	}
+	return oldValue.Attachments, nil
+}
+
+// AppendAttachments adds pm to the "attachments" field.
+func (m *MessageMutation) AppendAttachments(pm []provider.AttachmentMeta) {
+	m.appendattachments = append(m.appendattachments, pm...)
+}
+
+// AppendedAttachments returns the list of values that were appended to the "attachments" field in this mutation.
+func (m *MessageMutation) AppendedAttachments() ([]provider.AttachmentMeta, bool) {
+	if len(m.appendattachments) == 0 {
+		return nil, false
+	}
+	return m.appendattachments, true
+}
+
+// ClearAttachments clears the value of the "attachments" field.
+func (m *MessageMutation) ClearAttachments() {
+	m.attachments = nil
+	m.appendattachments = nil
+	m.clearedFields[message.FieldAttachments] = struct{}{}
+}
+
+// AttachmentsCleared returns if the "attachments" field was cleared in this mutation.
+func (m *MessageMutation) AttachmentsCleared() bool {
+	_, ok := m.clearedFields[message.FieldAttachments]
+	return ok
+}
+
+// ResetAttachments resets all changes to the "attachments" field.
+func (m *MessageMutation) ResetAttachments() {
+	m.attachments = nil
+	m.appendattachments = nil
+	delete(m.clearedFields, message.FieldAttachments)
+}
+
 // SetThreadID sets the "thread" edge to the Thread entity by id.
 func (m *MessageMutation) SetThreadID(id int) {
 	m.thread = &id
@@ -1631,7 +1699,7 @@ func (m *MessageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MessageMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.provider_message_id != nil {
 		fields = append(fields, message.FieldProviderMessageID)
 	}
@@ -1659,6 +1727,9 @@ func (m *MessageMutation) Fields() []string {
 	if m.reply_headers != nil {
 		fields = append(fields, message.FieldReplyHeaders)
 	}
+	if m.attachments != nil {
+		fields = append(fields, message.FieldAttachments)
+	}
 	return fields
 }
 
@@ -1685,6 +1756,8 @@ func (m *MessageMutation) Field(name string) (ent.Value, bool) {
 		return m.BodyText()
 	case message.FieldReplyHeaders:
 		return m.ReplyHeaders()
+	case message.FieldAttachments:
+		return m.Attachments()
 	}
 	return nil, false
 }
@@ -1712,6 +1785,8 @@ func (m *MessageMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldBodyText(ctx)
 	case message.FieldReplyHeaders:
 		return m.OldReplyHeaders(ctx)
+	case message.FieldAttachments:
+		return m.OldAttachments(ctx)
 	}
 	return nil, fmt.Errorf("unknown Message field %s", name)
 }
@@ -1784,6 +1859,13 @@ func (m *MessageMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetReplyHeaders(v)
 		return nil
+	case message.FieldAttachments:
+		v, ok := value.([]provider.AttachmentMeta)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAttachments(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Message field %s", name)
 }
@@ -1813,7 +1895,11 @@ func (m *MessageMutation) AddField(name string, value ent.Value) error {
 // ClearedFields returns all nullable fields that were cleared during this
 // mutation.
 func (m *MessageMutation) ClearedFields() []string {
-	return nil
+	var fields []string
+	if m.FieldCleared(message.FieldAttachments) {
+		fields = append(fields, message.FieldAttachments)
+	}
+	return fields
 }
 
 // FieldCleared returns a boolean indicating if a field with the given name was
@@ -1826,6 +1912,11 @@ func (m *MessageMutation) FieldCleared(name string) bool {
 // ClearField clears the value of the field with the given name. It returns an
 // error if the field is not defined in the schema.
 func (m *MessageMutation) ClearField(name string) error {
+	switch name {
+	case message.FieldAttachments:
+		m.ClearAttachments()
+		return nil
+	}
 	return fmt.Errorf("unknown Message nullable field %s", name)
 }
 
@@ -1859,6 +1950,9 @@ func (m *MessageMutation) ResetField(name string) error {
 		return nil
 	case message.FieldReplyHeaders:
 		m.ResetReplyHeaders()
+		return nil
+	case message.FieldAttachments:
+		m.ResetAttachments()
 		return nil
 	}
 	return fmt.Errorf("unknown Message field %s", name)
@@ -3412,6 +3506,7 @@ type ThreadMutation struct {
 	snoozed_until      *time.Time
 	message_count      *int
 	addmessage_count   *int
+	has_attachments    *bool
 	clearedFields      map[string]struct{}
 	account            *uuid.UUID
 	clearedaccount     bool
@@ -3980,6 +4075,42 @@ func (m *ThreadMutation) ResetMessageCount() {
 	m.addmessage_count = nil
 }
 
+// SetHasAttachments sets the "has_attachments" field.
+func (m *ThreadMutation) SetHasAttachments(b bool) {
+	m.has_attachments = &b
+}
+
+// HasAttachments returns the value of the "has_attachments" field in the mutation.
+func (m *ThreadMutation) HasAttachments() (r bool, exists bool) {
+	v := m.has_attachments
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHasAttachments returns the old "has_attachments" field's value of the Thread entity.
+// If the Thread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ThreadMutation) OldHasAttachments(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHasAttachments is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHasAttachments requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHasAttachments: %w", err)
+	}
+	return oldValue.HasAttachments, nil
+}
+
+// ResetHasAttachments resets all changes to the "has_attachments" field.
+func (m *ThreadMutation) ResetHasAttachments() {
+	m.has_attachments = nil
+}
+
 // SetAccountID sets the "account" edge to the Account entity by id.
 func (m *ThreadMutation) SetAccountID(id uuid.UUID) {
 	m.account = &id
@@ -4107,7 +4238,7 @@ func (m *ThreadMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ThreadMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.provider_thread_id != nil {
 		fields = append(fields, thread.FieldProviderThreadID)
 	}
@@ -4141,6 +4272,9 @@ func (m *ThreadMutation) Fields() []string {
 	if m.message_count != nil {
 		fields = append(fields, thread.FieldMessageCount)
 	}
+	if m.has_attachments != nil {
+		fields = append(fields, thread.FieldHasAttachments)
+	}
 	return fields
 }
 
@@ -4171,6 +4305,8 @@ func (m *ThreadMutation) Field(name string) (ent.Value, bool) {
 		return m.SnoozedUntil()
 	case thread.FieldMessageCount:
 		return m.MessageCount()
+	case thread.FieldHasAttachments:
+		return m.HasAttachments()
 	}
 	return nil, false
 }
@@ -4202,6 +4338,8 @@ func (m *ThreadMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldSnoozedUntil(ctx)
 	case thread.FieldMessageCount:
 		return m.OldMessageCount(ctx)
+	case thread.FieldHasAttachments:
+		return m.OldHasAttachments(ctx)
 	}
 	return nil, fmt.Errorf("unknown Thread field %s", name)
 }
@@ -4287,6 +4425,13 @@ func (m *ThreadMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMessageCount(v)
+		return nil
+	case thread.FieldHasAttachments:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHasAttachments(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Thread field %s", name)
@@ -4393,6 +4538,9 @@ func (m *ThreadMutation) ResetField(name string) error {
 		return nil
 	case thread.FieldMessageCount:
 		m.ResetMessageCount()
+		return nil
+	case thread.FieldHasAttachments:
+		m.ResetHasAttachments()
 		return nil
 	}
 	return fmt.Errorf("unknown Thread field %s", name)

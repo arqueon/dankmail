@@ -5,11 +5,13 @@ import (
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
+
+	"github.com/arqueon/dankmail/core/internal/provider"
 )
 
 // Message is one message inside a cached thread: metadata plus a truncated
-// plain-text body. No HTML, no attachments, no blobs — anything richer is
-// read in the webmail via deep link.
+// plain-text body and attachment METADATA. No HTML, no attachment
+// content, no blobs — anything richer is read in the webmail via deep link.
 type Message struct {
 	ent.Schema
 }
@@ -31,6 +33,9 @@ func (Message) Fields() []ent.Field {
 		// Minimal headers required to build a threaded reply later
 		// (References, In-Reply-To source), keyed by canonical name.
 		field.JSON("reply_headers", map[string]string{}).Default(map[string]string{}),
+		// Attachment metadata only (filename/mime/size) — content is
+		// never downloaded nor stored (spec §1).
+		field.JSON("attachments", []provider.AttachmentMeta{}).Optional(),
 	}
 }
 

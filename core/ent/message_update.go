@@ -15,6 +15,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/predicate"
 	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dankmail/core/internal/provider"
 )
 
 // MessageUpdate is the builder for updating Message entities.
@@ -145,6 +146,24 @@ func (_u *MessageUpdate) SetReplyHeaders(v map[string]string) *MessageUpdate {
 	return _u
 }
 
+// SetAttachments sets the "attachments" field.
+func (_u *MessageUpdate) SetAttachments(v []provider.AttachmentMeta) *MessageUpdate {
+	_u.mutation.SetAttachments(v)
+	return _u
+}
+
+// AppendAttachments appends value to the "attachments" field.
+func (_u *MessageUpdate) AppendAttachments(v []provider.AttachmentMeta) *MessageUpdate {
+	_u.mutation.AppendAttachments(v)
+	return _u
+}
+
+// ClearAttachments clears the value of the "attachments" field.
+func (_u *MessageUpdate) ClearAttachments() *MessageUpdate {
+	_u.mutation.ClearAttachments()
+	return _u
+}
+
 // SetThreadID sets the "thread" edge to the Thread entity by ID.
 func (_u *MessageUpdate) SetThreadID(id int) *MessageUpdate {
 	_u.mutation.SetThreadID(id)
@@ -256,6 +275,17 @@ func (_u *MessageUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.ReplyHeaders(); ok {
 		_spec.SetField(message.FieldReplyHeaders, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.Attachments(); ok {
+		_spec.SetField(message.FieldAttachments, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedAttachments(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, message.FieldAttachments, value)
+		})
+	}
+	if _u.mutation.AttachmentsCleared() {
+		_spec.ClearField(message.FieldAttachments, field.TypeJSON)
 	}
 	if _u.mutation.ThreadCleared() {
 		edge := &sqlgraph.EdgeSpec{
@@ -422,6 +452,24 @@ func (_u *MessageUpdateOne) SetReplyHeaders(v map[string]string) *MessageUpdateO
 	return _u
 }
 
+// SetAttachments sets the "attachments" field.
+func (_u *MessageUpdateOne) SetAttachments(v []provider.AttachmentMeta) *MessageUpdateOne {
+	_u.mutation.SetAttachments(v)
+	return _u
+}
+
+// AppendAttachments appends value to the "attachments" field.
+func (_u *MessageUpdateOne) AppendAttachments(v []provider.AttachmentMeta) *MessageUpdateOne {
+	_u.mutation.AppendAttachments(v)
+	return _u
+}
+
+// ClearAttachments clears the value of the "attachments" field.
+func (_u *MessageUpdateOne) ClearAttachments() *MessageUpdateOne {
+	_u.mutation.ClearAttachments()
+	return _u
+}
+
 // SetThreadID sets the "thread" edge to the Thread entity by ID.
 func (_u *MessageUpdateOne) SetThreadID(id int) *MessageUpdateOne {
 	_u.mutation.SetThreadID(id)
@@ -563,6 +611,17 @@ func (_u *MessageUpdateOne) sqlSave(ctx context.Context) (_node *Message, err er
 	}
 	if value, ok := _u.mutation.ReplyHeaders(); ok {
 		_spec.SetField(message.FieldReplyHeaders, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.Attachments(); ok {
+		_spec.SetField(message.FieldAttachments, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedAttachments(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, message.FieldAttachments, value)
+		})
+	}
+	if _u.mutation.AttachmentsCleared() {
+		_spec.ClearField(message.FieldAttachments, field.TypeJSON)
 	}
 	if _u.mutation.ThreadCleared() {
 		edge := &sqlgraph.EdgeSpec{

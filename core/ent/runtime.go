@@ -144,4 +144,8 @@ func init() {
 	threadDescMessageCount := threadFields[10].Descriptor()
 	// thread.DefaultMessageCount holds the default value on creation for the message_count field.
 	thread.DefaultMessageCount = threadDescMessageCount.Default.(int)
+	// threadDescHasAttachments is the schema descriptor for has_attachments field.
+	threadDescHasAttachments := threadFields[11].Descriptor()
+	// thread.DefaultHasAttachments holds the default value on creation for the has_attachments field.
+	thread.DefaultHasAttachments = threadDescHasAttachments.Default.(bool)
 }

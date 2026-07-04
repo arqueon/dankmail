@@ -147,6 +147,20 @@ func (_c *ThreadCreate) SetNillableMessageCount(v *int) *ThreadCreate {
 	return _c
 }
 
+// SetHasAttachments sets the "has_attachments" field.
+func (_c *ThreadCreate) SetHasAttachments(v bool) *ThreadCreate {
+	_c.mutation.SetHasAttachments(v)
+	return _c
+}
+
+// SetNillableHasAttachments sets the "has_attachments" field if the given value is not nil.
+func (_c *ThreadCreate) SetNillableHasAttachments(v *bool) *ThreadCreate {
+	if v != nil {
+		_c.SetHasAttachments(*v)
+	}
+	return _c
+}
+
 // SetAccountID sets the "account" edge to the Account entity by ID.
 func (_c *ThreadCreate) SetAccountID(id uuid.UUID) *ThreadCreate {
 	_c.mutation.SetAccountID(id)
@@ -240,6 +254,10 @@ func (_c *ThreadCreate) defaults() {
 		v := thread.DefaultMessageCount
 		_c.mutation.SetMessageCount(v)
 	}
+	if _, ok := _c.mutation.HasAttachments(); !ok {
+		v := thread.DefaultHasAttachments
+		_c.mutation.SetHasAttachments(v)
+	}
 }
 
 // check runs all checks and user-defined validators on the builder.
@@ -273,6 +291,9 @@ func (_c *ThreadCreate) check() error {
 	}
 	if _, ok := _c.mutation.MessageCount(); !ok {
 		return &ValidationError{Name: "message_count", err: errors.New(`ent: missing required field "Thread.message_count"`)}
+	}
+	if _, ok := _c.mutation.HasAttachments(); !ok {
+		return &ValidationError{Name: "has_attachments", err: errors.New(`ent: missing required field "Thread.has_attachments"`)}
 	}
 	if len(_c.mutation.AccountIDs()) == 0 {
 		return &ValidationError{Name: "account", err: errors.New(`ent: missing required edge "Thread.account"`)}
@@ -347,6 +368,10 @@ func (_c *ThreadCreate) createSpec() (*Thread, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.MessageCount(); ok {
 		_spec.SetField(thread.FieldMessageCount, field.TypeInt, value)
 		_node.MessageCount = value
+	}
+	if value, ok := _c.mutation.HasAttachments(); ok {
+		_spec.SetField(thread.FieldHasAttachments, field.TypeBool, value)
+		_node.HasAttachments = value
 	}
 	if nodes := _c.mutation.AccountIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -577,6 +602,18 @@ func (u *ThreadUpsert) AddMessageCount(v int) *ThreadUpsert {
 	return u
 }
 
+// SetHasAttachments sets the "has_attachments" field.
+func (u *ThreadUpsert) SetHasAttachments(v bool) *ThreadUpsert {
+	u.Set(thread.FieldHasAttachments, v)
+	return u
+}
+
+// UpdateHasAttachments sets the "has_attachments" field to the value that was provided on create.
+func (u *ThreadUpsert) UpdateHasAttachments() *ThreadUpsert {
+	u.SetExcluded(thread.FieldHasAttachments)
+	return u
+}
+
 // UpdateNewValues updates the mutable fields using the new values that were set on create.
 // Using this option is equivalent to using:
 //
@@ -782,6 +819,20 @@ func (u *ThreadUpsertOne) AddMessageCount(v int) *ThreadUpsertOne {
 func (u *ThreadUpsertOne) UpdateMessageCount() *ThreadUpsertOne {
 	return u.Update(func(s *ThreadUpsert) {
 		s.UpdateMessageCount()
+	})
+}
+
+// SetHasAttachments sets the "has_attachments" field.
+func (u *ThreadUpsertOne) SetHasAttachments(v bool) *ThreadUpsertOne {
+	return u.Update(func(s *ThreadUpsert) {
+		s.SetHasAttachments(v)
+	})
+}
+
+// UpdateHasAttachments sets the "has_attachments" field to the value that was provided on create.
+func (u *ThreadUpsertOne) UpdateHasAttachments() *ThreadUpsertOne {
+	return u.Update(func(s *ThreadUpsert) {
+		s.UpdateHasAttachments()
 	})
 }
 
@@ -1154,6 +1205,20 @@ func (u *ThreadUpsertBulk) AddMessageCount(v int) *ThreadUpsertBulk {
 func (u *ThreadUpsertBulk) UpdateMessageCount() *ThreadUpsertBulk {
 	return u.Update(func(s *ThreadUpsert) {
 		s.UpdateMessageCount()
+	})
+}
+
+// SetHasAttachments sets the "has_attachments" field.
+func (u *ThreadUpsertBulk) SetHasAttachments(v bool) *ThreadUpsertBulk {
+	return u.Update(func(s *ThreadUpsert) {
+		s.SetHasAttachments(v)
+	})
+}
+
+// UpdateHasAttachments sets the "has_attachments" field to the value that was provided on create.
+func (u *ThreadUpsertBulk) UpdateHasAttachments() *ThreadUpsertBulk {
+	return u.Update(func(s *ThreadUpsert) {
+		s.UpdateHasAttachments()
 	})
 }
 

@@ -29,7 +29,14 @@ type ThreadSummary struct {
 	InInbox          bool       `json:"inInbox"`
 	SnoozedUntil     *time.Time `json:"snoozedUntil,omitempty"`
 	MessageCount     int        `json:"messageCount"`
+	HasAttachments   bool       `json:"hasAttachments"`
 	WebLink          string     `json:"webLink,omitempty"`
+}
+
+type AttachmentView struct {
+	Filename string `json:"filename"`
+	MimeType string `json:"mimeType"`
+	Size     int64  `json:"size"`
 }
 
 type MessageView struct {
@@ -41,6 +48,8 @@ type MessageView struct {
 	Date              time.Time `json:"date"`
 	Snippet           string    `json:"snippet"`
 	BodyText          string    `json:"bodyText"`
+	// Attachments is metadata only; opening them happens in the webmail.
+	Attachments []AttachmentView `json:"attachments,omitempty"`
 }
 
 type ThreadDetail struct {

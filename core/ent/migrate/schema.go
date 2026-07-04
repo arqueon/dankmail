@@ -39,6 +39,7 @@ var (
 		{Name: "snippet", Type: field.TypeString, Default: ""},
 		{Name: "body_text", Type: field.TypeString, Size: 2147483647, Default: ""},
 		{Name: "reply_headers", Type: field.TypeJSON},
+		{Name: "attachments", Type: field.TypeJSON, Nullable: true},
 		{Name: "thread_messages", Type: field.TypeInt},
 	}
 	// MessagesTable holds the schema information for the "messages" table.
@@ -49,7 +50,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "messages_threads_messages",
-				Columns:    []*schema.Column{MessagesColumns[10]},
+				Columns:    []*schema.Column{MessagesColumns[11]},
 				RefColumns: []*schema.Column{ThreadsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -58,7 +59,7 @@ var (
 			{
 				Name:    "message_provider_message_id_thread_messages",
 				Unique:  true,
-				Columns: []*schema.Column{MessagesColumns[1], MessagesColumns[10]},
+				Columns: []*schema.Column{MessagesColumns[1], MessagesColumns[11]},
 			},
 			{
 				Name:    "message_date",
@@ -151,6 +152,7 @@ var (
 		{Name: "labels", Type: field.TypeJSON},
 		{Name: "snoozed_until", Type: field.TypeTime, Nullable: true},
 		{Name: "message_count", Type: field.TypeInt, Default: 0},
+		{Name: "has_attachments", Type: field.TypeBool, Default: false},
 		{Name: "account_threads", Type: field.TypeUUID},
 	}
 	// ThreadsTable holds the schema information for the "threads" table.
@@ -161,7 +163,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "threads_accounts_threads",
-				Columns:    []*schema.Column{ThreadsColumns[12]},
+				Columns:    []*schema.Column{ThreadsColumns[13]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -170,7 +172,7 @@ var (
 			{
 				Name:    "thread_provider_thread_id_account_threads",
 				Unique:  true,
-				Columns: []*schema.Column{ThreadsColumns[1], ThreadsColumns[12]},
+				Columns: []*schema.Column{ThreadsColumns[1], ThreadsColumns[13]},
 			},
 			{
 				Name:    "thread_last_message_at",

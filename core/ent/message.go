@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dankmail/core/internal/provider"
 )
 
 // Message is the model entity for the Message schema.
@@ -37,6 +38,8 @@ type Message struct {
 	BodyText string `json:"body_text,omitempty"`
 	// ReplyHeaders holds the value of the "reply_headers" field.
 	ReplyHeaders map[string]string `json:"reply_headers,omitempty"`
+	// Attachments holds the value of the "attachments" field.
+	Attachments []provider.AttachmentMeta `json:"attachments,omitempty"`
 	// Edges holds the relations/edges for other nodes in the graph.
 	// The values are being populated by the MessageQuery when eager-loading is set.
 	Edges           MessageEdges `json:"edges"`
@@ -69,7 +72,7 @@ func (*Message) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case message.FieldTo, message.FieldCc, message.FieldReplyHeaders:
+		case message.FieldTo, message.FieldCc, message.FieldReplyHeaders, message.FieldAttachments:
 			values[i] = new([]byte)
 		case message.FieldID:
 			values[i] = new(sql.NullInt64)
@@ -160,6 +163,14 @@ func (_m *Message) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field reply_headers: %w", err)
 				}
 			}
+		case message.FieldAttachments:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field attachments", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Attachments); err != nil {
+					return fmt.Errorf("unmarshal field attachments: %w", err)
+				}
+			}
 		case message.ForeignKeys[0]:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for edge-field thread_messages", value)
@@ -234,6 +245,9 @@ func (_m *Message) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("reply_headers=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ReplyHeaders))
+	builder.WriteString(", ")
+	builder.WriteString("attachments=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Attachments))
 	builder.WriteByte(')')
 	return builder.String()
 }

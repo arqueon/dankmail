@@ -30,6 +30,8 @@ const (
 	FieldBodyText = "body_text"
 	// FieldReplyHeaders holds the string denoting the reply_headers field in the database.
 	FieldReplyHeaders = "reply_headers"
+	// FieldAttachments holds the string denoting the attachments field in the database.
+	FieldAttachments = "attachments"
 	// EdgeThread holds the string denoting the thread edge name in mutations.
 	EdgeThread = "thread"
 	// Table holds the table name of the message in the database.
@@ -55,6 +57,7 @@ var Columns = []string{
 	FieldSnippet,
 	FieldBodyText,
 	FieldReplyHeaders,
+	FieldAttachments,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the "messages"

@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"net/mail"
 	"net/url"
 	"sort"
@@ -395,8 +396,38 @@ func (p *Provider) messageDelta(m *gmailv1.Message) provider.MessageDelta {
 	if len(replyHeaders) > 0 {
 		d.ReplyHeaders = replyHeaders
 	}
-	d.BodyText = truncateAtRune(firstPlainText(m.Payload), p.bodyCap)
+	body := firstPlainText(m.Payload)
+	if body == "" {
+		// HTML-only message: distill the first text/html part to plain
+		// markdown-ish text (never rendered — spec §1).
+		body = htmlToText(firstHTML(m.Payload))
+	}
+	d.BodyText = truncateAtRune(body, p.bodyCap)
+	d.Attachments = collectAttachments(m.Payload, nil)
 	return d
+}
+
+// collectAttachments walks the payload tree gathering metadata for every
+// named part (regular and inline attachments). Content is never fetched.
+func collectAttachments(part *gmailv1.MessagePart, acc []provider.AttachmentMeta) []provider.AttachmentMeta {
+	if part == nil {
+		return acc
+	}
+	if part.Filename != "" {
+		size := int64(0)
+		if part.Body != nil {
+			size = part.Body.Size
+		}
+		acc = append(acc, provider.AttachmentMeta{
+			Filename: part.Filename,
+			MimeType: part.MimeType,
+			Size:     size,
+		})
+	}
+	for _, child := range part.Parts {
+		acc = collectAttachments(child, acc)
+	}
+	return acc
 }
 
 // isSystemLabel filters Gmail system labels out of ThreadDelta.Labels;
@@ -463,6 +494,37 @@ func firstPlainText(part *gmailv1.MessagePart) string {
 		}
 	}
 	return ""
+}
+
+// firstHTML walks the payload tree depth-first and returns the decoded
+// content of the first text/html part.
+func firstHTML(part *gmailv1.MessagePart) string {
+	if part == nil {
+		return ""
+	}
+	if strings.HasPrefix(strings.ToLower(part.MimeType), "text/html") &&
+		part.Body != nil && part.Body.Data != "" {
+		return decodeBase64URL(part.Body.Data)
+	}
+	for _, child := range part.Parts {
+		if s := firstHTML(child); s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+// htmlToText distills HTML to plain markdown-ish text. Errors degrade to
+// an empty body (the snippet still shows in the UI).
+func htmlToText(html string) string {
+	if html == "" {
+		return ""
+	}
+	text, err := htmltomarkdown.ConvertString(html)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(text)
 }
 
 // decodeBase64URL decodes Gmail body data, which is base64url with or

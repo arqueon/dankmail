@@ -100,6 +100,11 @@ func MessageCount(v int) predicate.Thread {
 	return predicate.Thread(sql.FieldEQ(FieldMessageCount, v))
 }
 
+// HasAttachments applies equality check predicate on the "has_attachments" field. It's identical to HasAttachmentsEQ.
+func HasAttachments(v bool) predicate.Thread {
+	return predicate.Thread(sql.FieldEQ(FieldHasAttachments, v))
+}
+
 // ProviderThreadIDEQ applies the EQ predicate on the "provider_thread_id" field.
 func ProviderThreadIDEQ(v string) predicate.Thread {
 	return predicate.Thread(sql.FieldEQ(FieldProviderThreadID, v))
@@ -453,6 +458,16 @@ func MessageCountLT(v int) predicate.Thread {
 // MessageCountLTE applies the LTE predicate on the "message_count" field.
 func MessageCountLTE(v int) predicate.Thread {
 	return predicate.Thread(sql.FieldLTE(FieldMessageCount, v))
+}
+
+// HasAttachmentsEQ applies the EQ predicate on the "has_attachments" field.
+func HasAttachmentsEQ(v bool) predicate.Thread {
+	return predicate.Thread(sql.FieldEQ(FieldHasAttachments, v))
+}
+
+// HasAttachmentsNEQ applies the NEQ predicate on the "has_attachments" field.
+func HasAttachmentsNEQ(v bool) predicate.Thread {
+	return predicate.Thread(sql.FieldNEQ(FieldHasAttachments, v))
 }
 
 // HasAccount applies the HasEdge predicate on the "account" edge.
