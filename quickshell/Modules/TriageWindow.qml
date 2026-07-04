@@ -100,11 +100,45 @@ FloatingWindow {
         return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // linkify wraps http(s)/mailto URLs in already-escaped text.
+    function makeAnchor(url, label) {
+        return `<a href="${url.replace(/&amp;/g, "&")}"><font color="${Theme.primary}">${label}</font></a>`;
+    }
+
+    // linkify wraps bare http(s)/mailto URLs in already-escaped text,
+    // shortening very long ones for display (href keeps the full URL).
     function linkify(escaped) {
         return escaped.replace(/(https?:\/\/[^\s&]*(?:&amp;[^\s&]*)*|mailto:[^\s<]+)/g, url => {
-            return `<a href="${url.replace(/&amp;/g, "&")}"><font color="${Theme.primary}">${url}</font></a>`;
+            const label = url.length > 64 ? url.substring(0, 60) + "…" : url;
+            return makeAnchor(url, label);
         });
+    }
+
+    // renderInline turns the light markdown that the HTML→text distiller
+    // emits into presentation markup: [text](url) becomes a clickable
+    // label (URL hidden), image-buttons collapse to their alt text,
+    // **bold** becomes bold, and leftover bare URLs get linkified.
+    // Anchors are stashed behind \x01N\x01 placeholders so later passes
+    // never touch URLs already inside an href.
+    function renderInline(escaped) {
+        let s = escaped.replace(/\\([\\`*_{}\[\]()#+\-.!~])/g, "$1"); // markdown escapes
+        const stash = [];
+        const put = html => {
+            stash.push(html);
+            return "\x01" + (stash.length - 1) + "\x01";
+        };
+        const boldify = t => t.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+
+        // [![alt](img)](url) — image buttons (Guardar/Twitter/…): keep a
+        // small labeled link, drop the image.
+        s = s.replace(/\[!\[([^\]]*)\]\(([^()\s]+)\)\]\(([^()\s]+)\)/g, (m, alt, img, url) => put(makeAnchor(url, (alt !== "" ? alt : "enlace") + " ↗")));
+        // ![alt](img) — plain images: alt text only.
+        s = s.replace(/!\[([^\]]*)\]\(([^()\s]+)\)/g, (m, alt) => alt);
+        // [text](url) — regular links: clickable label, URL hidden.
+        s = s.replace(/\[([^\]]+)\]\(([^()\s]+)\)/g, (m, txt, url) => put(makeAnchor(url, boldify(txt))));
+
+        s = boldify(s);
+        s = linkify(s);
+        return s.replace(/\x01(\d+)\x01/g, (m, i) => stash[i]);
     }
 
     // formatBody turns the plain-text body into our own presentation
@@ -129,7 +163,11 @@ FloatingWindow {
                 depth--;
             }
             const color = quoteColors[Math.min(d, quoteColors.length - 1)];
-            const body = linkify(escapeHtml(content));
+            let body = renderInline(escapeHtml(content));
+            // Markdown headings from the distiller → bold lines.
+            const h = body.match(/^\s*#{1,6}\s+(.*)$/);
+            if (h)
+                body = "<b>" + h[1] + "</b>";
             html += `<font color="${color}">${body === "" ? "&nbsp;" : body}</font><br>`;
         }
         while (depth > 0) {
