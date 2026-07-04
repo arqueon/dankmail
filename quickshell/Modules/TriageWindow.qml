@@ -178,18 +178,16 @@ FloatingWindow {
         return html;
     }
 
-    Connections {
-        target: DankMailService
+    // Entry points for the shell's pending-intent dispatch (ui.showThread
+    // / ui.compose events may arrive before this window exists).
+    function openThread(threadId) {
+        selectedThreadId = threadId;
+        replyArea.reset();
+        DankMailService.loadThread(threadId, true);
+    }
 
-        function onComposeRequested() {
-            composeModal.show();
-        }
-
-        function onShowThreadRequested(threadId) {
-            window.selectedThreadId = threadId;
-            replyArea.reset();
-            DankMailService.loadThread(threadId, true);
-        }
+    function openCompose() {
+        composeModal.show();
     }
 
     AccountAddModal {

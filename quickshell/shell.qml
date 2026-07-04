@@ -58,10 +58,45 @@ ShellRoot {
         }
     }
 
+    // Pending intents (dcal pattern): the window may not exist yet when
+    // an open-thread/compose event arrives; stash and apply on load.
+    property int pendingThreadId: -1
+    property bool pendingCompose: false
+
+    function applyPending() {
+        if (!windowLoader.item)
+            return;
+        if (pendingThreadId >= 0) {
+            windowLoader.item.openThread(pendingThreadId);
+            pendingThreadId = -1;
+        }
+        if (pendingCompose) {
+            windowLoader.item.openCompose();
+            pendingCompose = false;
+        }
+    }
+
     Connections {
         target: DankMailService
         function onWindowActionRequested(action) {
             root.handleWindowAction(action);
+        }
+        function onShowThreadRequested(threadId) {
+            root.pendingThreadId = threadId;
+            root.showAndFocus();
+            root.applyPending();
+        }
+        function onComposeRequested() {
+            root.pendingCompose = true;
+            root.showAndFocus();
+            root.applyPending();
+        }
+    }
+
+    Connections {
+        target: windowLoader
+        function onItemChanged() {
+            root.applyPending();
         }
     }
 
