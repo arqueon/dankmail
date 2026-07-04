@@ -367,7 +367,9 @@ FloatingWindow {
                                     StyledText {
                                         Layout.fillWidth: true
                                         text: DankMailService.displayName(rowContent.sender)
-                                        font.weight: row.modelData.unread ? Font.Bold : Font.Normal
+                                        // Sender names always bold; read
+                                        // vs unread is carried by color.
+                                        font.weight: Font.Bold
                                         color: row.modelData.unread ? Theme.surfaceText : Theme.surfaceTextMedium
                                         maximumLineCount: 1
                                     }
