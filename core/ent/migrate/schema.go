@@ -51,7 +51,7 @@ var (
 				Symbol:     "messages_threads_messages",
 				Columns:    []*schema.Column{MessagesColumns[10]},
 				RefColumns: []*schema.Column{ThreadsColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.Cascade,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -87,7 +87,7 @@ var (
 				Symbol:     "notify_rules_accounts_notify_rules",
 				Columns:    []*schema.Column{NotifyRulesColumns[6]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.Cascade,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -121,7 +121,7 @@ var (
 				Symbol:     "pending_ops_accounts_pending_ops",
 				Columns:    []*schema.Column{PendingOpsColumns[9]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.Cascade,
 			},
 		},
 		Indexes: []*schema.Index{
@@ -163,7 +163,7 @@ var (
 				Symbol:     "threads_accounts_threads",
 				Columns:    []*schema.Column{ThreadsColumns[12]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
-				OnDelete:   schema.NoAction,
+				OnDelete:   schema.Cascade,
 			},
 		},
 		Indexes: []*schema.Index{

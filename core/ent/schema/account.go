@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"github.com/google/uuid"
@@ -38,8 +39,8 @@ func (Account) Fields() []ent.Field {
 
 func (Account) Edges() []ent.Edge {
 	return []ent.Edge{
-		edge.To("threads", Thread.Type),
-		edge.To("pending_ops", PendingOp.Type),
-		edge.To("notify_rules", NotifyRule.Type),
+		edge.To("threads", Thread.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("pending_ops", PendingOp.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("notify_rules", NotifyRule.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }
