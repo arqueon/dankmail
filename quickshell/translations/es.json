@@ -49,6 +49,7 @@
     "Authorize in the browser": "Autoriza en el navegador",
     "Account added": "Cuenta añadida",
     "Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.": "Pega el Client ID y el Client Secret del cliente OAuth que acabas de crear. Se guardan en el keyring del sistema, nunca en archivos.",
+    "Shortcut: paste the whole content of the downloaded client_secret_*.json into the Client ID field — it is detected automatically.": "Atajo: pega el contenido completo del client_secret_*.json descargado en el campo Client ID — se detecta automáticamente.",
     "Client ID": "Client ID",
     "Client Secret": "Client Secret",
     "Waiting for you to authorize dankmail in the browser…": "Esperando a que autorices dankmail en el navegador…",

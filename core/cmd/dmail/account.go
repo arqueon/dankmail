@@ -27,8 +27,12 @@ func accountCmd() *cobra.Command {
 		Use:   "add-gmail",
 		Short: "Add a Gmail account (opens the browser for OAuth consent; the address is read from the authorized profile)",
 		Args:  cobra.NoArgs,
-		RunE:  func(c *cobra.Command, args []string) error { return runAccountAddGmail() },
+		RunE: func(c *cobra.Command, args []string) error {
+			jsonPath, _ := c.Flags().GetString("client-json")
+			return runAccountAddGmail(jsonPath)
+		},
 	}
+	addGmail.Flags().String("client-json", "", "path to the client_secret_*.json downloaded from Google Console")
 
 	list := &cobra.Command{
 		Use:   "list",
@@ -161,15 +165,26 @@ func withDB(fn func(ctx context.Context, db *ent.Client) error) error {
 	return fn(ctx, db)
 }
 
-func runAccountAddGmail() error {
+func runAccountAddGmail(clientJSONPath string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
-	if cfg.GoogleClientID == "" || cfg.GoogleClientSecret == "" {
-		return fmt.Errorf("set DMAIL_GOOGLE_CLIENT_ID and DMAIL_GOOGLE_CLIENT_SECRET first,\nor use the in-app wizard (tray → Open Dank Mail → add account), which walks\nyou through creating the OAuth client (see also docs/gmail-setup.md)")
+	var creds oauth.ClientCreds
+	if clientJSONPath != "" {
+		raw, err := os.ReadFile(clientJSONPath)
+		if err != nil {
+			return err
+		}
+		creds, err = oauth.ParseClientJSON(raw)
+		if err != nil {
+			return err
+		}
+	} else if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
+		creds = oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
+	} else {
+		return fmt.Errorf("pass --client-json <client_secret_*.json>, set DMAIL_GOOGLE_CLIENT_ID/SECRET,\nor use the in-app wizard (tray → Open Dank Mail → add account); see docs/gmail-setup.md")
 	}
-	creds := oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
 
 	return withDB(func(ctx context.Context, db *ent.Client) error {
 		fmt.Println("Abriendo el navegador para autorizar la cuenta…")

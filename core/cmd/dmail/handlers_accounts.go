@@ -66,6 +66,15 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		creds := oauth.ClientCreds{}
 		creds.ClientID, _ = p["clientId"].(string)
 		creds.ClientSecret, _ = p["clientSecret"].(string)
+		// The wizard may hand over the downloaded client_secret_*.json
+		// verbatim instead of the individual fields (dcal parity).
+		if raw, _ := p["clientJson"].(string); raw != "" {
+			parsed, err := oauth.ParseClientJSON([]byte(raw))
+			if err != nil {
+				return nil, err
+			}
+			creds = parsed
+		}
 		if creds.ClientID == "" {
 			creds.ClientID = d.cfg.GoogleClientID
 		}

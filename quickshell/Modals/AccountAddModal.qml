@@ -408,6 +408,14 @@ FloatingWindow {
                     wrapMode: Text.WordWrap
                 }
 
+                StyledText {
+                    Layout.fillWidth: true
+                    text: I18n.tr("Shortcut: paste the whole content of the downloaded client_secret_*.json into the Client ID field — it is detected automatically.", "account wizard")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.primary
+                    wrapMode: Text.WordWrap
+                }
+
                 DankTextField {
                     Layout.fillWidth: true
                     label: I18n.tr("Client ID", "account wizard")
@@ -758,7 +766,7 @@ FloatingWindow {
 
             StyledRect {
                 visible: modal.onGmailCreds
-                readonly property bool ready: modal.clientId.trim() !== "" && modal.clientSecret.trim() !== "" && !modal.flowInProgress
+                readonly property bool ready: !modal.flowInProgress && (modal.clientId.trim().startsWith("{") || (modal.clientId.trim() !== "" && modal.clientSecret.trim() !== ""))
                 width: authLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18

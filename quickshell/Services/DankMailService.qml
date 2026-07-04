@@ -415,12 +415,17 @@ Singleton {
         sendRequest("accounts.imap.add", params, resp => callback(resp.error ? resp : resp.result));
     }
 
-    // callback({state, authUrl}) or callback({error}).
+    // callback({state, authUrl}) or callback({error}). Pasting the whole
+    // downloaded client_secret_*.json into the ID field also works: it
+    // is detected and forwarded for the daemon to parse.
     function startGmailFlow(clientId, clientSecret, callback) {
-        sendRequest("accounts.gmail.start", {
+        const params = clientId.trim().startsWith("{") ? {
+            "clientJson": clientId
+        } : {
             "clientId": clientId,
             "clientSecret": clientSecret
-        }, resp => callback(resp.error ? resp : resp.result));
+        };
+        sendRequest("accounts.gmail.start", params, resp => callback(resp.error ? resp : resp.result));
     }
 
     // Long-running: resolves when the user finishes (or the daemon times

@@ -67,6 +67,30 @@ type ClientCreds struct {
 	ClientSecret string `json:"clientSecret"`
 }
 
+// ParseClientJSON extracts the credentials from the client_secret_*.json
+// file Google Console offers for download. Only the "installed"
+// (Desktop app) shape is accepted — "web" clients cannot do the
+// loopback flow.
+func ParseClientJSON(raw []byte) (ClientCreds, error) {
+	var doc struct {
+		Installed *struct {
+			ClientID     string `json:"client_id"`
+			ClientSecret string `json:"client_secret"`
+		} `json:"installed"`
+		Web *struct{} `json:"web"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return ClientCreds{}, fmt.Errorf("not a Google client JSON: %w", err)
+	}
+	if doc.Web != nil {
+		return ClientCreds{}, fmt.Errorf("this is a \"web application\" client; create one of type \"Desktop app\" instead")
+	}
+	if doc.Installed == nil || doc.Installed.ClientID == "" || doc.Installed.ClientSecret == "" {
+		return ClientCreds{}, fmt.Errorf("client JSON is missing the installed.client_id/client_secret fields")
+	}
+	return ClientCreds{ClientID: doc.Installed.ClientID, ClientSecret: doc.Installed.ClientSecret}, nil
+}
+
 func SaveClientCreds(accountID string, c ClientCreds) error {
 	raw, err := json.Marshal(c)
 	if err != nil {
