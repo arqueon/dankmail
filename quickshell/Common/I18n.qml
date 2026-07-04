@@ -16,6 +16,8 @@ Singleton {
 
     readonly property string _rawLocale: Qt.locale().name
     readonly property string _lang: _rawLocale.split(/[_-]/)[0]
+    readonly property var _rtlLanguages: ["ar", "he", "iw", "fa", "ur", "ps", "sd", "dv", "yi", "ku"]
+    readonly property bool isRtl: _rtlLanguages.includes(_lang)
     property string resolvedLocale: "en"
 
     property var translations: ({})

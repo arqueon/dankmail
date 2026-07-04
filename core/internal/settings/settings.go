@@ -22,12 +22,23 @@ type Settings struct {
 	// SnoozeMinutes is the duration used by the notification's snooze
 	// button (the UI popup has its own picker).
 	SnoozeMinutes int `json:"snoozeMinutes"`
+
+	// Chained-action policies (spec §5): expand one user action into
+	// companion ops before enqueueing. Applied live by the queue.
+	MarkReadOnPreview bool `json:"markReadOnPreview"`
+	MarkReadOnReply   bool `json:"markReadOnReply"`
+	MarkReadOnTrash   bool `json:"markReadOnTrash"`
+	UnarchiveOnStar   bool `json:"unarchiveOnStar"`
 }
 
 func Defaults() Settings {
 	return Settings{
-		NotifyActions: []string{"read", "archive", "open"},
-		SnoozeMinutes: 60,
+		NotifyActions:     []string{"read", "archive", "open"},
+		SnoozeMinutes:     60,
+		MarkReadOnPreview: true,
+		MarkReadOnReply:   true,
+		MarkReadOnTrash:   true,
+		UnarchiveOnStar:   false,
 	}
 }
 

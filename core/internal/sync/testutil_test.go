@@ -219,7 +219,7 @@ func newRig(t *testing.T, policies rules.Policies) *rig {
 	b := bus.New()
 	acct := mkAccount(t, db)
 	prov := newFakeProvider(acct.ID.String())
-	q := NewQueue(db, b, policies)
+	q := NewQueue(db, b, func() rules.Policies { return policies })
 	reg := regMap{acct.ID: prov}
 	exec := NewExecutor(db, b, q, reg, acct.ID)
 

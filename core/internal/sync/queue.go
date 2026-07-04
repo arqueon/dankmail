@@ -22,16 +22,21 @@ import (
 // optimistic local change, and inserts the PendingOp rows — all in one
 // transaction — then wakes the account's executor.
 type Queue struct {
-	db       *ent.Client
-	bus      *bus.Bus
-	policies rules.Policies
+	db  *ent.Client
+	bus *bus.Bus
+	// policiesFn is consulted on every Enqueue so settings changes
+	// apply live, without rebuilding the queue.
+	policiesFn func() rules.Policies
 
 	mu    gosync.Mutex
 	wakes map[uuid.UUID]chan struct{}
 }
 
-func NewQueue(db *ent.Client, b *bus.Bus, policies rules.Policies) *Queue {
-	return &Queue{db: db, bus: b, policies: policies, wakes: map[uuid.UUID]chan struct{}{}}
+func NewQueue(db *ent.Client, b *bus.Bus, policiesFn func() rules.Policies) *Queue {
+	if policiesFn == nil {
+		policiesFn = rules.DefaultPolicies
+	}
+	return &Queue{db: db, bus: b, policiesFn: policiesFn, wakes: map[uuid.UUID]chan struct{}{}}
 }
 
 // WakeChan returns the (buffered, size-1) channel the account's executor
@@ -99,7 +104,7 @@ func (q *Queue) expand(op Op) []Op {
 	default:
 		return []Op{op}
 	}
-	extra := q.policies.Expand(trigger)
+	extra := q.policiesFn().Expand(trigger)
 	ops := make([]Op, 0, len(extra)+1)
 	for _, t := range extra {
 		ops = append(ops, Op{

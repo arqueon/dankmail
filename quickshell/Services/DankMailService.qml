@@ -121,6 +121,10 @@ Singleton {
     property bool gmailHasDefaultCreds: false
     property var imapPresets: []
 
+    // Daemon settings (notification actions, snooze default, chained
+    // policies) — live-updated via settings.set.
+    property var settingsData: ({})
+
     property var pendingRequests: ({})
     property int requestCounter: 0
 
@@ -257,6 +261,9 @@ Singleton {
         case "dnd.changed":
             dndEnabled = !!(event.payload && event.payload.enabled);
             break;
+        case "settings.changed":
+            refreshSettings();
+            break;
         case "ui.show":
             windowActionRequested("show");
             break;
@@ -309,6 +316,25 @@ Singleton {
         refreshThreads();
         refreshDnd();
         refreshGmailSetupSteps();
+        refreshSettings();
+    }
+
+    function refreshSettings() {
+        sendRequest("settings.get", null, resp => {
+            if (!resp.error && resp.result)
+                settingsData = resp.result;
+        });
+    }
+
+    // updateSettings sends a partial patch; the daemon merges, persists
+    // and republishes.
+    function updateSettings(patch, callback) {
+        sendRequest("settings.set", patch, resp => {
+            if (!resp.error && resp.result)
+                settingsData = resp.result;
+            if (callback)
+                callback(resp);
+        });
     }
 
     function refreshAccounts() {

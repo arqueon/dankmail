@@ -113,6 +113,11 @@ FloatingWindow {
         id: accountModal
     }
 
+    SettingsModal {
+        id: settingsModal
+        onAddAccountRequested: accountModal.show()
+    }
+
     Shortcut {
         sequence: "Escape"
         onActivated: window.hideRequested()
@@ -265,6 +270,11 @@ FloatingWindow {
                 DankActionButton {
                     iconName: "person_add"
                     onClicked: accountModal.show()
+                }
+
+                DankActionButton {
+                    iconName: "settings"
+                    onClicked: settingsModal.show()
                 }
 
                 DankActionButton {
@@ -617,63 +627,157 @@ FloatingWindow {
                         }
                     }
 
-                    // Snooze options (inline popup).
+                    // Snooze options (inline popup) with a calendar picker
+                    // for arbitrary dates.
                     StyledRect {
                         id: snoozeMenu
                         visible: false
                         Layout.fillWidth: true
-                        implicitHeight: snoozeRow.implicitHeight + Theme.spacingM
+                        implicitHeight: snoozeColumn.implicitHeight + Theme.spacingL
                         color: Theme.surfaceContainerHigh
 
-                        RowLayout {
-                            id: snoozeRow
+                        property bool showCustom: false
+                        property date customDate: new Date()
+                        property int customMinutes: 540 // 09:00
+
+                        onVisibleChanged: {
+                            if (visible) {
+                                showCustom = false;
+                                const d = new Date();
+                                d.setDate(d.getDate() + 1);
+                                customDate = d;
+                                customMinutes = 540;
+                            }
+                        }
+
+                        function customUntil() {
+                            const d = new Date(customDate);
+                            d.setHours(Math.floor(customMinutes / 60), customMinutes % 60, 0, 0);
+                            return d;
+                        }
+
+                        function doSnooze(until) {
+                            const ids = window.selectedIds();
+                            if (ids.length) {
+                                DankMailService.snooze(ids, until);
+                                DankMailService.currentThread = null;
+                            }
+                            snoozeMenu.visible = false;
+                        }
+
+                        ColumnLayout {
+                            id: snoozeColumn
                             anchors.centerIn: parent
+                            width: parent.width - Theme.spacingL
                             spacing: Theme.spacingS
 
-                            Repeater {
-                                model: [
-                                    {
-                                        "key": "hour",
-                                        "label": I18n.tr("In 1 hour", "snooze")
-                                    },
-                                    {
-                                        "key": "evening",
-                                        "label": I18n.tr("This evening", "snooze")
-                                    },
-                                    {
-                                        "key": "tomorrow",
-                                        "label": I18n.tr("Tomorrow", "snooze")
-                                    },
-                                    {
-                                        "key": "nextweek",
-                                        "label": I18n.tr("Next week", "snooze")
-                                    }
-                                ]
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingS
 
-                                delegate: StyledRect {
-                                    required property var modelData
-                                    width: snoozeLabel.implicitWidth + Theme.spacingL
+                                Repeater {
+                                    model: [
+                                        {
+                                            "key": "hour",
+                                            "label": I18n.tr("In 1 hour", "snooze")
+                                        },
+                                        {
+                                            "key": "evening",
+                                            "label": I18n.tr("This evening", "snooze")
+                                        },
+                                        {
+                                            "key": "tomorrow",
+                                            "label": I18n.tr("Tomorrow", "snooze")
+                                        },
+                                        {
+                                            "key": "nextweek",
+                                            "label": I18n.tr("Next week", "snooze")
+                                        }
+                                    ]
+
+                                    delegate: StyledRect {
+                                        id: presetChip
+                                        required property var modelData
+                                        width: snoozeLabel.implicitWidth + Theme.spacingL
+                                        height: 30
+                                        radius: 15
+                                        color: Theme.surfaceContainerHighest
+
+                                        StyledText {
+                                            id: snoozeLabel
+                                            anchors.centerIn: parent
+                                            text: presetChip.modelData.label
+                                            font.pixelSize: Theme.fontSizeSmall
+                                        }
+
+                                        StateLayer {
+                                            stateColor: Theme.primary
+                                            onClicked: snoozeMenu.doSnooze(window.snoozeUntil(presetChip.modelData.key))
+                                        }
+                                    }
+                                }
+
+                                StyledRect {
+                                    width: customChipLabel.implicitWidth + Theme.spacingL
                                     height: 30
                                     radius: 15
-                                    color: Theme.surfaceContainerHighest
+                                    color: snoozeMenu.showCustom ? Theme.primaryContainer : Theme.surfaceContainerHighest
 
                                     StyledText {
-                                        id: snoozeLabel
+                                        id: customChipLabel
                                         anchors.centerIn: parent
-                                        text: parent.modelData.label
+                                        text: I18n.tr("Pick date…", "snooze")
                                         font.pixelSize: Theme.fontSizeSmall
+                                        color: snoozeMenu.showCustom ? Theme.primary : Theme.surfaceText
                                     }
 
                                     StateLayer {
                                         stateColor: Theme.primary
-                                        onClicked: {
-                                            const ids = window.selectedIds();
-                                            if (ids.length) {
-                                                DankMailService.snooze(ids, window.snoozeUntil(parent.modelData.key));
-                                                DankMailService.currentThread = null;
-                                            }
-                                            snoozeMenu.visible = false;
-                                        }
+                                        onClicked: snoozeMenu.showCustom = !snoozeMenu.showCustom
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                visible: snoozeMenu.showCustom
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingS
+
+                                DankDatePicker {
+                                    selectedDate: snoozeMenu.customDate
+                                    onDateSelected: value => snoozeMenu.customDate = value
+                                }
+
+                                DankTimePicker {
+                                    minutes: snoozeMenu.customMinutes
+                                    use24Hour: true
+                                    onTimeSelected: value => snoozeMenu.customMinutes = value
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+
+                                StyledRect {
+                                    readonly property bool ready: snoozeMenu.customUntil() > new Date()
+                                    width: confirmLabel.implicitWidth + Theme.spacingXL
+                                    height: 32
+                                    radius: 16
+                                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                                    opacity: ready ? 1 : 0.6
+
+                                    StyledText {
+                                        id: confirmLabel
+                                        anchors.centerIn: parent
+                                        text: I18n.tr("Snooze", "snooze")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                                    }
+
+                                    StateLayer {
+                                        disabled: !parent.ready
+                                        stateColor: Theme.primary
+                                        onClicked: snoozeMenu.doSnooze(snoozeMenu.customUntil())
                                     }
                                 }
                             }

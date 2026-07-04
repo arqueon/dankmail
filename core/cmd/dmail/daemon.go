@@ -34,7 +34,6 @@ type daemon struct {
 	queue    *dsync.Queue
 	registry *registry
 	notifier notify.Notifier
-	policies rules.Policies
 	settings *settings.Store
 
 	dnd    atomic.Bool
@@ -88,13 +87,12 @@ func runDaemon(shellDir string, hidden bool) error {
 		bus:      bus.New(),
 		registry: newRegistry(cfg, db),
 		notifier: notify.NewBest(),
-		policies: rules.DefaultPolicies(),
 		settings: settings.NewStore(paths.SettingsPath()),
 		reload:   make(chan struct{}, 1),
 		exit:     cancel,
 		flows:    newFlowRegistry(),
 	}
-	d.queue = dsync.NewQueue(db, d.bus, d.policies)
+	d.queue = dsync.NewQueue(db, d.bus, d.currentPolicies)
 
 	var wg gosync.WaitGroup
 
@@ -201,6 +199,18 @@ func (d *daemon) engineLoop(ctx context.Context) {
 			cancel()
 			<-done
 		}
+	}
+}
+
+// currentPolicies maps live settings onto the chained-action policies
+// the queue consults on every Enqueue.
+func (d *daemon) currentPolicies() rules.Policies {
+	s := d.settings.Get()
+	return rules.Policies{
+		MarkReadOnPreview: s.MarkReadOnPreview,
+		MarkReadOnReply:   s.MarkReadOnReply,
+		MarkReadOnTrash:   s.MarkReadOnTrash,
+		UnarchiveOnStar:   s.UnarchiveOnStar,
 	}
 }
 

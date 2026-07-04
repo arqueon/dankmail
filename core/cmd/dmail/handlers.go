@@ -54,7 +54,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 
 	// threads.previewOpened drives the mark-read-on-preview hook.
 	srv.Register("threads.previewOpened", func(ctx context.Context, p map[string]any) (any, error) {
-		if !d.policies.MarkReadOnPreview {
+		if !d.settings.Get().MarkReadOnPreview {
 			return "ok", nil
 		}
 		accountID, ptids, err := d.resolveThreads(ctx, p)
@@ -203,6 +203,16 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		}
 		if mins, ok := p["snoozeMinutes"].(float64); ok {
 			s.SnoozeMinutes = int(mins)
+		}
+		for key, dst := range map[string]*bool{
+			"markReadOnPreview": &s.MarkReadOnPreview,
+			"markReadOnReply":   &s.MarkReadOnReply,
+			"markReadOnTrash":   &s.MarkReadOnTrash,
+			"unarchiveOnStar":   &s.UnarchiveOnStar,
+		} {
+			if v, ok := p[key].(bool); ok {
+				*dst = v
+			}
 		}
 		if err := d.settings.Update(s); err != nil {
 			return nil, err

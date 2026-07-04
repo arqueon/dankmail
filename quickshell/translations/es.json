@@ -74,7 +74,32 @@
     "In 1 hour": "En 1 hora",
     "This evening": "Esta tarde",
     "Tomorrow": "Mañana",
-    "Next week": "Próxima semana"
+    "Next week": "Próxima semana",
+    "Pick date…": "Elegir fecha…",
+    "Snooze": "Posponer"
+  },
+  "settings title": {
+    "Settings": "Configuración"
+  },
+  "settings section": {
+    "Notification buttons": "Botones de notificación",
+    "Chained actions": "Acciones encadenadas",
+    "Accounts": "Cuentas"
+  },
+  "notify action": {
+    "Mark read": "Marcar leído",
+    "Archive": "Archivar",
+    "Trash": "Papelera",
+    "Snooze": "Posponer",
+    "Open in web": "Abrir en web"
+  },
+  "settings": {
+    "Pick the inline actions on new-mail notifications. Most notification servers show at most 3 buttons.": "Elige las acciones de las notificaciones de correo nuevo. La mayoría de servidores muestran máximo 3 botones.",
+    "Notification snooze duration (minutes)": "Duración del posponer de la notificación (minutos)",
+    "Opening the preview marks the thread read": "Abrir la vista previa marca el hilo como leído",
+    "Sending a reply marks the thread read": "Enviar una respuesta marca el hilo como leído",
+    "Trashing also marks read": "Enviar a papelera también marca como leído",
+    "Starring moves the thread back to the inbox": "Destacar devuelve el hilo a la bandeja"
   },
   "preview footer": {
     "Plain-text preview — open in web for the full message.": "Vista previa en texto plano — abre en web para el mensaje completo."
