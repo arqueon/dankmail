@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -31,6 +34,11 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		f.UnreadOnly, _ = p["unread"].(bool)
 		f.Starred, _ = p["starred"].(bool)
 		f.InboxOnly, _ = p["inbox"].(bool)
+		f.Query, _ = p["query"].(string)
+		if f.Query != "" {
+			// A search sweeps the whole cache, not just the inbox.
+			f.InboxOnly = false
+		}
 		if limit, ok := p["limit"].(float64); ok {
 			f.Limit = int(limit)
 		}
@@ -175,6 +183,31 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		}
 		return "ok", nil
 	})
+	// ui.openSearch continues a local search in the account's webmail
+	// (full history lives there; the local cache only spans retention).
+	srv.Register("ui.openSearch", func(ctx context.Context, p map[string]any) (any, error) {
+		query, _ := p["query"].(string)
+		if strings.TrimSpace(query) == "" {
+			return nil, fmt.Errorf("empty query")
+		}
+		accounts, err := d.repo.Accounts(ctx)
+		if err != nil {
+			return nil, err
+		}
+		wanted, _ := p["account"].(string)
+		for _, a := range accounts {
+			if wanted != "" && a.ID != wanted {
+				continue
+			}
+			if a.Type == "gmail" {
+				u := "https://mail.google.com/mail/u/0/?authuser=" + url.QueryEscape(a.Email) + "#search/" + url.PathEscape(query)
+				_ = exec.Command("xdg-open", u).Start()
+				return "ok", nil
+			}
+		}
+		return nil, fmt.Errorf("no gmail account to search in the webmail")
+	})
+
 	srv.Register("ui.openLink", func(ctx context.Context, p map[string]any) (any, error) {
 		id, err := intParam(p, "id")
 		if err != nil {

@@ -188,7 +188,13 @@ FloatingWindow {
 
     Shortcut {
         sequence: "Escape"
-        onActivated: window.hideRequested()
+        onActivated: {
+            // First Escape clears an active search; the second hides.
+            if (searchField.text !== "")
+                searchField.text = "";
+            else
+                window.hideRequested();
+        }
     }
 
     Shortcut {
@@ -326,6 +332,34 @@ FloatingWindow {
 
                 Item {
                     Layout.fillWidth: true
+                }
+
+                // Spotlight-style search over the local cache; the web
+                // button continues the query in the webmail.
+                DankTextField {
+                    id: searchField
+                    Layout.preferredWidth: 220
+                    Layout.preferredHeight: 36
+                    iconName: "search"
+                    placeholderText: I18n.tr("Search mail…", "search")
+                    onTextChanged: searchDebounce.restart()
+
+                    Timer {
+                        id: searchDebounce
+                        interval: 250
+                        repeat: false
+                        onTriggered: {
+                            DankMailService.searchQuery = searchField.text.trim();
+                            DankMailService.refreshThreads();
+                        }
+                    }
+
+                }
+
+                DankActionButton {
+                    visible: searchField.text.trim() !== ""
+                    iconName: "travel_explore"
+                    onClicked: DankMailService.openWebSearch(searchField.text.trim())
                 }
 
                 StyledText {
@@ -536,6 +570,8 @@ FloatingWindow {
                                 return I18n.tr("Daemon offline", "empty state");
                             if (DankMailService.accounts.length === 0)
                                 return I18n.tr("No accounts yet", "empty state");
+                            if (DankMailService.searchQuery !== "")
+                                return I18n.tr("No local results — try the web search button", "empty state");
                             return I18n.tr("Inbox zero", "empty state");
                         }
                         color: Theme.surfaceTextMedium

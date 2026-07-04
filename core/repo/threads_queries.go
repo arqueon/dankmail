@@ -19,16 +19,32 @@ type ThreadFilter struct {
 	UnreadOnly bool
 	Starred    bool
 	InboxOnly  bool
-	Limit      int
+	// Query matches subject, snippet, sender, or message body
+	// (case-folded LIKE over the local cache — FTS5 is a ring-3
+	// upgrade). While searching, snoozed threads are included.
+	Query string
+	Limit int
 }
 
 // ListThreads returns the unified triage list, newest first. Snoozed
-// threads are hidden (they come back when they wake).
+// threads are hidden (they come back when they wake) except when
+// searching.
 func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.ThreadSummary, error) {
 	q := r.client.Thread.Query().
-		Where(thread.SnoozedUntilIsNil()).
 		WithAccount().
 		Order(ent.Desc(thread.FieldLastMessageAt))
+	if f.Query == "" {
+		q = q.Where(thread.SnoozedUntilIsNil())
+	} else {
+		q = q.Where(thread.Or(
+			thread.SubjectContainsFold(f.Query),
+			thread.SnippetContainsFold(f.Query),
+			thread.HasMessagesWith(message.Or(
+				message.FromContainsFold(f.Query),
+				message.BodyTextContainsFold(f.Query),
+			)),
+		))
+	}
 	if f.AccountID != nil {
 		q = q.Where(thread.HasAccountWith(account.IDEQ(*f.AccountID)))
 	}

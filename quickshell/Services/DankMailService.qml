@@ -45,6 +45,10 @@ Singleton {
     property bool filterUnread: false
     property bool filterStarred: false
     property string filterAccount: ""
+    // searchQuery sweeps the whole local cache (subject/sender/snippet/
+    // body); empty = normal inbox view. Full-history search continues in
+    // the webmail via openWebSearch.
+    property string searchQuery: ""
 
     readonly property int unreadTotal: {
         let n = 0;
@@ -350,9 +354,11 @@ Singleton {
     function refreshThreads() {
         threadsLoading = true;
         const params = {
-            "inbox": true,
+            "inbox": searchQuery === "",
             "limit": 200
         };
+        if (searchQuery !== "")
+            params.query = searchQuery;
         if (filterUnread)
             params.unread = true;
         if (filterStarred)
@@ -436,6 +442,20 @@ Singleton {
         sendRequest("ui.openLink", {
             "id": id
         }, null);
+    }
+
+    // openWebSearch continues the query in the webmail (Gmail #search
+    // deep link), scoped to the account filter when one is active.
+    function openWebSearch(query) {
+        const params = {
+            "query": query
+        };
+        if (filterAccount !== "")
+            params.account = filterAccount;
+        sendRequest("ui.openSearch", params, resp => {
+            if (resp.error)
+                log.warn("ui.openSearch:", resp.error);
+        });
     }
 
     function syncNow() {
