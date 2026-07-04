@@ -105,6 +105,14 @@
     "Trashing also marks read": "Enviar a papelera también marca como leído",
     "Starring moves the thread back to the inbox": "Destacar devuelve el hilo a la bandeja"
   },
+  "quick reply": {
+    "To": "Para",
+    "To everyone on the thread": "Para todos los del hilo",
+    "Reply all": "Responder a todos",
+    "Write your reply… Ctrl+Enter sends": "Escribe tu respuesta… Ctrl+Enter envía",
+    "Send": "Enviar",
+    "Sending…": "Enviando…"
+  },
   "preview footer": {
     "Plain-text preview — open in web for the full message.": "Vista previa en texto plano — abre en web para el mensaje completo."
   }

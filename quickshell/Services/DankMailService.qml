@@ -444,6 +444,23 @@ Singleton {
         }, null);
     }
 
+    // reply enqueues a plain-text reply on the thread (send_reply op:
+    // optimistic, retried, mark-read hook applies). replyAll includes
+    // the original To/Cc besides the sender.
+    function reply(id, body, replyAll, callback) {
+        sendRequest("ops.reply", {
+            "id": id,
+            "body": body,
+            "replyAll": replyAll
+        }, resp => {
+            if (resp.error)
+                log.warn("ops.reply:", resp.error);
+            refreshDebounce.restart();
+            if (callback)
+                callback(resp);
+        });
+    }
+
     // searchRemoteHistory sweeps the FULL mailbox history server-side
     // (Gmail q= search) and ingests the results as cache backfill; the
     // refresh then surfaces them in the local search view.

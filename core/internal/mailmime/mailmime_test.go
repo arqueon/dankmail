@@ -242,3 +242,21 @@ func TestBuildComposeNoRecipients(t *testing.T) {
 		t.Errorf("err = %v, want ErrNoRecipients", err)
 	}
 }
+
+func TestBuildReplySelfConversationAddressesSelf(t *testing.T) {
+	// A thread where I'm both sender and sole recipient (note to self):
+	// self-exclusion must not leave the reply without recipients.
+	orig := origMsg()
+	orig.From = self
+	orig.To = []string{self}
+	orig.Cc = nil
+	raw, err := BuildReply(orig, self, provider.ReplyDraft{Body: "nota"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, _ := parse(t, raw)
+	to := addressEmails(t, msg, "To")
+	if len(to) != 1 || to[0] != "ruben@example.org" {
+		t.Errorf("To = %v, want self", to)
+	}
+}

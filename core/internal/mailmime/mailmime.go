@@ -54,7 +54,14 @@ func BuildReply(orig provider.MessageDelta, from string, d provider.ReplyDraft) 
 	to = dedupe(to)
 	cc = dedupe(excludeAll(cc, to))
 	if len(to) == 0 {
-		return nil, ErrNoRecipients
+		// Degenerate self-conversation (a note to yourself): after
+		// self-exclusion nobody is left — address the reply target
+		// anyway rather than failing.
+		if strings.TrimSpace(target) != "" {
+			to = []string{target}
+		} else {
+			return nil, ErrNoRecipients
+		}
 	}
 
 	subject := orig.ReplyHeaders[provider.HeaderSubject]

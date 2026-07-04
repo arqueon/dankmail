@@ -24,6 +24,7 @@ FloatingWindow {
 
     function selectThread(t) {
         selectedThreadId = t.id;
+        replyArea.reset();
         DankMailService.loadThread(t.id, true);
     }
 
@@ -784,6 +785,16 @@ FloatingWindow {
                             onClicked: snoozeMenu.visible = !snoozeMenu.visible
                         }
 
+                        DankActionButton {
+                            iconName: "reply"
+                            iconColor: replyArea.visible ? Theme.primary : Theme.surfaceText
+                            onClicked: {
+                                replyArea.visible = !replyArea.visible;
+                                if (replyArea.visible)
+                                    replyInput.forceActiveFocus();
+                            }
+                        }
+
                         Item {
                             Layout.fillWidth: true
                         }
@@ -997,6 +1008,175 @@ FloatingWindow {
                             HoverHandler {
                                 enabled: bodyText.hoveredLink !== ""
                                 cursorShape: Qt.PointingHandCursor
+                            }
+                        }
+                    }
+
+                    // Quick reply (spec §7): plain textarea, Ctrl+Enter
+                    // sends, reply-all as a toggle. No CC/BCC, no
+                    // attachments, no rich signature — by design.
+                    StyledRect {
+                        id: replyArea
+                        visible: false
+                        Layout.fillWidth: true
+                        implicitHeight: replyColumn.implicitHeight + Theme.spacingL
+                        color: Theme.surfaceContainerHigh
+
+                        property bool sending: false
+                        property bool replyAll: false
+                        property string error: ""
+
+                        function reset() {
+                            visible = false;
+                            sending = false;
+                            replyAll = false;
+                            error = "";
+                            replyInput.text = "";
+                        }
+
+                        function send() {
+                            const t = DankMailService.currentThread;
+                            if (!t || replyInput.text.trim() === "" || sending)
+                                return;
+                            sending = true;
+                            error = "";
+                            DankMailService.reply(t.id, replyInput.text, replyAll, resp => {
+                                replyArea.sending = false;
+                                if (resp.error) {
+                                    replyArea.error = resp.error;
+                                    return;
+                                }
+                                replyArea.reset();
+                            });
+                        }
+
+                        ColumnLayout {
+                            id: replyColumn
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: Theme.spacingM
+                            spacing: Theme.spacingS
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingS
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: {
+                                        const t = DankMailService.currentThread;
+                                        if (!t || !t.messages || t.messages.length === 0)
+                                            return "";
+                                        if (replyArea.replyAll)
+                                            return I18n.tr("To everyone on the thread", "quick reply");
+                                        return I18n.tr("To", "quick reply") + " " + DankMailService.displayName(t.messages[t.messages.length - 1].from);
+                                    }
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceTextMedium
+                                    maximumLineCount: 1
+                                }
+
+                                StyledRect {
+                                    width: replyAllLabel.implicitWidth + Theme.spacingL
+                                    height: 28
+                                    radius: 14
+                                    color: replyArea.replyAll ? Theme.primaryContainer : Theme.surfaceContainerHighest
+
+                                    StyledText {
+                                        id: replyAllLabel
+                                        anchors.centerIn: parent
+                                        text: I18n.tr("Reply all", "quick reply")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: replyArea.replyAll ? Theme.primary : Theme.surfaceTextMedium
+                                    }
+
+                                    StateLayer {
+                                        stateColor: Theme.primary
+                                        onClicked: replyArea.replyAll = !replyArea.replyAll
+                                    }
+                                }
+                            }
+
+                            StyledRect {
+                                Layout.fillWidth: true
+                                implicitHeight: 96
+                                radius: Theme.cornerRadiusSmall
+                                color: Theme.surfaceContainer
+                                border.width: 1
+                                border.color: replyInput.activeFocus ? Theme.primary : Theme.outlineLight
+
+                                DankFlickable {
+                                    anchors.fill: parent
+                                    anchors.margins: Theme.spacingS
+                                    contentHeight: replyInput.implicitHeight
+                                    clip: true
+
+                                    TextEdit {
+                                        id: replyInput
+                                        width: parent.width
+                                        wrapMode: TextEdit.Wrap
+                                        textFormat: TextEdit.PlainText
+                                        color: Theme.surfaceText
+                                        selectionColor: Theme.primarySelected
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeMedium
+
+                                        Keys.onPressed: event => {
+                                            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
+                                                event.accepted = true;
+                                                replyArea.send();
+                                            }
+                                        }
+
+                                        StyledText {
+                                            visible: replyInput.text === "" && !replyInput.activeFocus
+                                            text: I18n.tr("Write your reply… Ctrl+Enter sends", "quick reply")
+                                            color: Theme.surfaceTextAlpha
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingS
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: replyArea.error
+                                    visible: replyArea.error !== ""
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.error
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                Item {
+                                    Layout.fillWidth: replyArea.error === ""
+                                }
+
+                                StyledRect {
+                                    readonly property bool ready: replyInput.text.trim() !== "" && !replyArea.sending
+                                    width: sendLabel.implicitWidth + Theme.spacingXL
+                                    height: 32
+                                    radius: 16
+                                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                                    opacity: ready ? 1 : 0.6
+
+                                    StyledText {
+                                        id: sendLabel
+                                        anchors.centerIn: parent
+                                        text: replyArea.sending ? I18n.tr("Sending…", "quick reply") : I18n.tr("Send", "quick reply")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                                    }
+
+                                    StateLayer {
+                                        disabled: !parent.ready
+                                        stateColor: Theme.primary
+                                        onClicked: replyArea.send()
+                                    }
+                                }
                             }
                         }
                     }
