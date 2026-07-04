@@ -731,30 +731,9 @@ FloatingWindow {
                         }
                     }
 
-                    // Action bar.
+                    // Action bar — archive leads, Gmail-style.
                     RowLayout {
                         spacing: Theme.spacingXS
-
-                        DankActionButton {
-                            iconName: DankMailService.currentThread && DankMailService.currentThread.unread ? "drafts" : "mark_email_unread"
-                            onClicked: {
-                                const t = DankMailService.currentThread;
-                                if (!t)
-                                    return;
-                                t.unread ? DankMailService.markRead([t.id]) : DankMailService.markUnread([t.id]);
-                            }
-                        }
-
-                        DankActionButton {
-                            iconName: "star"
-                            iconColor: DankMailService.currentThread && DankMailService.currentThread.starred ? Theme.warning : Theme.surfaceText
-                            onClicked: {
-                                const t = DankMailService.currentThread;
-                                if (!t)
-                                    return;
-                                t.starred ? DankMailService.unstar([t.id]) : DankMailService.star([t.id]);
-                            }
-                        }
 
                         DankActionButton {
                             iconName: "archive"
@@ -776,6 +755,27 @@ FloatingWindow {
                                     DankMailService.trash(ids);
                                     DankMailService.currentThread = null;
                                 }
+                            }
+                        }
+
+                        DankActionButton {
+                            iconName: DankMailService.currentThread && DankMailService.currentThread.unread ? "drafts" : "mark_email_unread"
+                            onClicked: {
+                                const t = DankMailService.currentThread;
+                                if (!t)
+                                    return;
+                                t.unread ? DankMailService.markRead([t.id]) : DankMailService.markUnread([t.id]);
+                            }
+                        }
+
+                        DankActionButton {
+                            iconName: "star"
+                            iconColor: DankMailService.currentThread && DankMailService.currentThread.starred ? Theme.warning : Theme.surfaceText
+                            onClicked: {
+                                const t = DankMailService.currentThread;
+                                if (!t)
+                                    return;
+                                t.starred ? DankMailService.unstar([t.id]) : DankMailService.star([t.id]);
                             }
                         }
 
