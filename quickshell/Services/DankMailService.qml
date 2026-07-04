@@ -134,6 +134,8 @@ Singleton {
 
     signal connectionStateChanged
     signal windowActionRequested(string action)
+    signal composeRequested
+    signal showThreadRequested(int threadId)
     signal opFailed(string opType, string error)
 
     Component.onCompleted: socketProbe.running = true
@@ -273,6 +275,15 @@ Singleton {
             break;
         case "ui.toggle":
             windowActionRequested("toggle");
+            break;
+        case "ui.compose":
+            windowActionRequested("show");
+            composeRequested();
+            break;
+        case "ui.showThread":
+            windowActionRequested("show");
+            if (event.payload && event.payload.id !== undefined)
+                showThreadRequested(event.payload.id);
             break;
         case "op.failed":
             {

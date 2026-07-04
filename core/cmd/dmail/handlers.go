@@ -79,6 +79,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		"ops.star":       dsync.OpStar,
 		"ops.unstar":     dsync.OpUnstar,
 		"ops.archive":    dsync.OpArchive,
+		"ops.unarchive":  dsync.OpUnarchive,
 		"ops.trash":      dsync.OpTrash,
 	} {
 		srv.Register(method, d.simpleOpHandler(opType))
@@ -96,6 +97,23 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		return "ok", d.queue.Enqueue(ctx, dsync.Op{
 			AccountID: accountID, Type: dsync.OpSnooze, ThreadIDs: ptids,
 			Payload: dsync.OpPayload{Snooze: &dsync.SnoozePayload{Until: until, MarkUnread: true}},
+		})
+	})
+
+	// ops.snoozePreset snoozes using the configured preset (settings
+	// snoozePreset/snoozeMinutes) — the time math stays server-side so
+	// bar widgets don't reimplement it.
+	srv.Register("ops.snoozePreset", func(ctx context.Context, p map[string]any) (any, error) {
+		accountID, ptids, err := d.resolveThreads(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		return "ok", d.queue.Enqueue(ctx, dsync.Op{
+			AccountID: accountID, Type: dsync.OpSnooze, ThreadIDs: ptids,
+			Payload: dsync.OpPayload{Snooze: &dsync.SnoozePayload{
+				Until:      d.settings.Get().SnoozeUntil(time.Now()),
+				MarkUnread: true,
+			}},
 		})
 	})
 
@@ -182,6 +200,23 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if !d.ensureUIVisible() {
 			d.bus.Publish("ui.toggle", nil)
 		}
+		return "ok", nil
+	})
+	// ui.compose shows the window with the compose modal open (bar
+	// widgets and scripts: `dmail ipc` or the plugin popout).
+	srv.Register("ui.compose", func(ctx context.Context, _ map[string]any) (any, error) {
+		d.ensureUIVisible()
+		d.bus.Publish("ui.compose", nil)
+		return "ok", nil
+	})
+	// ui.showThread shows the window focused on one thread (local id).
+	srv.Register("ui.showThread", func(ctx context.Context, p map[string]any) (any, error) {
+		id, err := intParam(p, "id")
+		if err != nil {
+			return nil, err
+		}
+		d.ensureUIVisible()
+		d.bus.Publish("ui.showThread", map[string]any{"id": id})
 		return "ok", nil
 	})
 	// threads.searchRemote sweeps the FULL mailbox history server-side

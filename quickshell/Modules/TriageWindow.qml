@@ -178,6 +178,20 @@ FloatingWindow {
         return html;
     }
 
+    Connections {
+        target: DankMailService
+
+        function onComposeRequested() {
+            composeModal.show();
+        }
+
+        function onShowThreadRequested(threadId) {
+            window.selectedThreadId = threadId;
+            replyArea.reset();
+            DankMailService.loadThread(threadId, true);
+        }
+    }
+
     AccountAddModal {
         id: accountModal
     }
