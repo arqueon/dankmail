@@ -348,18 +348,22 @@ FloatingWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
 
+                                    // Sender: human name only, no quotes
+                                    // or address; the address lives in
+                                    // the preview header.
                                     StyledText {
                                         Layout.fillWidth: true
-                                        text: (row.modelData.participants && row.modelData.participants.length > 0) ? row.modelData.participants[0] : ""
-                                        font.weight: row.modelData.unread ? Font.DemiBold : Font.Normal
+                                        text: (row.modelData.participants && row.modelData.participants.length > 0) ? DankMailService.displayName(row.modelData.participants[0]) : ""
+                                        font.weight: row.modelData.unread ? Font.Bold : Font.Medium
                                         font.pixelSize: Theme.fontSizeSmall
+                                        color: row.modelData.unread ? Theme.surfaceText : Theme.surfaceTextMedium
                                         maximumLineCount: 1
                                     }
 
                                     StyledText {
                                         text: window.timeLabel(row.modelData.lastMessageAt)
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: Theme.surfaceTextMedium
+                                        color: row.modelData.unread ? Theme.primary : Theme.surfaceTextAlpha
                                     }
                                 }
 
@@ -367,6 +371,7 @@ FloatingWindow {
                                     Layout.fillWidth: true
                                     text: row.modelData.subject || I18n.tr("(no subject)", "thread list")
                                     font.weight: row.modelData.unread ? Font.DemiBold : Font.Normal
+                                    color: Theme.surfaceText
                                     maximumLineCount: 1
                                 }
 
@@ -374,7 +379,7 @@ FloatingWindow {
                                     Layout.fillWidth: true
                                     text: row.modelData.snippet || ""
                                     font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.surfaceTextMedium
+                                    color: Theme.surfaceTextAlpha
                                     maximumLineCount: 1
                                 }
                             }
@@ -494,17 +499,38 @@ FloatingWindow {
                             color: DankMailService.currentThread ? DankMailService.accountColor(DankMailService.currentThread.accountId) : "transparent"
                         }
 
-                        StyledText {
+                        RowLayout {
                             Layout.fillWidth: true
-                            readonly property var msgs: DankMailService.currentThread ? (DankMailService.currentThread.messages || []) : []
-                            text: {
-                                if (msgs.length === 0)
-                                    return "";
-                                const last = msgs[msgs.length - 1];
-                                return last.from + "  ·  " + Qt.formatDateTime(new Date(last.date), "ddd d MMM, HH:mm");
+                            spacing: Theme.spacingS
+
+                            readonly property var lastMsg: {
+                                const t = DankMailService.currentThread;
+                                if (!t || !t.messages || t.messages.length === 0)
+                                    return null;
+                                return t.messages[t.messages.length - 1];
                             }
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceTextMedium
+                            readonly property var fromAddr: lastMsg ? DankMailService.parseAddress(lastMsg.from) : null
+                            id: fromLine
+
+                            StyledText {
+                                text: fromLine.fromAddr ? (fromLine.fromAddr.name !== "" ? fromLine.fromAddr.name : fromLine.fromAddr.email) : ""
+                                font.weight: Font.DemiBold
+                                font.pixelSize: Theme.fontSizeMedium
+                            }
+
+                            StyledText {
+                                Layout.fillWidth: true
+                                text: {
+                                    if (!fromLine.fromAddr)
+                                        return "";
+                                    const addr = fromLine.fromAddr.name !== "" ? fromLine.fromAddr.email : "";
+                                    const when = Qt.formatDateTime(new Date(fromLine.lastMsg.date), "ddd d MMM, HH:mm");
+                                    return (addr !== "" ? addr + "  ·  " : "") + when;
+                                }
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceTextAlpha
+                                maximumLineCount: 1
+                            }
                         }
                     }
 

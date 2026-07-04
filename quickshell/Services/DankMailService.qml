@@ -71,6 +71,32 @@ Singleton {
         return "";
     }
 
+    // parseAddress splits an RFC-style display string ('"Ada L." <a@x>')
+    // into {name, email}; bare addresses land in email with empty name.
+    function parseAddress(raw) {
+        if (!raw)
+            return {
+                "name": "",
+                "email": ""
+            };
+        const m = raw.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+        if (m)
+            return {
+                "name": m[1].trim(),
+                "email": m[2].trim()
+            };
+        return {
+            "name": "",
+            "email": raw.trim()
+        };
+    }
+
+    // displayName favors the human name, falling back to the address.
+    function displayName(raw) {
+        const a = parseAddress(raw);
+        return a.name !== "" ? a.name : a.email;
+    }
+
     // Account wizard data (guides/presets served by the daemon, dcal
     // pattern).
     property var gmailSetupSteps: []
