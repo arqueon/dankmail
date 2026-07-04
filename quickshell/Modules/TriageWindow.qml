@@ -66,6 +66,49 @@ FloatingWindow {
         return Qt.formatDate(d, "dd/MM/yy");
     }
 
+    function escapeHtml(s) {
+        return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // linkify wraps http(s)/mailto URLs in already-escaped text.
+    function linkify(escaped) {
+        return escaped.replace(/(https?:\/\/[^\s&]*(?:&amp;[^\s&]*)*|mailto:[^\s<]+)/g, url => {
+            return `<a href="${url.replace(/&amp;/g, "&")}"><font color="${Theme.primary}">${url}</font></a>`;
+        });
+    }
+
+    // formatBody turns the plain-text body into our own presentation
+    // markup (this is NOT rendering the email's HTML — the source stays
+    // plain text): quote levels ('>', '>>', …) become indented, colored
+    // blocks with the markers stripped, and URLs become clickable.
+    function formatBody(text) {
+        const quoteColors = [String(Theme.surfaceText), String(Theme.primary), String(Theme.success), String(Theme.warning), String(Theme.secondary)];
+        const lines = text.split("\n");
+        let html = "";
+        let depth = 0;
+        for (let i = 0; i < lines.length; i++) {
+            const m = lines[i].match(/^\s*((?:>\s?)+)/);
+            const d = m ? (m[1].match(/>/g) || []).length : 0;
+            const content = m ? lines[i].substring(m[0].length) : lines[i];
+            while (depth < d) {
+                html += "<blockquote>";
+                depth++;
+            }
+            while (depth > d) {
+                html += "</blockquote>";
+                depth--;
+            }
+            const color = quoteColors[Math.min(d, quoteColors.length - 1)];
+            const body = linkify(escapeHtml(content));
+            html += `<font color="${color}">${body === "" ? "&nbsp;" : body}</font><br>`;
+        }
+        while (depth > 0) {
+            html += "</blockquote>";
+            depth--;
+        }
+        return html;
+    }
+
     AccountAddModal {
         id: accountModal
     }
@@ -614,7 +657,7 @@ FloatingWindow {
                             readOnly: true
                             selectByMouse: true
                             wrapMode: TextEdit.Wrap
-                            textFormat: TextEdit.PlainText
+                            textFormat: TextEdit.RichText
                             color: Theme.surfaceText
                             selectionColor: Theme.primarySelected
                             font.family: Theme.fontFamily
@@ -623,7 +666,16 @@ FloatingWindow {
                                 const t = DankMailService.currentThread;
                                 if (!t || !t.messages || t.messages.length === 0)
                                     return "";
-                                return t.messages[t.messages.length - 1].bodyText || "";
+                                return window.formatBody(t.messages[t.messages.length - 1].bodyText || "");
+                            }
+                            onLinkActivated: link => {
+                                if (link.startsWith("http://") || link.startsWith("https://") || link.startsWith("mailto:"))
+                                    Qt.openUrlExternally(link);
+                            }
+
+                            HoverHandler {
+                                enabled: bodyText.hoveredLink !== ""
+                                cursorShape: Qt.PointingHandCursor
                             }
                         }
                     }
