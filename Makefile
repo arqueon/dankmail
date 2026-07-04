@@ -51,25 +51,27 @@ vet:
 generate:
 	@$(MAKE) -C $(CORE_DIR) generate
 
+# DESTDIR is honored for packaging (PKGBUILD et al.); cache-refresh
+# commands only run on direct installs.
 install-bin:
 	@test -f $(BUILD_DIR)/$(BINARY_NAME) || { echo "$(BUILD_DIR)/$(BINARY_NAME) not found; run 'make' first"; exit 1; }
-	@echo "Installing $(BINARY_NAME) to $(INSTALL_DIR)..."
-	@install -D -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(INSTALL_DIR)/$(BINARY_NAME)
+	@echo "Installing $(BINARY_NAME) to $(DESTDIR)$(INSTALL_DIR)..."
+	@install -D -m 755 $(BUILD_DIR)/$(BINARY_NAME) $(DESTDIR)$(INSTALL_DIR)/$(BINARY_NAME)
 
 install-shell:
-	@echo "Installing shell files to $(SHELL_INSTALL_DIR)..."
-	@mkdir -p $(SHELL_INSTALL_DIR)
-	@cp -r $(SHELL_DIR)/* $(SHELL_INSTALL_DIR)/
+	@echo "Installing shell files to $(DESTDIR)$(SHELL_INSTALL_DIR)..."
+	@mkdir -p $(DESTDIR)$(SHELL_INSTALL_DIR)
+	@cp -r $(SHELL_DIR)/* $(DESTDIR)$(SHELL_INSTALL_DIR)/
 
 install-icon:
 	@echo "Installing icon..."
-	@install -D -m 644 $(SHELL_DIR)/assets/$(ICON_NAME).svg $(ICON_DIR)/$(ICON_NAME).svg
-	@gtk-update-icon-cache -q $(DATA_DIR)/icons/hicolor 2>/dev/null || true
+	@install -D -m 644 $(SHELL_DIR)/assets/$(ICON_NAME).svg $(DESTDIR)$(ICON_DIR)/$(ICON_NAME).svg
+	@if [ -z "$(DESTDIR)" ]; then gtk-update-icon-cache -q $(DATA_DIR)/icons/hicolor 2>/dev/null || true; fi
 
 install-desktop:
 	@echo "Installing desktop entry..."
-	@install -D -m 644 $(ASSETS_DIR)/$(DESKTOP_ID).desktop $(APPLICATIONS_DIR)/$(DESKTOP_ID).desktop
-	@update-desktop-database -q $(APPLICATIONS_DIR) 2>/dev/null || true
+	@install -D -m 644 $(ASSETS_DIR)/$(DESKTOP_ID).desktop $(DESTDIR)$(APPLICATIONS_DIR)/$(DESKTOP_ID).desktop
+	@if [ -z "$(DESTDIR)" ]; then update-desktop-database -q $(APPLICATIONS_DIR) 2>/dev/null || true; fi
 
 install-systemd:
 	@echo "Installing systemd user service to $(SYSTEMD_USER_DIR)..."
