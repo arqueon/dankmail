@@ -418,14 +418,14 @@ FloatingWindow {
 
                 DankTextField {
                     Layout.fillWidth: true
-                    label: I18n.tr("Client ID", "account wizard")
+                    placeholderText: I18n.tr("Client ID", "account wizard")
                     text: modal.clientId
                     onTextChanged: modal.clientId = text
                 }
 
                 DankTextField {
                     Layout.fillWidth: true
-                    label: I18n.tr("Client Secret", "account wizard")
+                    placeholderText: I18n.tr("Client Secret", "account wizard")
                     text: modal.clientSecret
                     echoMode: TextInput.Password
                     onTextChanged: modal.clientSecret = text
@@ -571,14 +571,14 @@ FloatingWindow {
 
                     DankTextField {
                         Layout.fillWidth: true
-                        label: I18n.tr("Email address", "account wizard")
+                        placeholderText: I18n.tr("Email address", "account wizard")
                         text: modal.imapEmail
                         onTextChanged: modal.imapEmail = text
                     }
 
                     DankTextField {
                         Layout.fillWidth: true
-                        label: I18n.tr("Password (or app password)", "account wizard")
+                        placeholderText: I18n.tr("Password (or app password)", "account wizard")
                         text: modal.imapPassword
                         echoMode: TextInput.Password
                         onTextChanged: modal.imapPassword = text
@@ -590,14 +590,14 @@ FloatingWindow {
 
                         DankTextField {
                             Layout.fillWidth: true
-                            label: I18n.tr("IMAP server", "account wizard")
+                            placeholderText: I18n.tr("IMAP server", "account wizard")
                             text: modal.imapHost
                             onTextChanged: modal.imapHost = text
                         }
 
                         DankTextField {
                             Layout.preferredWidth: 110
-                            label: I18n.tr("Port", "account wizard")
+                            placeholderText: I18n.tr("Port", "account wizard")
                             text: modal.imapPort
                             onTextChanged: modal.imapPort = text
                         }
@@ -629,14 +629,14 @@ FloatingWindow {
 
                         DankTextField {
                             Layout.fillWidth: true
-                            label: I18n.tr("SMTP server (for replies, next ring)", "account wizard")
+                            placeholderText: I18n.tr("SMTP server (for replies, next ring)", "account wizard")
                             text: modal.imapSmtpHost
                             onTextChanged: modal.imapSmtpHost = text
                         }
 
                         DankTextField {
                             Layout.preferredWidth: 110
-                            label: I18n.tr("Port", "account wizard")
+                            placeholderText: I18n.tr("Port", "account wizard")
                             text: modal.imapSmtpPort
                             onTextChanged: modal.imapSmtpPort = text
                         }
