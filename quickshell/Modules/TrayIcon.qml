@@ -65,8 +65,15 @@ Item {
                 separator: true
             }
 
+            // Closing the UI leaves the daemon running: notifications
+            // keep arriving and `dmail show` brings the window back.
             Platform.MenuItem {
-                text: I18n.tr("Quit", "tray menu")
+                text: I18n.tr("Close interface (daemon keeps running)", "tray menu")
+                onTriggered: Qt.quit()
+            }
+
+            Platform.MenuItem {
+                text: I18n.tr("Stop dankmail completely", "tray menu")
                 onTriggered: DankMailService.quit()
             }
         }

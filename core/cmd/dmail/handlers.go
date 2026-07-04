@@ -164,11 +164,15 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 	})
 
 	srv.Register("ui.show", func(ctx context.Context, _ map[string]any) (any, error) {
-		d.bus.Publish("ui.show", nil)
+		if !d.ensureUIVisible() {
+			d.bus.Publish("ui.show", nil)
+		}
 		return "ok", nil
 	})
 	srv.Register("ui.toggle", func(ctx context.Context, _ map[string]any) (any, error) {
-		d.bus.Publish("ui.toggle", nil)
+		if !d.ensureUIVisible() {
+			d.bus.Publish("ui.toggle", nil)
+		}
 		return "ok", nil
 	})
 	srv.Register("ui.openLink", func(ctx context.Context, p map[string]any) (any, error) {

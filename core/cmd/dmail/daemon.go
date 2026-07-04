@@ -42,6 +42,14 @@ type daemon struct {
 	exit   context.CancelFunc
 	flows  *flowRegistry
 
+	// UI lifecycle: the daemon owns the Quickshell process and respawns
+	// it on demand (ui.show/ui.toggle) — the window is a view, the
+	// daemon is the program.
+	rootCtx  context.Context
+	shellDir string
+	uiMu     gosync.Mutex
+	uiProc   *os.Process
+
 	mu     gosync.Mutex
 	engine *dsync.Engine
 }
@@ -143,17 +151,11 @@ func runDaemon(shellDir string, hidden bool) error {
 		d.engineLoop(rootCtx)
 	}()
 
-	// Optional UI.
+	// Optional UI (respawnable later via ui.show/ui.toggle).
+	d.rootCtx = rootCtx
+	d.shellDir = shellDir
 	if shellDir != "" {
-		args := []string{"-p", shellDir}
-		cmd := exec.CommandContext(rootCtx, "qs", args...)
-		cmd.Env = os.Environ()
-		if hidden {
-			cmd.Env = append(cmd.Env, "DMAIL_START_HIDDEN=1")
-		}
-		if err := cmd.Start(); err != nil {
-			slog.Warn("quickshell not started", "err", err)
-		}
+		d.startUI(hidden)
 	}
 
 	slog.Info("dankmail daemon running", "version", Version, "db", dbPath, "socket", paths.SocketPath())
@@ -200,6 +202,52 @@ func (d *daemon) engineLoop(ctx context.Context) {
 			<-done
 		}
 	}
+}
+
+// uiAlive reports whether the Quickshell child is still running.
+func (d *daemon) uiAlive() bool {
+	d.uiMu.Lock()
+	defer d.uiMu.Unlock()
+	return d.uiProc != nil
+}
+
+// startUI spawns Quickshell pointed at the configured shell dir. No-op
+// when a UI is already running or the daemon is headless (no shell dir).
+func (d *daemon) startUI(hidden bool) {
+	d.uiMu.Lock()
+	defer d.uiMu.Unlock()
+	if d.shellDir == "" || d.uiProc != nil {
+		return
+	}
+	cmd := exec.CommandContext(d.rootCtx, "qs", "-p", d.shellDir)
+	cmd.Env = os.Environ()
+	if hidden {
+		cmd.Env = append(cmd.Env, "DMAIL_START_HIDDEN=1")
+	}
+	if err := cmd.Start(); err != nil {
+		slog.Warn("quickshell not started", "err", err)
+		return
+	}
+	d.uiProc = cmd.Process
+	slog.Info("ui started", "pid", cmd.Process.Pid, "hidden", hidden)
+	go func() {
+		_ = cmd.Wait()
+		d.uiMu.Lock()
+		d.uiProc = nil
+		d.uiMu.Unlock()
+		slog.Info("ui exited; daemon keeps running (dmail show relaunches it)")
+	}()
+}
+
+// ensureUIVisible relaunches the UI if it is gone; used by the
+// ui.show/ui.toggle IPC handlers so the window can always come back
+// while the daemon lives.
+func (d *daemon) ensureUIVisible() bool {
+	if d.uiAlive() {
+		return false
+	}
+	d.startUI(false) // start with the window visible
+	return true
 }
 
 // requestReload asks engineLoop for a registry rebuild + engine restart,

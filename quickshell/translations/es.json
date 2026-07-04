@@ -7,7 +7,8 @@
     "Sync now": "Sincronizar ahora",
     "Enable do-not-disturb": "Activar no molestar",
     "Disable do-not-disturb": "Desactivar no molestar",
-    "Quit": "Salir"
+    "Close interface (daemon keeps running)": "Cerrar interfaz (el daemon sigue)",
+    "Stop dankmail completely": "Detener dankmail por completo"
   },
   "filter": {
     "All": "Todos",
