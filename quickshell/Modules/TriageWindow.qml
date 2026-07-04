@@ -14,6 +14,15 @@ FloatingWindow {
 
     signal hideRequested
 
+    // Closing via the window manager (e.g. niri's close-window bind)
+    // kills the surface without going through our X/Esc paths; mirror
+    // that into the loader so the next "show" recreates the window
+    // instead of focusing a ghost.
+    onVisibleChanged: {
+        if (!visible)
+            hideRequested();
+    }
+
     title: "Dank Mail"
     implicitWidth: 980
     implicitHeight: 620
