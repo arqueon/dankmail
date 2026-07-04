@@ -29,7 +29,21 @@
   "account wizard title": {
     "Add account": "Añadir cuenta"
   },
+  "provider chooser": {
+    "Official API: full triage, minimal scopes, guided OAuth setup.": "API oficial: triage completo, scopes mínimos, configuración OAuth guiada.",
+    "Other provider (IMAP)": "Otro proveedor (IMAP)",
+    "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge o tu propio servidor. Se guarda y verifica ahora; la sincronización llega con el anillo IMAP."
+  },
   "account wizard": {
+    "Choose your mail provider": "Elige tu proveedor de correo",
+    "IMAP account": "Cuenta IMAP",
+    "Pick your provider or configure a custom server. The connection is tested before anything is saved; the password goes to your system keyring.": "Elige tu proveedor o configura un servidor propio. La conexión se prueba antes de guardar nada; la contraseña va al keyring del sistema.",
+    "Email address": "Dirección de correo",
+    "Password (or app password)": "Contraseña (o app password)",
+    "IMAP server": "Servidor IMAP",
+    "Port": "Puerto",
+    "SMTP server (for replies, next ring)": "Servidor SMTP (para responder, siguiente anillo)",
+    "Connection verified and account stored. IMAP syncing arrives with the next ring; the account stays parked until then.": "Conexión verificada y cuenta guardada. La sincronización IMAP llega en el siguiente anillo; la cuenta queda en pausa hasta entonces.",
     "Set up your Google OAuth client": "Configura tu cliente OAuth de Google",
     "Enter your client credentials": "Introduce las credenciales del cliente",
     "Authorize in the browser": "Autoriza en el navegador",
@@ -47,7 +61,9 @@
     "Authorize": "Autorizar",
     "Cancel": "Cancelar",
     "Done": "Listo",
-    "Already have a client? Skip the guide.": "¿Ya tienes un cliente? Salta la guía."
+    "Already have a client? Skip the guide.": "¿Ya tienes un cliente? Salta la guía.",
+    "Add account": "Añadir cuenta",
+    "Testing connection…": "Probando conexión…"
   },
   "empty preview": {
     "Select a thread": "Selecciona un hilo"

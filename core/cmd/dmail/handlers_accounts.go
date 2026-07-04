@@ -125,6 +125,35 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		return map[string]any{"cancelled": ok}, nil
 	})
 
+	srv.Register("accounts.imap.presets", func(ctx context.Context, _ map[string]any) (any, error) {
+		return accounts.IMAPPresets(), nil
+	})
+
+	srv.Register("accounts.imap.add", func(ctx context.Context, p map[string]any) (any, error) {
+		email, _ := p["email"].(string)
+		password, _ := p["password"].(string)
+		cfg := accounts.IMAPConfig{}
+		cfg.Host, _ = p["host"].(string)
+		if port, ok := p["port"].(float64); ok {
+			cfg.Port = int(port)
+		}
+		cfg.Security, _ = p["security"].(string)
+		cfg.Username, _ = p["username"].(string)
+		cfg.SMTPHost, _ = p["smtpHost"].(string)
+		if port, ok := p["smtpPort"].(float64); ok {
+			cfg.SMTPPort = int(port)
+		}
+		cfg.WebmailURL, _ = p["webmailUrl"].(string)
+
+		res, err := accounts.AddIMAP(ctx, d.db, cfg, email, password)
+		if err != nil {
+			return nil, err
+		}
+		d.requestReload()
+		d.bus.Publish("accounts.changed", map[string]any{"accountId": res.AccountID})
+		return res, nil
+	})
+
 	srv.Register("accounts.remove", func(ctx context.Context, p map[string]any) (any, error) {
 		idStr, _ := p["id"].(string)
 		id, err := parseUUID(idStr)

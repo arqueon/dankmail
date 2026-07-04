@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	gosync "sync"
@@ -16,6 +17,10 @@ import (
 	"github.com/arqueon/dankmail/core/internal/provider"
 	"github.com/arqueon/dankmail/core/internal/provider/gmail"
 )
+
+// errProviderPending marks account types whose sync provider is not
+// shipped yet (IMAP: anillo 2). The account is stored and parked.
+var errProviderPending = errors.New("sync provider for this account type arrives in the next ring; account parked (paused)")
 
 // registry builds and caches one provider instance per account. rebuild
 // is called at daemon start and on system.reload (account added/removed
@@ -50,7 +55,18 @@ func (r *registry) rebuild(ctx context.Context) error {
 	next := map[uuid.UUID]provider.Provider{}
 	for _, a := range accts {
 		p, err := r.build(ctx, a)
-		if err != nil {
+		switch {
+		case errors.Is(err, errProviderPending):
+			// Account type stored but its sync provider isn't shipped
+			// yet: park it (paused, not an auth failure).
+			if a.Status == account.StatusActive {
+				_, _ = r.db.Account.UpdateOneID(a.ID).
+					SetStatus(account.StatusPaused).
+					SetLastError(err.Error()).
+					Save(ctx)
+			}
+			continue
+		case err != nil:
 			slog.Warn("provider unavailable", "account", a.Email, "err", err)
 			_, _ = r.db.Account.UpdateOneID(a.ID).
 				SetStatus(account.StatusAuthError).
@@ -91,7 +107,7 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 		}
 		return gmail.NewWithClient(a.ID.String(), a.Email, oauth2.NewClient(ctx, ts), opts)
 	case account.TypeImap:
-		return nil, fmt.Errorf("imap provider lands in anillo 2")
+		return nil, errProviderPending
 	default:
 		return nil, fmt.Errorf("unknown account type %q", a.Type)
 	}

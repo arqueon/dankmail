@@ -71,10 +71,12 @@ Singleton {
         return "";
     }
 
-    // Gmail account wizard (guide served by the daemon, dcal pattern).
+    // Account wizard data (guides/presets served by the daemon, dcal
+    // pattern).
     property var gmailSetupSteps: []
     property string gmailDefaultClientId: ""
     property bool gmailHasDefaultCreds: false
+    property var imapPresets: []
 
     property var pendingRequests: ({})
     property int requestCounter: 0
@@ -400,6 +402,17 @@ Singleton {
             gmailDefaultClientId = resp.result.defaultClientId || "";
             gmailHasDefaultCreds = !!resp.result.hasDefaultCreds;
         });
+        sendRequest("accounts.imap.presets", null, resp => {
+            if (!resp.error && resp.result)
+                imapPresets = resp.result;
+        });
+    }
+
+    // params: {email, password, host, port, security, username, smtpHost,
+    // smtpPort, webmailUrl}. The daemon tests the connection before
+    // storing anything. callback({accountId, email}) or {error}.
+    function addImapAccount(params, callback) {
+        sendRequest("accounts.imap.add", params, resp => callback(resp.error ? resp : resp.result));
     }
 
     // callback({state, authUrl}) or callback({error}).
