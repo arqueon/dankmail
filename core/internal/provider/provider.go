@@ -104,6 +104,13 @@ type MessageDelta struct {
 	ReplyHeaders map[string]string
 }
 
+// Canonical keys providers must use in MessageDelta.ReplyHeaders.
+const (
+	HeaderSubject    = "Subject"
+	HeaderReferences = "References"
+	HeaderReplyTo    = "Reply-To"
+)
+
 // ReplyDraft is a plain-text reply to an existing thread. The provider is
 // responsible for building the MIME message: quoting is NOT included, the
 // body is sent as-is; In-Reply-To/References come from the original message.
@@ -153,6 +160,11 @@ type Provider interface {
 
 	// Archive removes the threads from the inbox. Requires CapArchive.
 	Archive(ctx context.Context, threadIDs []string) error
+
+	// Unarchive puts the threads back in the inbox (Gmail: add INBOX;
+	// IMAP: MOVE back from the archive folder). Required by the local
+	// snooze wake-up and the star→inbox action hook. Requires CapArchive.
+	Unarchive(ctx context.Context, threadIDs []string) error
 
 	// Trash moves the threads to the provider trash (Gmail TRASH label,
 	// IMAP \Trash folder). Never permanent deletion. Requires CapTrash.
