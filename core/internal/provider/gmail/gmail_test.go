@@ -61,6 +61,9 @@ type fakeAPI struct {
 
 	sent    []sentCall
 	sendErr error
+
+	searchPages []listPage
+	lastQuery   string
 }
 
 func (f *fakeAPI) record(name string) { f.calls = append(f.calls, name) }
@@ -148,6 +151,20 @@ func (f *fakeAPI) SendMessage(_ context.Context, threadID string, raw []byte) er
 	}
 	f.sent = append(f.sent, sentCall{threadID: threadID, raw: raw})
 	return nil
+}
+
+func (f *fakeAPI) SearchThreads(_ context.Context, query string, pageToken string) ([]string, string, error) {
+	f.record("SearchThreads")
+	f.lastQuery = query
+	pages := f.searchPages
+	idx := 0
+	if pageToken != "" {
+		idx, _ = strconv.Atoi(pageToken)
+	}
+	if idx >= len(pages) {
+		return nil, "", nil
+	}
+	return pages[idx].ids, pages[idx].next, nil
 }
 
 func (f *fakeAPI) GetProfile(_ context.Context) (string, uint64, error) {
@@ -836,5 +853,47 @@ func TestMessageDeltaPlainTextPreferredOverHTML(t *testing.T) {
 	}
 	if d := p.messageDelta(m); d.BodyText != "texto plano" {
 		t.Errorf("body = %q, want the text/plain part untouched", d.BodyText)
+	}
+}
+
+// ---- remote search -----------------------------------------------------
+
+func TestSearchRemote(t *testing.T) {
+	f := &fakeAPI{
+		threads:     fixtureThreads(),
+		searchPages: []listPage{{ids: []string{"t1", "t2"}, next: "1"}, {ids: []string{"t3"}}},
+	}
+	p := newTestProvider(f, Options{})
+
+	changes, err := p.SearchRemote(context.Background(), "from:eve tesis", 25)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !changes.Backfill {
+		t.Error("Backfill = false, want true (search results must not notify)")
+	}
+	if changes.FullResync {
+		t.Error("FullResync must be false for search results")
+	}
+	if f.lastQuery != "from:eve tesis" {
+		t.Errorf("query = %q", f.lastQuery)
+	}
+	if len(changes.Upserted) != 3 {
+		t.Fatalf("upserted = %d, want 3 across pages", len(changes.Upserted))
+	}
+}
+
+func TestSearchRemoteHonorsLimit(t *testing.T) {
+	f := &fakeAPI{
+		threads:     fixtureThreads(),
+		searchPages: []listPage{{ids: []string{"t1", "t2", "t3"}}},
+	}
+	p := newTestProvider(f, Options{})
+	changes, err := p.SearchRemote(context.Background(), "x", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(changes.Upserted) != 2 {
+		t.Errorf("upserted = %d, want limit 2", len(changes.Upserted))
 	}
 }

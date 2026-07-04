@@ -64,6 +64,9 @@ type Changes struct {
 	// the local cache for the account must be reconciled against it, and
 	// threads absent from it treated as gone.
 	FullResync bool
+	// Backfill marks deltas that ingest OLD mail on purpose (remote
+	// search results): upsert normally but never notify, never prune.
+	Backfill bool
 	// Upserted holds new or modified threads with their messages.
 	Upserted []ThreadDelta
 	// RemovedThreadIDs lists provider thread IDs that left the monitored
@@ -140,6 +143,15 @@ type ComposeDraft struct {
 	To      []string
 	Subject string
 	Body    string
+}
+
+// RemoteSearcher is an optional interface (dcal-style: assert with a
+// type switch, never assume): providers whose backend can search the
+// FULL mailbox history server-side implement it. Results are deltas
+// meant to be ingested as backfill — Changes.Backfill must be true so
+// the reconciler suppresses notifications for old mail.
+type RemoteSearcher interface {
+	SearchRemote(ctx context.Context, query string, limit int) (Changes, error)
 }
 
 // Provider is implemented once per account type. Implementations must be

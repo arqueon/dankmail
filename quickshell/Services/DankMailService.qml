@@ -444,6 +444,28 @@ Singleton {
         }, null);
     }
 
+    // searchRemoteHistory sweeps the FULL mailbox history server-side
+    // (Gmail q= search) and ingests the results as cache backfill; the
+    // refresh then surfaces them in the local search view.
+    property bool remoteSearching: false
+
+    function searchRemoteHistory(query) {
+        if (remoteSearching)
+            return;
+        remoteSearching = true;
+        const params = {
+            "query": query
+        };
+        if (filterAccount !== "")
+            params.account = filterAccount;
+        sendRequest("threads.searchRemote", params, resp => {
+            remoteSearching = false;
+            if (resp.error)
+                log.warn("threads.searchRemote:", resp.error);
+            refreshThreads();
+        });
+    }
+
     // openWebSearch continues the query in the webmail (Gmail #search
     // deep link), scoped to the account filter when one is active.
     function openWebSearch(query) {

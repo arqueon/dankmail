@@ -43,9 +43,9 @@ func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider
 		seen := make(map[string]bool, len(ch.Upserted))
 		for _, delta := range ch.Upserted {
 			seen[delta.ThreadID] = true
-			// A FullResync is a backfill: it must never fire
-			// notifications for the history it (re)ingests.
-			arr, err := upsertThread(ctx, tx, accountID, delta, frozen[delta.ThreadID], !ch.FullResync)
+			// FullResync and Backfill (remote search results) re-ingest
+			// history on purpose: never fire notifications for it.
+			arr, err := upsertThread(ctx, tx, accountID, delta, frozen[delta.ThreadID], !ch.FullResync && !ch.Backfill)
 			if err != nil {
 				return err
 			}

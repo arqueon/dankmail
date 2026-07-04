@@ -224,6 +224,41 @@ func collectThreadIDs(dst map[string]bool, h *gmailv1.History) {
 	}
 }
 
+// SearchRemote implements provider.RemoteSearcher: a server-side sweep
+// of the FULL mailbox history via Gmail's search syntax. Results come
+// back as Backfill deltas (upserted into the cache, never notified).
+func (p *Provider) SearchRemote(ctx context.Context, query string, limit int) (provider.Changes, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	changes := provider.Changes{Backfill: true}
+	pageToken := ""
+	for len(changes.Upserted) < limit {
+		ids, next, err := p.api.SearchThreads(ctx, query, pageToken)
+		if err != nil {
+			return provider.Changes{}, classify(err)
+		}
+		for _, id := range ids {
+			if len(changes.Upserted) >= limit {
+				break
+			}
+			t, err := p.api.GetThread(ctx, id)
+			if err != nil {
+				if isNotFound(err) {
+					continue
+				}
+				return provider.Changes{}, classify(err)
+			}
+			changes.Upserted = append(changes.Upserted, p.threadDelta(t))
+		}
+		if next == "" {
+			break
+		}
+		pageToken = next
+	}
+	return changes, nil
+}
+
 // ModifyFlags maps provider flags to Gmail labels (unread→UNREAD,
 // starred→STARRED) and applies them per thread.
 func (p *Provider) ModifyFlags(ctx context.Context, threadIDs []string, add, remove []provider.Flag) error {

@@ -26,7 +26,7 @@
     "Daemon offline": "Daemon desconectado",
     "No accounts yet": "Aún no hay cuentas",
     "Add a Gmail account": "Añadir cuenta de Gmail",
-    "No local results — try the web search button": "Sin resultados locales — prueba el botón de búsqueda web"
+    "No local results — search the full history or the web": "Sin resultados locales — busca en el historial completo o en la web"
   },
   "search": {
     "Search mail…": "Buscar correo…"

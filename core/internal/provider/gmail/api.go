@@ -42,4 +42,8 @@ type gmailAPI interface {
 
 	// GetProfile returns the account email address and current historyId.
 	GetProfile(ctx context.Context) (email string, historyID uint64, err error)
+
+	// SearchThreads returns one page of thread IDs matching a Gmail
+	// search query (users.threads.list with q; full-history, server-side).
+	SearchThreads(ctx context.Context, query string, pageToken string) (ids []string, nextPageToken string, err error)
 }

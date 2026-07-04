@@ -100,6 +100,22 @@ func (r *realAPI) SendMessage(ctx context.Context, threadID string, raw []byte) 
 	return err
 }
 
+func (r *realAPI) SearchThreads(ctx context.Context, query string, pageToken string) ([]string, string, error) {
+	call := r.svc.Users.Threads.List(userID).Q(query).Context(ctx)
+	if pageToken != "" {
+		call = call.PageToken(pageToken)
+	}
+	resp, err := call.Do()
+	if err != nil {
+		return nil, "", err
+	}
+	ids := make([]string, 0, len(resp.Threads))
+	for _, t := range resp.Threads {
+		ids = append(ids, t.Id)
+	}
+	return ids, resp.NextPageToken, nil
+}
+
 func (r *realAPI) GetProfile(ctx context.Context) (string, uint64, error) {
 	p, err := r.svc.Users.GetProfile(userID).Context(ctx).Do()
 	if err != nil {

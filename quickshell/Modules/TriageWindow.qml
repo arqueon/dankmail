@@ -356,6 +356,16 @@ FloatingWindow {
 
                 }
 
+                // Deep history: server-side Gmail search, results ingested
+                // into the cache (old mail becomes triageable locally).
+                DankActionButton {
+                    visible: searchField.text.trim() !== ""
+                    enabled: !DankMailService.remoteSearching
+                    iconName: DankMailService.remoteSearching ? "hourglass_top" : "manage_search"
+                    iconColor: DankMailService.remoteSearching ? Theme.surfaceTextAlpha : Theme.surfaceText
+                    onClicked: DankMailService.searchRemoteHistory(searchField.text.trim())
+                }
+
                 DankActionButton {
                     visible: searchField.text.trim() !== ""
                     iconName: "travel_explore"
@@ -571,7 +581,7 @@ FloatingWindow {
                             if (DankMailService.accounts.length === 0)
                                 return I18n.tr("No accounts yet", "empty state");
                             if (DankMailService.searchQuery !== "")
-                                return I18n.tr("No local results — try the web search button", "empty state");
+                                return I18n.tr("No local results — search the full history or the web", "empty state");
                             return I18n.tr("Inbox zero", "empty state");
                         }
                         color: Theme.surfaceTextMedium
