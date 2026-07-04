@@ -1,6 +1,9 @@
-dankmail is licensed under GPL-3.0-or-later. Parts of this Quickshell configuration (Widgets/, Common/DankSocket.qml,
+dankmail is licensed under GPL-3.0-or-later (see ../LICENSE).
+
+Parts of this Quickshell configuration (Widgets/, Common/DankSocket.qml,
 Common/Paths.qml, Common/Anims.qml, bundled fonts, and the overall
-structure) are adapted from dankcalendar:
+structure) are adapted from dankcalendar and remain under their
+original MIT license:
 
   https://github.com/AvengeMedia/dankcalendar
   MIT License, Copyright (c) 2025-2026 Avenge Media LLC
