@@ -32,6 +32,7 @@ func GmailSetupSteps() []SetupStep {
 			Description: "With the new project selected, click \"Enable\" on the Gmail API page.",
 			URL:         "https://console.cloud.google.com/apis/library/gmail.googleapis.com",
 			URLLabel:    "Enable Gmail API",
+			Note:        "Ignore the \"Create credentials\" button the console shows afterwards — it steers you toward a service account or API key, which dankmail cannot use. The right credential is an OAuth client ID (Desktop app), created in the later steps after the consent screen is configured.",
 		},
 		{
 			Title:       "Configure the Google Auth Platform",
@@ -47,10 +48,10 @@ func GmailSetupSteps() []SetupStep {
 		},
 		{
 			Title:       "Create an OAuth client",
-			Description: "On the Clients page click \"Create client\", choose \"Desktop app\", and create it. Copy the Client ID and Client Secret for the next step.",
+			Description: "On the Clients page click \"Create client\" (in older consoles: Credentials → Create credentials → OAuth client ID), choose \"Desktop app\", and create it. Copy the Client ID and Client Secret for the next step.",
 			URL:         "https://console.cloud.google.com/auth/clients",
 			URLLabel:    "Open Clients page",
-			Note:        "dankmail will only request the gmail.modify and gmail.send scopes — never full mailbox access.",
+			Note:        "Application type must be \"Desktop app\" — NOT a service account, API key, or web application. dankmail will only request the gmail.modify and gmail.send scopes — never full mailbox access.",
 		},
 	}
 }

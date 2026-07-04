@@ -26,6 +26,11 @@ The full-access scope (`https://mail.google.com/`) is never used.
    (any name, e.g. "dankmail").
 2. Enable the **Gmail API**:
    <https://console.cloud.google.com/apis/library/gmail.googleapis.com>.
+   ⚠️ Ignore the "Create credentials" button the console offers right
+   after enabling — it steers you toward a **service account** or API
+   key, neither of which works for a personal mailbox. The credential
+   dankmail needs is an **OAuth client ID (Desktop app)**, created in
+   step 5 once the consent screen exists.
 3. Configure the Google Auth Platform
    (<https://console.cloud.google.com/auth/overview>): app name anything,
    support email your own, audience **External**. Nothing is published.
