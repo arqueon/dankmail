@@ -5,6 +5,14 @@ client**. You create a (free) client ID in Google Cloud Console once;
 dankmail never sees Google's verification process because the app runs
 in testing mode with you as the only test user.
 
+**The easiest path is the in-app wizard** (tray → Open Dank Mail → the
+person-add button, or the "Add a Gmail account" button when no account
+exists): it walks you through the exact steps below with direct links,
+takes the Client ID/Secret, and runs the OAuth consent — no environment
+variables needed. Credentials and tokens land in your system keyring,
+stored per account. The steps are served by the daemon over IPC
+(`accounts.gmail.setupGuide`), same pattern as dankcalendar.
+
 Scopes requested — and the only ones dankmail will ever request:
 
 - `gmail.modify` — read messages, change labels (read/star/archive/trash)
@@ -12,16 +20,25 @@ Scopes requested — and the only ones dankmail will ever request:
 
 The full-access scope (`https://mail.google.com/`) is never used.
 
-## Steps (to be expanded during Anillo 1)
+## Steps (what the wizard walks you through)
 
-1. Create a project at <https://console.cloud.google.com/>.
-2. Enable the **Gmail API** for the project.
-3. Configure the OAuth consent screen: type **External**, publishing
-   status **Testing**, add your own address as test user.
-4. Create credentials → **OAuth client ID** → application type
-   **Desktop app**.
-5. Export the client ID/secret to the daemon environment
-   (`DMAIL_GOOGLE_CLIENT_ID`, `DMAIL_GOOGLE_CLIENT_SECRET`) or enter
-   them in Settings → Accounts.
-6. Add the account in dankmail; the browser opens the consent page and
-   the token lands in your system keyring, never on disk.
+1. Create a project at <https://console.cloud.google.com/projectcreate>
+   (any name, e.g. "dankmail").
+2. Enable the **Gmail API**:
+   <https://console.cloud.google.com/apis/library/gmail.googleapis.com>.
+3. Configure the Google Auth Platform
+   (<https://console.cloud.google.com/auth/overview>): app name anything,
+   support email your own, audience **External**. Nothing is published.
+4. Add yourself as **test user** on the Audience page
+   (<https://console.cloud.google.com/auth/audience>).
+5. Create an OAuth client of type **Desktop app**
+   (<https://console.cloud.google.com/auth/clients>) and copy the
+   Client ID and Client Secret.
+6. Enter them in the wizard and authorize in the browser — or, for the
+   CLI path, export `DMAIL_GOOGLE_CLIENT_ID` /
+   `DMAIL_GOOGLE_CLIENT_SECRET` and run `dmail account add-gmail`.
+
+The account's address is read from the authorized Gmail profile (you
+never type it), and the token plus your OAuth client are stored in the
+system keyring per account — so token refresh works no matter how the
+daemon is started (systemd, terminal, etc.).

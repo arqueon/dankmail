@@ -7,6 +7,11 @@ import Quickshell.Io
 import qs.Common
 import qs.Services
 
+// NOTE: responses may arrive out of order (the daemon dispatches each
+// request on its own goroutine so long-running calls like the OAuth
+// complete don't block the connection); the pendingRequests map keyed by
+// id handles that.
+
 // Bridge to the dmail daemon over its unix IPC socket, mirroring
 // dankcalendar's DankCalService: one request/response connection with a
 // pending-callback map, one subscription connection for daemon events.
@@ -65,6 +70,11 @@ Singleton {
         }
         return "";
     }
+
+    // Gmail account wizard (guide served by the daemon, dcal pattern).
+    property var gmailSetupSteps: []
+    property string gmailDefaultClientId: ""
+    property bool gmailHasDefaultCreds: false
 
     property var pendingRequests: ({})
     property int requestCounter: 0
@@ -195,7 +205,9 @@ Singleton {
             refreshDebounce.restart();
             break;
         case "account.auth":
+        case "accounts.changed":
             refreshAccounts();
+            refreshDebounce.restart();
             break;
         case "dnd.changed":
             dndEnabled = !!(event.payload && event.payload.enabled);
@@ -251,6 +263,7 @@ Singleton {
         refreshAccounts();
         refreshThreads();
         refreshDnd();
+        refreshGmailSetupSteps();
     }
 
     function refreshAccounts() {
@@ -375,5 +388,48 @@ Singleton {
     function quit() {
         sendRequest("system.exit", null, null);
         Qt.quit();
+    }
+
+    // ---- gmail account wizard -------------------------------------------
+
+    function refreshGmailSetupSteps() {
+        sendRequest("accounts.gmail.setupGuide", null, resp => {
+            if (resp.error || !resp.result)
+                return;
+            gmailSetupSteps = resp.result.steps || [];
+            gmailDefaultClientId = resp.result.defaultClientId || "";
+            gmailHasDefaultCreds = !!resp.result.hasDefaultCreds;
+        });
+    }
+
+    // callback({state, authUrl}) or callback({error}).
+    function startGmailFlow(clientId, clientSecret, callback) {
+        sendRequest("accounts.gmail.start", {
+            "clientId": clientId,
+            "clientSecret": clientSecret
+        }, resp => callback(resp.error ? resp : resp.result));
+    }
+
+    // Long-running: resolves when the user finishes (or the daemon times
+    // out after 5 minutes). callback({accountId, email}) or {error}.
+    function completeGmailFlow(state, callback) {
+        sendRequest("accounts.gmail.complete", {
+            "state": state
+        }, resp => callback(resp.error ? resp : resp.result));
+    }
+
+    function cancelFlow(state) {
+        sendRequest("accounts.flow.cancel", {
+            "state": state
+        }, null);
+    }
+
+    function removeAccount(accountId) {
+        sendRequest("accounts.remove", {
+            "id": accountId
+        }, resp => {
+            if (resp.error)
+                log.warn("accounts.remove:", resp.error);
+        });
     }
 }

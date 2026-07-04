@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.Common
+import qs.Modals
 import qs.Services
 import qs.Widgets
 
@@ -63,6 +64,10 @@ FloatingWindow {
         if (d.getFullYear() === now.getFullYear())
             return Qt.formatDate(d, "d MMM");
         return Qt.formatDate(d, "dd/MM/yy");
+    }
+
+    AccountAddModal {
+        id: accountModal
     }
 
     Shortcut {
@@ -212,6 +217,11 @@ FloatingWindow {
                     text: I18n.tr("Daemon offline", "header status")
                     color: Theme.error
                     font.pixelSize: Theme.fontSizeSmall
+                }
+
+                DankActionButton {
+                    iconName: "person_add"
+                    onClicked: accountModal.show()
                 }
 
                 DankActionButton {
@@ -372,8 +382,35 @@ FloatingWindow {
 
                     StyledText {
                         Layout.alignment: Qt.AlignHCenter
-                        text: DankMailService.connected ? I18n.tr("Inbox zero", "empty state") : I18n.tr("Daemon offline", "empty state")
+                        text: {
+                            if (!DankMailService.connected)
+                                return I18n.tr("Daemon offline", "empty state");
+                            if (DankMailService.accounts.length === 0)
+                                return I18n.tr("No accounts yet", "empty state");
+                            return I18n.tr("Inbox zero", "empty state");
+                        }
                         color: Theme.surfaceTextMedium
+                    }
+
+                    StyledRect {
+                        visible: DankMailService.connected && DankMailService.accounts.length === 0
+                        Layout.alignment: Qt.AlignHCenter
+                        width: addAccountLabel.implicitWidth + Theme.spacingXL
+                        height: 38
+                        radius: 19
+                        color: Theme.primaryContainer
+
+                        StyledText {
+                            id: addAccountLabel
+                            anchors.centerIn: parent
+                            text: I18n.tr("Add a Gmail account", "empty state")
+                            color: Theme.primary
+                        }
+
+                        StateLayer {
+                            stateColor: Theme.primary
+                            onClicked: accountModal.show()
+                        }
                     }
                 }
             }

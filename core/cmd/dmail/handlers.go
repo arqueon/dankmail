@@ -215,10 +215,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		return "ok", nil
 	})
 	srv.Register("system.reload", func(ctx context.Context, _ map[string]any) (any, error) {
-		select {
-		case d.reload <- struct{}{}:
-		default:
-		}
+		d.requestReload()
 		return "ok", nil
 	})
 	srv.Register("system.exit", func(ctx context.Context, _ map[string]any) (any, error) {

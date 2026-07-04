@@ -10,6 +10,7 @@ const service = "dankmail"
 // Well-known secret keys per account.
 const (
 	KeyOAuthToken   = "oauth-token"   // JSON-serialized oauth2.Token
+	KeyOAuthClient  = "oauth-client"  // JSON {clientId, clientSecret} of the user's own OAuth app
 	KeyIMAPPassword = "imap-password" // password or app-password
 	KeySMTPPassword = "smtp-password" // only if different from IMAP
 )

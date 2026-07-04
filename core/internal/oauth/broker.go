@@ -5,12 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net"
-	"net/http"
 	"os/exec"
-	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -51,76 +47,44 @@ func (b *Broker) config(redirectURL string) *oauth2.Config {
 	}
 }
 
-// Authorize opens the browser, waits for the loopback redirect, and
-// exchanges the code (PKCE + state). Blocks until consent or ctx done.
+// Authorize is the CLI path: start a flow, open the browser, wait.
 func (b *Broker) Authorize(ctx context.Context) (*oauth2.Token, error) {
-	ln, err := net.Listen("tcp", b.bindAddr)
+	flow, err := b.StartFlow()
 	if err != nil {
 		return nil, err
 	}
-	defer ln.Close()
+	if err := b.openURL(flow.AuthURL()); err != nil {
+		flow.Close()
+		return nil, fmt.Errorf("oauth: cannot open browser (visit manually: %s): %w", flow.AuthURL(), err)
+	}
+	return flow.Wait(ctx)
+}
 
-	redirect := fmt.Sprintf("http://%s/callback", ln.Addr().String())
-	cfg := b.config(redirect)
-	verifier := oauth2.GenerateVerifier()
-	state, err := randomState()
+// ClientCreds is the user-supplied OAuth desktop client, stored in the
+// keyring next to the token so refresh works regardless of environment.
+type ClientCreds struct {
+	ClientID     string `json:"clientId"`
+	ClientSecret string `json:"clientSecret"`
+}
+
+func SaveClientCreds(accountID string, c ClientCreds) error {
+	raw, err := json.Marshal(c)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	return keyring.Set(accountID, keyring.KeyOAuthClient, string(raw))
+}
 
-	type result struct {
-		code string
-		err  error
+func LoadClientCreds(accountID string) (ClientCreds, error) {
+	raw, err := keyring.Get(accountID, keyring.KeyOAuthClient)
+	if err != nil {
+		return ClientCreds{}, err
 	}
-	resCh := make(chan result, 1)
-	srv := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/callback" {
-			http.NotFound(w, r)
-			return
-		}
-		q := r.URL.Query()
-		switch {
-		case q.Get("state") != state:
-			http.Error(w, "state mismatch", http.StatusBadRequest)
-			resCh <- result{err: errors.New("oauth: state mismatch")}
-		case q.Get("error") != "":
-			fmt.Fprintln(w, "Autorización denegada. Puedes cerrar esta pestaña.")
-			resCh <- result{err: fmt.Errorf("oauth: consent denied: %s", q.Get("error"))}
-		default:
-			fmt.Fprintln(w, "Cuenta autorizada. Puedes cerrar esta pestaña y volver a dankmail.")
-			resCh <- result{code: q.Get("code")}
-		}
-	})}
-	go func() { _ = srv.Serve(ln) }()
-	defer func() {
-		shutCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		_ = srv.Shutdown(shutCtx)
-	}()
-
-	authURL := cfg.AuthCodeURL(state,
-		oauth2.AccessTypeOffline,
-		oauth2.S256ChallengeOption(verifier),
-		// Force the refresh-token grant even on re-consent.
-		oauth2.SetAuthURLParam("prompt", "consent"),
-	)
-	if err := b.openURL(authURL); err != nil {
-		return nil, fmt.Errorf("oauth: cannot open browser (visit manually: %s): %w", authURL, err)
+	var c ClientCreds
+	if err := json.Unmarshal([]byte(raw), &c); err != nil {
+		return ClientCreds{}, err
 	}
-
-	select {
-	case <-ctx.Done():
-		return nil, ctx.Err()
-	case res := <-resCh:
-		if res.err != nil {
-			return nil, res.err
-		}
-		tok, err := cfg.Exchange(ctx, res.code, oauth2.VerifierOption(verifier))
-		if err != nil {
-			return nil, errdefs.Wrap(errdefs.KindAuth, err)
-		}
-		return tok, nil
-	}
+	return c, nil
 }
 
 // SaveToken persists tok in the keyring for accountID.

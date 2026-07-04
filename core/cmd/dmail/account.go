@@ -8,6 +8,7 @@ import (
 
 	"github.com/arqueon/dankmail/core/config"
 	"github.com/arqueon/dankmail/core/ent"
+	"github.com/arqueon/dankmail/core/internal/accounts"
 	"github.com/arqueon/dankmail/core/internal/keyring"
 	"github.com/arqueon/dankmail/core/internal/oauth"
 	"github.com/arqueon/dankmail/core/internal/paths"
@@ -21,10 +22,10 @@ func accountCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "account", Short: "Manage mail accounts"}
 
 	addGmail := &cobra.Command{
-		Use:   "add-gmail <email>",
-		Short: "Add a Gmail account (opens the browser for OAuth consent)",
-		Args:  cobra.ExactArgs(1),
-		RunE:  func(c *cobra.Command, args []string) error { return runAccountAddGmail(args[0]) },
+		Use:   "add-gmail",
+		Short: "Add a Gmail account (opens the browser for OAuth consent; the address is read from the authorized profile)",
+		Args:  cobra.NoArgs,
+		RunE:  func(c *cobra.Command, args []string) error { return runAccountAddGmail() },
 	}
 
 	list := &cobra.Command{
@@ -80,37 +81,32 @@ func withDB(fn func(ctx context.Context, db *ent.Client) error) error {
 	return fn(ctx, db)
 }
 
-func runAccountAddGmail(email string) error {
+func runAccountAddGmail() error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
 	if cfg.GoogleClientID == "" || cfg.GoogleClientSecret == "" {
-		return fmt.Errorf("set DMAIL_GOOGLE_CLIENT_ID and DMAIL_GOOGLE_CLIENT_SECRET first (see docs/gmail-setup.md)")
+		return fmt.Errorf("set DMAIL_GOOGLE_CLIENT_ID and DMAIL_GOOGLE_CLIENT_SECRET first,\nor use the in-app wizard (tray → Open Dank Mail → add account), which walks\nyou through creating the OAuth client (see also docs/gmail-setup.md)")
 	}
+	creds := oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
 
 	return withDB(func(ctx context.Context, db *ent.Client) error {
-		acct, err := db.Account.Create().
-			SetType("gmail").
-			SetEmail(email).
-			Save(ctx)
-		if err != nil {
-			return err
-		}
-
 		fmt.Println("Abriendo el navegador para autorizar la cuenta…")
-		broker := oauth.NewBroker(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthBindAddr)
+		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
 		tok, err := broker.Authorize(ctx)
 		if err != nil {
-			_ = db.Account.DeleteOne(acct).Exec(ctx)
 			return err
 		}
-		if err := oauth.SaveToken(acct.ID.String(), tok); err != nil {
-			_ = db.Account.DeleteOne(acct).Exec(ctx)
+		res, err := accounts.FinishGmail(ctx, db, creds, tok)
+		if err != nil {
 			return err
 		}
-
-		fmt.Printf("Cuenta %s añadida (%s).\n", email, acct.ID)
+		if res.Created {
+			fmt.Printf("Cuenta %s añadida (%s).\n", res.Email, res.AccountID)
+		} else {
+			fmt.Printf("Cuenta %s re-autorizada (%s).\n", res.Email, res.AccountID)
+		}
 		notifyDaemonReload()
 		return nil
 	})
@@ -125,7 +121,7 @@ func runAccountRemove(id string) error {
 		if err := db.Account.DeleteOneID(uid).Exec(ctx); err != nil {
 			return err
 		}
-		for _, key := range []string{keyring.KeyOAuthToken, keyring.KeyIMAPPassword, keyring.KeySMTPPassword} {
+		for _, key := range []string{keyring.KeyOAuthToken, keyring.KeyOAuthClient, keyring.KeyIMAPPassword, keyring.KeySMTPPassword} {
 			_ = keyring.Delete(id, key)
 		}
 		fmt.Println("Cuenta eliminada (la bandeja remota queda intacta).")
@@ -144,12 +140,23 @@ func runAccountReauth(id string) error {
 		if err != nil {
 			return fmt.Errorf("bad account id: %w", err)
 		}
-		broker := oauth.NewBroker(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.OAuthBindAddr)
+		// Prefer the OAuth client stored with the account at add time.
+		creds, err := oauth.LoadClientCreds(id)
+		if err != nil || creds.ClientID == "" {
+			creds = oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
+		}
+		if creds.ClientID == "" || creds.ClientSecret == "" {
+			return fmt.Errorf("no OAuth client for this account; set DMAIL_GOOGLE_CLIENT_ID/SECRET or re-add via the wizard")
+		}
+		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
 		tok, err := broker.Authorize(ctx)
 		if err != nil {
 			return err
 		}
 		if err := oauth.SaveToken(id, tok); err != nil {
+			return err
+		}
+		if err := oauth.SaveClientCreds(id, creds); err != nil {
 			return err
 		}
 		_, err = db.Account.UpdateOneID(uid).

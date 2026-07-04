@@ -69,7 +69,14 @@ func (r *registry) rebuild(ctx context.Context) error {
 func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider, error) {
 	switch a.Type {
 	case account.TypeGmail:
-		broker := oauth.NewBroker(r.cfg.GoogleClientID, r.cfg.GoogleClientSecret, r.cfg.OAuthBindAddr)
+		// The account's own OAuth client lives in the keyring (stored at
+		// add time); the environment is only a fallback for accounts
+		// added before that existed.
+		creds, err := oauth.LoadClientCreds(a.ID.String())
+		if err != nil || creds.ClientID == "" {
+			creds = oauth.ClientCreds{ClientID: r.cfg.GoogleClientID, ClientSecret: r.cfg.GoogleClientSecret}
+		}
+		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, r.cfg.OAuthBindAddr)
 		ts, err := broker.TokenSource(ctx, a.ID.String())
 		if err != nil {
 			return nil, err

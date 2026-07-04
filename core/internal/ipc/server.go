@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/arqueon/dankmail/core/internal/bus"
 )
@@ -82,47 +83,59 @@ func (s *Server) Serve(ctx context.Context) error {
 
 func (s *Server) handleConn(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
+	// The encoder is shared by concurrent request goroutines; writes are
+	// serialized through this mutex.
+	var wmu sync.Mutex
 	enc := json.NewEncoder(conn)
-	if err := enc.Encode(Capabilities{APIVersion: APIVersion, Features: Features}); err != nil {
+	write := func(v any) error {
+		wmu.Lock()
+		defer wmu.Unlock()
+		return enc.Encode(v)
+	}
+	if err := write(Capabilities{APIVersion: APIVersion, Features: Features}); err != nil {
 		return
 	}
 
 	sc := bufio.NewScanner(conn)
 	sc.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
 	for sc.Scan() {
-		line := sc.Bytes()
+		line := append([]byte(nil), sc.Bytes()...)
 		if len(line) == 0 {
 			continue
 		}
 		var req Request
 		if err := json.Unmarshal(line, &req); err != nil {
-			_ = enc.Encode(Response[any]{ID: req.ID, Error: "bad request: " + err.Error()})
+			_ = write(Response[any]{ID: req.ID, Error: "bad request: " + err.Error()})
 			continue
 		}
 		if req.Method == "subscribe" {
-			_ = enc.Encode(Response[string]{ID: req.ID, Result: ptr("subscribed")})
-			s.streamEvents(ctx, enc)
+			_ = write(Response[string]{ID: req.ID, Result: ptr("subscribed")})
+			s.streamEvents(ctx, write)
 			return
 		}
 		h, ok := s.handlers[req.Method]
 		if !ok {
-			_ = enc.Encode(Response[any]{ID: req.ID, Error: "unknown method: " + req.Method})
+			_ = write(Response[any]{ID: req.ID, Error: "unknown method: " + req.Method})
 			continue
 		}
-		result, err := h(ctx, req.Params)
-		if err != nil {
-			_ = enc.Encode(Response[any]{ID: req.ID, Error: err.Error()})
-			continue
-		}
-		if err := enc.Encode(Response[any]{ID: req.ID, Result: &result}); err != nil {
-			return
-		}
+		// Dispatch on a goroutine so long-running methods (OAuth
+		// complete waits minutes for consent) don't block the
+		// connection. Clients match responses by id, so out-of-order
+		// delivery is part of the protocol.
+		go func(req Request) {
+			result, err := h(ctx, req.Params)
+			if err != nil {
+				_ = write(Response[any]{ID: req.ID, Error: err.Error()})
+				return
+			}
+			_ = write(Response[any]{ID: req.ID, Result: &result})
+		}(req)
 	}
 }
 
 // streamEvents turns the connection into a one-way event feed until the
 // client disconnects or the daemon stops.
-func (s *Server) streamEvents(ctx context.Context, enc *json.Encoder) {
+func (s *Server) streamEvents(ctx context.Context, write func(any) error) {
 	id, ch := s.bus.Subscribe(64)
 	defer s.bus.Unsubscribe(id)
 	for {
@@ -133,7 +146,7 @@ func (s *Server) streamEvents(ctx context.Context, enc *json.Encoder) {
 			if !ok {
 				return
 			}
-			if err := enc.Encode(Event{Topic: ev.Topic, Payload: ev.Payload}); err != nil {
+			if err := write(Event{Topic: ev.Topic, Payload: ev.Payload}); err != nil {
 				return
 			}
 		}

@@ -22,7 +22,32 @@
   },
   "empty state": {
     "Inbox zero": "Bandeja en cero",
-    "Daemon offline": "Daemon desconectado"
+    "Daemon offline": "Daemon desconectado",
+    "No accounts yet": "Aún no hay cuentas",
+    "Add a Gmail account": "Añadir cuenta de Gmail"
+  },
+  "account wizard title": {
+    "Add account": "Añadir cuenta"
+  },
+  "account wizard": {
+    "Set up your Google OAuth client": "Configura tu cliente OAuth de Google",
+    "Enter your client credentials": "Introduce las credenciales del cliente",
+    "Authorize in the browser": "Autoriza en el navegador",
+    "Account added": "Cuenta añadida",
+    "Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.": "Pega el Client ID y el Client Secret del cliente OAuth que acabas de crear. Se guardan en el keyring del sistema, nunca en archivos.",
+    "Client ID": "Client ID",
+    "Client Secret": "Client Secret",
+    "Waiting for you to authorize dankmail in the browser…": "Esperando a que autorices dankmail en el navegador…",
+    "Reopen consent page": "Reabrir página de consentimiento",
+    "Syncing has started. New mail will appear shortly.": "La sincronización ha comenzado. El correo nuevo aparecerá en breve."
+  },
+  "account wizard nav": {
+    "Back": "Atrás",
+    "Next": "Siguiente",
+    "Authorize": "Autorizar",
+    "Cancel": "Cancelar",
+    "Done": "Listo",
+    "Already have a client? Skip the guide.": "¿Ya tienes un cliente? Salta la guía."
   },
   "empty preview": {
     "Select a thread": "Selecciona un hilo"

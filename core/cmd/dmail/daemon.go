@@ -37,6 +37,7 @@ type daemon struct {
 	dnd    atomic.Bool
 	reload chan struct{}
 	exit   context.CancelFunc
+	flows  *flowRegistry
 
 	mu     gosync.Mutex
 	engine *dsync.Engine
@@ -79,6 +80,7 @@ func runDaemon(shellDir string, hidden bool) error {
 		policies: rules.DefaultPolicies(),
 		reload:   make(chan struct{}, 1),
 		exit:     cancel,
+		flows:    newFlowRegistry(),
 	}
 	d.queue = dsync.NewQueue(db, d.bus, d.policies)
 
@@ -87,6 +89,7 @@ func runDaemon(shellDir string, hidden bool) error {
 	// IPC server (fails fast if another daemon owns the socket).
 	srv := ipc.NewServer(paths.SocketPath(), d.bus)
 	d.registerIPC(srv)
+	d.registerAccountIPC(srv)
 	ipcErr := make(chan error, 1)
 	wg.Add(1)
 	go func() {
@@ -192,6 +195,14 @@ func (d *daemon) engineLoop(ctx context.Context) {
 			cancel()
 			<-done
 		}
+	}
+}
+
+// requestReload asks engineLoop for a registry rebuild + engine restart.
+func (d *daemon) requestReload() {
+	select {
+	case d.reload <- struct{}{}:
+	default:
 	}
 }
 
