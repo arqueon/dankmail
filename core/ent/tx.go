@@ -16,6 +16,8 @@ type Tx struct {
 	config
 	// Account is the client for interacting with the Account builders.
 	Account *AccountClient
+	// Contact is the client for interacting with the Contact builders.
+	Contact *ContactClient
 	// Message is the client for interacting with the Message builders.
 	Message *MessageClient
 	// NotifyRule is the client for interacting with the NotifyRule builders.
@@ -156,6 +158,7 @@ func (tx *Tx) Client() *Client {
 
 func (tx *Tx) init() {
 	tx.Account = NewAccountClient(tx.config)
+	tx.Contact = NewContactClient(tx.config)
 	tx.Message = NewMessageClient(tx.config)
 	tx.NotifyRule = NewNotifyRuleClient(tx.config)
 	tx.PendingOp = NewPendingOpClient(tx.config)

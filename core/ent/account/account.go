@@ -40,6 +40,8 @@ const (
 	EdgePendingOps = "pending_ops"
 	// EdgeNotifyRules holds the string denoting the notify_rules edge name in mutations.
 	EdgeNotifyRules = "notify_rules"
+	// EdgeContacts holds the string denoting the contacts edge name in mutations.
+	EdgeContacts = "contacts"
 	// Table holds the table name of the account in the database.
 	Table = "accounts"
 	// ThreadsTable is the table that holds the threads relation/edge.
@@ -63,6 +65,13 @@ const (
 	NotifyRulesInverseTable = "notify_rules"
 	// NotifyRulesColumn is the table column denoting the notify_rules relation/edge.
 	NotifyRulesColumn = "account_notify_rules"
+	// ContactsTable is the table that holds the contacts relation/edge.
+	ContactsTable = "contacts"
+	// ContactsInverseTable is the table name for the Contact entity.
+	// It exists in this package in order to avoid circular dependency with the "contact" package.
+	ContactsInverseTable = "contacts"
+	// ContactsColumn is the table column denoting the contacts relation/edge.
+	ContactsColumn = "account_contacts"
 )
 
 // Columns holds all SQL columns for account fields.
@@ -243,6 +252,20 @@ func ByNotifyRules(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newNotifyRulesStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByContactsCount orders the results by contacts count.
+func ByContactsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newContactsStep(), opts...)
+	}
+}
+
+// ByContacts orders the results by contacts terms.
+func ByContacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newContactsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newThreadsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -262,5 +285,12 @@ func newNotifyRulesStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(NotifyRulesInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, NotifyRulesTable, NotifyRulesColumn),
+	)
+}
+func newContactsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ContactsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ContactsTable, ContactsColumn),
 	)
 }

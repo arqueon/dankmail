@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	gosync "sync"
 
 	"github.com/google/uuid"
@@ -31,10 +32,21 @@ type registry struct {
 
 	mu        gosync.Mutex
 	providers map[uuid.UUID]provider.Provider
+	// clients caches the OAuth-authenticated HTTP client per gmail
+	// account (shared by the mail provider and the People API fetcher).
+	clients map[uuid.UUID]*http.Client
+}
+
+// Client returns the account's OAuth HTTP client, when it has one.
+func (r *registry) Client(id uuid.UUID) (*http.Client, bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	c, ok := r.clients[id]
+	return c, ok
 }
 
 func newRegistry(cfg *config.Config, db *ent.Client) *registry {
-	return &registry{cfg: cfg, db: db, providers: map[uuid.UUID]provider.Provider{}}
+	return &registry{cfg: cfg, db: db, providers: map[uuid.UUID]provider.Provider{}, clients: map[uuid.UUID]*http.Client{}}
 }
 
 func (r *registry) Provider(id uuid.UUID) (provider.Provider, bool) {
@@ -97,6 +109,10 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 		if err != nil {
 			return nil, err
 		}
+		hc := oauth2.NewClient(ctx, ts)
+		r.mu.Lock()
+		r.clients[a.ID] = hc
+		r.mu.Unlock()
 		opts := gmail.Options{BodyCapBytes: r.cfg.BodyCapKB * 1024}
 		if labels, ok := a.Config["labels"].([]any); ok {
 			for _, l := range labels {
@@ -105,7 +121,7 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 				}
 			}
 		}
-		return gmail.NewWithClient(a.ID.String(), a.Email, oauth2.NewClient(ctx, ts), opts)
+		return gmail.NewWithClient(a.ID.String(), a.Email, hc, opts)
 	case account.TypeImap:
 		return nil, errProviderPending
 	default:

@@ -35,6 +35,12 @@ func GmailSetupSteps() []SetupStep {
 			Note:        "Ignore the \"Create credentials\" button the console shows afterwards — it steers you toward a service account or API key, which dankmail cannot use. The right credential is an OAuth client ID (Desktop app), created in the later steps after the consent screen is configured.",
 		},
 		{
+			Title:       "Enable the People API (optional)",
+			Description: "Also enable the People API if you want your Google contacts in the compose autocomplete. Skipping it is fine: suggestions then come only from people you've corresponded with.",
+			URL:         "https://console.cloud.google.com/apis/library/people.googleapis.com",
+			URLLabel:    "Enable People API",
+		},
+		{
 			Title:       "Configure the Google Auth Platform",
 			Description: "Click \"Get started\" on the overview page. App name: anything (e.g. \"dankmail\"). User support email: your own address. Audience: \"External\". Then agree and finish — nothing here is ever published.",
 			URL:         "https://console.cloud.google.com/auth/overview",

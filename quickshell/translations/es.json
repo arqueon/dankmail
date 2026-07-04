@@ -105,6 +105,13 @@
     "Trashing also marks read": "Enviar a papelera también marca como leído",
     "Starring moves the thread back to the inbox": "Destacar devuelve el hilo a la bandeja"
   },
+  "compose": {
+    "New message": "Mensaje nuevo",
+    "To — type a name or address": "Para — escribe un nombre o dirección",
+    "Subject": "Asunto",
+    "Write your message… Ctrl+Enter sends": "Escribe tu mensaje… Ctrl+Enter envía",
+    "Google contact suggestions need a re-consent: run 'dmail account reauth <id>' or re-add the account.": "Las sugerencias de Google Contacts necesitan re-consentimiento: ejecuta 'dmail account reauth <id>' o vuelve a añadir la cuenta."
+  },
   "quick reply": {
     "To": "Para",
     "To everyone on the thread": "Para todos los del hilo",

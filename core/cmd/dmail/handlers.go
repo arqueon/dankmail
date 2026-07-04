@@ -12,6 +12,7 @@ import (
 
 	"github.com/arqueon/dankmail/core/api/server"
 	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dankmail/core/internal/contacts"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/provider"
 	dsync "github.com/arqueon/dankmail/core/internal/sync"
@@ -269,6 +270,28 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		}
 		d.openThreadInBrowser(detail.AccountID, detail.ProviderThreadID)
 		return "ok", nil
+	})
+
+	// contacts.search feeds the compose "To" autocomplete: ranked merge
+	// of mail correspondents and Google contacts.
+	srv.Register("contacts.search", func(ctx context.Context, p map[string]any) (any, error) {
+		query, _ := p["query"].(string)
+		var accountID *uuid.UUID
+		if s, ok := p["account"].(string); ok && s != "" {
+			id, err := uuid.Parse(s)
+			if err != nil {
+				return nil, fmt.Errorf("bad account id")
+			}
+			accountID = &id
+		}
+		suggestions, err := contacts.Search(ctx, d.db, accountID, strings.TrimSpace(query), 8)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{
+			"contacts":    suggestions,
+			"needsReauth": d.googleContactsNeedReauth(),
+		}, nil
 	})
 
 	srv.Register("settings.get", func(ctx context.Context, _ map[string]any) (any, error) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/arqueon/dankmail/core/ent/account"
+	"github.com/arqueon/dankmail/core/ent/contact"
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
@@ -44,6 +45,20 @@ func init() {
 	accountDescID := accountFields[0].Descriptor()
 	// account.DefaultID holds the default value on creation for the id field.
 	account.DefaultID = accountDescID.Default.(func() uuid.UUID)
+	contactFields := schema.Contact{}.Fields()
+	_ = contactFields
+	// contactDescName is the schema descriptor for name field.
+	contactDescName := contactFields[1].Descriptor()
+	// contact.DefaultName holds the default value on creation for the name field.
+	contact.DefaultName = contactDescName.Default.(string)
+	// contactDescWeight is the schema descriptor for weight field.
+	contactDescWeight := contactFields[3].Descriptor()
+	// contact.DefaultWeight holds the default value on creation for the weight field.
+	contact.DefaultWeight = contactDescWeight.Default.(int)
+	// contactDescLastSeen is the schema descriptor for last_seen field.
+	contactDescLastSeen := contactFields[4].Descriptor()
+	// contact.DefaultLastSeen holds the default value on creation for the last_seen field.
+	contact.DefaultLastSeen = contactDescLastSeen.Default.(func() time.Time)
 	messageFields := schema.Message{}.Fields()
 	_ = messageFields
 	// messageDescRfc822MessageID is the schema descriptor for rfc822_message_id field.

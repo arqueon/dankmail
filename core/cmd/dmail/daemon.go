@@ -16,6 +16,7 @@ import (
 	"github.com/arqueon/dankmail/core/config"
 	"github.com/arqueon/dankmail/core/ent"
 	"github.com/arqueon/dankmail/core/internal/bus"
+	"github.com/arqueon/dankmail/core/internal/contacts"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/notify"
 	"github.com/arqueon/dankmail/core/internal/paths"
@@ -40,6 +41,9 @@ type daemon struct {
 	reload chan struct{}
 	exit   context.CancelFunc
 	flows  *flowRegistry
+	// contactsReauth flags accounts (by id string) whose token lacks the
+	// contacts scopes; the compose UI surfaces the re-consent hint.
+	contactsReauth gosync.Map
 
 	// UI lifecycle: the daemon owns the Quickshell process and respawns
 	// it on demand (ui.show/ui.toggle) — the window is a view, the
@@ -150,6 +154,15 @@ func runDaemon(shellDir string, hidden bool) error {
 		_ = dsync.NewJanitor(db, cfg.RetentionDays).Run(rootCtx)
 	}()
 
+	// Contacts for the compose autocomplete: mail-correspondent index
+	// every 15 min; Google contacts (People API) daily. Accounts whose
+	// token predates the contacts scopes are flagged for re-consent.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		d.contactsLoop(rootCtx)
+	}()
+
 	// Engine lifecycle with reload support.
 	wg.Add(1)
 	go func() {
@@ -208,6 +221,70 @@ func (d *daemon) engineLoop(ctx context.Context) {
 			<-done
 		}
 	}
+}
+
+// contactsLoop keeps the autocomplete sources fresh.
+func (d *daemon) contactsLoop(ctx context.Context) {
+	mailTick := time.NewTicker(15 * time.Minute)
+	googleTick := time.NewTicker(24 * time.Hour)
+	defer mailTick.Stop()
+	defer googleTick.Stop()
+
+	sweepGoogle := func() {
+		accts, err := d.db.Account.Query().All(ctx)
+		if err != nil {
+			return
+		}
+		for _, a := range accts {
+			hc, ok := d.registry.Client(a.ID)
+			if !ok {
+				continue
+			}
+			err := contacts.FetchGoogle(ctx, d.db, a.ID, hc)
+			switch {
+			case err == nil:
+				d.contactsReauth.Store(a.ID.String(), false)
+			case contacts.IsInsufficientScope(err):
+				// Token predates the contacts scopes: flag it so the
+				// compose UI can suggest a re-consent.
+				d.contactsReauth.Store(a.ID.String(), true)
+				slog.Info("google contacts need re-consent", "account", a.Email)
+			default:
+				slog.Debug("google contacts fetch failed", "account", a.Email, "err", err)
+			}
+		}
+	}
+
+	if err := contacts.IndexMail(ctx, d.db); err != nil && ctx.Err() == nil {
+		slog.Warn("contact mail index failed", "err", err)
+	}
+	sweepGoogle()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-mailTick.C:
+			if err := contacts.IndexMail(ctx, d.db); err != nil && ctx.Err() == nil {
+				slog.Warn("contact mail index failed", "err", err)
+			}
+		case <-googleTick.C:
+			sweepGoogle()
+		}
+	}
+}
+
+// googleContactsNeedReauth reports whether any account is flagged.
+func (d *daemon) googleContactsNeedReauth() bool {
+	needs := false
+	d.contactsReauth.Range(func(_, v any) bool {
+		if b, _ := v.(bool); b {
+			needs = true
+			return false
+		}
+		return true
+	})
+	return needs
 }
 
 // currentPolicies maps live settings onto the chained-action policies

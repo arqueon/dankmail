@@ -27,6 +27,42 @@ var (
 		Columns:    AccountsColumns,
 		PrimaryKey: []*schema.Column{AccountsColumns[0]},
 	}
+	// ContactsColumns holds the columns for the "contacts" table.
+	ContactsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "email", Type: field.TypeString},
+		{Name: "name", Type: field.TypeString, Default: ""},
+		{Name: "source", Type: field.TypeEnum, Enums: []string{"mail", "google"}},
+		{Name: "weight", Type: field.TypeInt, Default: 0},
+		{Name: "last_seen", Type: field.TypeTime},
+		{Name: "account_contacts", Type: field.TypeUUID},
+	}
+	// ContactsTable holds the schema information for the "contacts" table.
+	ContactsTable = &schema.Table{
+		Name:       "contacts",
+		Columns:    ContactsColumns,
+		PrimaryKey: []*schema.Column{ContactsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "contacts_accounts_contacts",
+				Columns:    []*schema.Column{ContactsColumns[6]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "contact_email_source_account_contacts",
+				Unique:  true,
+				Columns: []*schema.Column{ContactsColumns[1], ContactsColumns[3], ContactsColumns[6]},
+			},
+			{
+				Name:    "contact_weight",
+				Unique:  false,
+				Columns: []*schema.Column{ContactsColumns[4]},
+			},
+		},
+	}
 	// MessagesColumns holds the columns for the "messages" table.
 	MessagesColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -189,6 +225,7 @@ var (
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
 		AccountsTable,
+		ContactsTable,
 		MessagesTable,
 		NotifyRulesTable,
 		PendingOpsTable,
@@ -197,6 +234,7 @@ var (
 )
 
 func init() {
+	ContactsTable.ForeignKeys[0].RefTable = AccountsTable
 	MessagesTable.ForeignKeys[0].RefTable = ThreadsTable
 	NotifyRulesTable.ForeignKeys[0].RefTable = AccountsTable
 	PendingOpsTable.ForeignKeys[0].RefTable = AccountsTable

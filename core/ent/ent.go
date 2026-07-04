@@ -13,6 +13,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/arqueon/dankmail/core/ent/account"
+	"github.com/arqueon/dankmail/core/ent/contact"
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
@@ -78,6 +79,7 @@ func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
 			account.Table:    account.ValidColumn,
+			contact.Table:    contact.ValidColumn,
 			message.Table:    message.ValidColumn,
 			notifyrule.Table: notifyrule.ValidColumn,
 			pendingop.Table:  pendingop.ValidColumn,

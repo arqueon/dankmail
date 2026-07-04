@@ -51,9 +51,11 @@ type AccountEdges struct {
 	PendingOps []*PendingOp `json:"pending_ops,omitempty"`
 	// NotifyRules holds the value of the notify_rules edge.
 	NotifyRules []*NotifyRule `json:"notify_rules,omitempty"`
+	// Contacts holds the value of the contacts edge.
+	Contacts []*Contact `json:"contacts,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // ThreadsOrErr returns the Threads value or an error if the edge
@@ -81,6 +83,15 @@ func (e AccountEdges) NotifyRulesOrErr() ([]*NotifyRule, error) {
 		return e.NotifyRules, nil
 	}
 	return nil, &NotLoadedError{edge: "notify_rules"}
+}
+
+// ContactsOrErr returns the Contacts value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) ContactsOrErr() ([]*Contact, error) {
+	if e.loadedTypes[3] {
+		return e.Contacts, nil
+	}
+	return nil, &NotLoadedError{edge: "contacts"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -200,6 +211,11 @@ func (_m *Account) QueryPendingOps() *PendingOpQuery {
 // QueryNotifyRules queries the "notify_rules" edge of the Account entity.
 func (_m *Account) QueryNotifyRules() *NotifyRuleQuery {
 	return NewAccountClient(_m.config).QueryNotifyRules(_m)
+}
+
+// QueryContacts queries the "contacts" edge of the Account entity.
+func (_m *Account) QueryContacts() *ContactQuery {
+	return NewAccountClient(_m.config).QueryContacts(_m)
 }
 
 // Update returns a builder for updating this Account.

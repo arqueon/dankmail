@@ -187,6 +187,10 @@ FloatingWindow {
         onAddAccountRequested: accountModal.show()
     }
 
+    ComposeModal {
+        id: composeModal
+    }
+
     Shortcut {
         sequence: "Escape"
         onActivated: {
@@ -378,6 +382,11 @@ FloatingWindow {
                     text: I18n.tr("Daemon offline", "header status")
                     color: Theme.error
                     font.pixelSize: Theme.fontSizeSmall
+                }
+
+                DankActionButton {
+                    iconName: "edit_square"
+                    onClicked: composeModal.show()
                 }
 
                 DankActionButton {

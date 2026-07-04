@@ -444,6 +444,44 @@ Singleton {
         }, null);
     }
 
+    // contactsNeedReauth: some account's token predates the contacts
+    // scopes; Google suggestions need a re-consent (account reauth).
+    property bool contactsNeedReauth: false
+
+    // searchContacts feeds the compose autocomplete (ranked merge of
+    // mail correspondents + Google contacts).
+    function searchContacts(query, accountId, callback) {
+        const params = {
+            "query": query
+        };
+        if (accountId && accountId !== "")
+            params.account = accountId;
+        sendRequest("contacts.search", params, resp => {
+            if (resp.error) {
+                log.warn("contacts.search:", resp.error);
+                callback([]);
+                return;
+            }
+            contactsNeedReauth = !!resp.result.needsReauth;
+            callback(resp.result.contacts || []);
+        });
+    }
+
+    // compose sends a new plain-text message from the given account.
+    function compose(accountId, to, subject, body, callback) {
+        sendRequest("ops.compose", {
+            "account": accountId,
+            "to": to,
+            "subject": subject,
+            "body": body
+        }, resp => {
+            if (resp.error)
+                log.warn("ops.compose:", resp.error);
+            if (callback)
+                callback(resp);
+        });
+    }
+
     // reply enqueues a plain-text reply on the thread (send_reply op:
     // optimistic, retried, mark-read hook applies). replyAll includes
     // the original To/Cc besides the sender.

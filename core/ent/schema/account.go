@@ -42,5 +42,6 @@ func (Account) Edges() []ent.Edge {
 		edge.To("threads", Thread.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("pending_ops", PendingOp.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("notify_rules", NotifyRule.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("contacts", Contact.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }
