@@ -134,7 +134,7 @@ func (e *Engine) SyncAccount(ctx context.Context, accountID uuid.UUID) error {
 	}
 	_, err = e.db.Account.UpdateOneID(accountID).
 		SetSyncCursor(cursor).
-		SetLastSyncAt(time.Now()).
+		SetLastSyncAt(time.Now().UTC()).
 		SetLastError("").
 		Save(ctx)
 	return err

@@ -56,7 +56,7 @@ func (j *Janitor) Run(ctx context.Context) error {
 // SweepOnce applies both policies. Threads holding pending/inflight ops
 // are never pruned (same freeze rule as the reconciler).
 func (j *Janitor) SweepOnce(ctx context.Context) error {
-	now := j.now()
+	now := j.now().UTC()
 
 	// 1. Finished ops.
 	if _, err := j.db.PendingOp.Delete().

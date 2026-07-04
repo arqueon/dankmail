@@ -310,6 +310,9 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if mins, ok := p["snoozeMinutes"].(float64); ok {
 			s.SnoozeMinutes = int(mins)
 		}
+		if preset, ok := p["snoozePreset"].(string); ok && preset != "" {
+			s.SnoozePreset = preset
+		}
 		for key, dst := range map[string]*bool{
 			"markReadOnPreview": &s.MarkReadOnPreview,
 			"markReadOnReply":   &s.MarkReadOnReply,

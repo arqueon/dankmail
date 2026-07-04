@@ -194,7 +194,7 @@ func applyLocal(ctx context.Context, tx *ent.Tx, op *Op, rows []*ent.Thread) err
 			if op.Payload.Snooze == nil {
 				return fmt.Errorf("sync: snooze op without payload")
 			}
-			u.SetInInbox(false).SetSnoozedUntil(op.Payload.Snooze.Until)
+			u.SetInInbox(false).SetSnoozedUntil(op.Payload.Snooze.Until.UTC())
 		case OpSnoozeWake:
 			u.SetInInbox(true).ClearSnoozedUntil()
 			if op.Payload.Snooze != nil && op.Payload.Snooze.MarkUnread {
@@ -231,7 +231,7 @@ func revertLocal(ctx context.Context, tx *ent.Tx, op Op) error {
 			SetStarred(prev.Starred).
 			SetInInbox(prev.InInbox)
 		if prev.SnoozedUntil != nil {
-			u.SetSnoozedUntil(*prev.SnoozedUntil)
+			u.SetSnoozedUntil(prev.SnoozedUntil.UTC())
 		} else {
 			u.ClearSnoozedUntil()
 		}

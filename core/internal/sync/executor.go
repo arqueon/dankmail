@@ -90,7 +90,7 @@ func (e *Executor) processBatch(ctx context.Context) (int, error) {
 			pendingop.StateEQ(pendingop.StatePending),
 			pendingop.Or(
 				pendingop.NextAttemptAtIsNil(),
-				pendingop.NextAttemptAtLTE(e.now()),
+				pendingop.NextAttemptAtLTE(e.now().UTC()),
 			),
 		).
 		Order(ent.Asc(pendingop.FieldID)).
@@ -226,7 +226,7 @@ func (e *Executor) handleFailure(ctx context.Context, ops []Op, ids []int, callE
 			Where(pendingop.IDIn(ids...)).
 			SetState(pendingop.StatePending).
 			SetAttempts(attempt).
-			SetNextAttemptAt(e.now().Add(delay)).
+			SetNextAttemptAt(e.now().Add(delay).UTC()).
 			SetLastError(callErr.Error()).
 			Save(ctx)
 		return err

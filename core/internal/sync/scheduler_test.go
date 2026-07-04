@@ -63,3 +63,24 @@ func TestSchedulerSurvivesRestartByConstruction(t *testing.T) {
 		t.Error("a fresh scheduler over the same DB must wake due snoozes")
 	}
 }
+
+func TestSchedulerWakesAcrossTimezones(t *testing.T) {
+	// Regression: SQLite compares time columns as TEXT, so a UTC-stored
+	// snoozed_until ("+0000 UTC") vs a local-zone query parameter
+	// ("-0600 CST") produced garbage lexicographic comparisons and the
+	// wake never fired. The scheduler must query in UTC.
+	r := newRig(t, rules.DefaultPolicies())
+	cst := time.FixedZone("CST", -6*3600)
+	nowLocal := time.Date(2026, 7, 4, 11, 0, 0, 0, cst) // 17:00 UTC
+	pastUTC := time.Date(2026, 7, 4, 16, 57, 0, 0, time.UTC)
+	mkThread(t, r.db, r.acct, threadOpts{id: "tz", inInbox: false, snoozedUntil: &pastUTC})
+
+	s := NewScheduler(r.db, r.bus, r.queue, false)
+	s.now = func() time.Time { return nowLocal }
+	if err := s.WakeDue(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if th := r.reloadThread(t, "tz"); !th.InInbox || th.SnoozedUntil != nil {
+		t.Errorf("thread did not wake across timezones: inInbox=%v snoozed=%v", th.InInbox, th.SnoozedUntil)
+	}
+}

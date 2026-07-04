@@ -1,8 +1,6 @@
 package schema
 
 import (
-	"time"
-
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
@@ -27,7 +25,7 @@ func (Contact) Fields() []ent.Field {
 		field.Enum("source").Values("mail", "google"),
 		// weight ranks suggestions (mail: occurrence count).
 		field.Int("weight").Default(0),
-		field.Time("last_seen").Default(time.Now),
+		field.Time("last_seen").Default(utcNow),
 	}
 }
 

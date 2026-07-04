@@ -1,8 +1,6 @@
 package schema
 
 import (
-	"time"
-
 	"entgo.io/ent"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
@@ -34,7 +32,7 @@ func (PendingOp) Fields() []ent.Field {
 		// Op-specific data: ReplyDraft/ComposeDraft JSON, snooze deadline,
 		// pre-op thread state for revert on failure.
 		field.JSON("payload", map[string]any{}).Default(map[string]any{}),
-		field.Time("created_at").Default(time.Now).Immutable(),
+		field.Time("created_at").Default(utcNow).Immutable(),
 		field.Int("attempts").Default(0),
 		field.Time("next_attempt_at").Optional().Nillable(),
 		field.String("last_error").Default(""),

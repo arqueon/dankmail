@@ -470,11 +470,10 @@ func (d *daemon) notificationAction(key string, payload map[string]any) {
 		if err != nil {
 			return
 		}
-		mins := d.settings.Get().SnoozeMinutes
 		_ = d.queue.Enqueue(ctx, dsync.Op{
 			AccountID: id, Type: dsync.OpSnooze, ThreadIDs: []string{threadID},
 			Payload: dsync.OpPayload{Snooze: &dsync.SnoozePayload{
-				Until:      time.Now().Add(time.Duration(mins) * time.Minute),
+				Until:      d.settings.Get().SnoozeUntil(time.Now()),
 				MarkUnread: true,
 			}},
 		})

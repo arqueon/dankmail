@@ -54,7 +54,7 @@ func (s *Scheduler) WakeDue(ctx context.Context) error {
 	due, err := s.db.Thread.Query().
 		Where(
 			thread.SnoozedUntilNotNil(),
-			thread.SnoozedUntilLTE(s.now()),
+			thread.SnoozedUntilLTE(s.now().UTC()),
 		).
 		WithAccount().
 		All(ctx)

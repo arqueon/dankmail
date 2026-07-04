@@ -160,9 +160,81 @@ FloatingWindow {
                     }
                 }
 
+                StyledText {
+                    Layout.fillWidth: true
+                    text: I18n.tr("What the notification's snooze button does:", "settings")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceTextMedium
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingS
+
+                    Repeater {
+                        model: [
+                            {
+                                "key": "hour",
+                                "label": I18n.tr("In 1 hour", "snooze")
+                            },
+                            {
+                                "key": "evening",
+                                "label": I18n.tr("This evening", "snooze")
+                            },
+                            {
+                                "key": "tomorrow",
+                                "label": I18n.tr("Tomorrow", "snooze")
+                            },
+                            {
+                                "key": "laterweek",
+                                "label": I18n.tr("Later this week", "snooze")
+                            },
+                            {
+                                "key": "weekend",
+                                "label": I18n.tr("This weekend", "snooze")
+                            },
+                            {
+                                "key": "nextweek",
+                                "label": I18n.tr("Next week", "snooze")
+                            },
+                            {
+                                "key": "minutes",
+                                "label": I18n.tr("Fixed minutes", "snooze")
+                            }
+                        ]
+
+                        delegate: StyledRect {
+                            id: presetChip
+                            required property var modelData
+                            readonly property bool active: modal.s && modal.s.snoozePreset === modelData.key
+
+                            width: presetChipLabel.implicitWidth + Theme.spacingL
+                            height: 30
+                            radius: 15
+                            color: active ? Theme.primaryContainer : Theme.surfaceContainerHigh
+
+                            StyledText {
+                                id: presetChipLabel
+                                anchors.centerIn: parent
+                                text: presetChip.modelData.label
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: presetChip.active ? Theme.primary : Theme.surfaceTextMedium
+                            }
+
+                            StateLayer {
+                                stateColor: Theme.primary
+                                onClicked: DankMailService.updateSettings({
+                                    "snoozePreset": presetChip.modelData.key
+                                }, null)
+                            }
+                        }
+                    }
+                }
+
                 RowLayout {
                     Layout.fillWidth: true
                     spacing: Theme.spacingM
+                    visible: modal.s && modal.s.snoozePreset === "minutes"
 
                     StyledText {
                         text: I18n.tr("Notification snooze duration (minutes)", "settings")

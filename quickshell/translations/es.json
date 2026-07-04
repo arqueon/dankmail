@@ -80,7 +80,10 @@
     "Tomorrow": "Mañana",
     "Next week": "Próxima semana",
     "Pick date…": "Elegir fecha…",
-    "Snooze": "Posponer"
+    "Snooze": "Posponer",
+    "Later this week": "Esta semana",
+    "This weekend": "Este fin de semana",
+    "Fixed minutes": "Minutos fijos"
   },
   "settings title": {
     "Settings": "Configuración"
@@ -100,6 +103,7 @@
   "settings": {
     "Pick the inline actions on new-mail notifications. Most notification servers show at most 3 buttons.": "Elige las acciones de las notificaciones de correo nuevo. La mayoría de servidores muestran máximo 3 botones.",
     "Notification snooze duration (minutes)": "Duración del posponer de la notificación (minutos)",
+    "What the notification's snooze button does:": "Qué hace el botón de posponer de la notificación:",
     "Opening the preview marks the thread read": "Abrir la vista previa marca el hilo como leído",
     "Sending a reply marks the thread read": "Enviar una respuesta marca el hilo como leído",
     "Trashing also marks read": "Enviar a papelera también marca como leído",

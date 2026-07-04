@@ -176,6 +176,25 @@ func configCmd() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
+		Use:   "snooze-preset <p>",
+		Short: "What the notification snooze button means: hour|evening|tomorrow|laterweek|weekend|nextweek|minutes",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(c *cobra.Command, args []string) error {
+			cli, err := dial()
+			if err != nil {
+				return err
+			}
+			defer cli.Close()
+			raw, err := cli.Call("settings.set", map[string]any{"snoozePreset": args[0]})
+			if err != nil {
+				return err
+			}
+			fmt.Println(string(raw))
+			return nil
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
 		Use:   "snooze-minutes <n>",
 		Short: "Set the snooze duration used by the notification button",
 		Args:  cobra.ExactArgs(1),

@@ -1,8 +1,6 @@
 package schema
 
 import (
-	"time"
-
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/edge"
@@ -33,7 +31,7 @@ func (Account) Fields() []ent.Field {
 		field.Enum("status").Values("active", "paused", "auth_error").Default("active"),
 		field.Time("last_sync_at").Optional().Nillable(),
 		field.String("last_error").Default(""),
-		field.Time("created_at").Default(time.Now).Immutable(),
+		field.Time("created_at").Default(utcNow).Immutable(),
 	}
 }
 

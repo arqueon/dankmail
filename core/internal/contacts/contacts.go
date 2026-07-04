@@ -114,7 +114,7 @@ func FetchGoogle(ctx context.Context, db *ent.Client, accountID uuid.UUID, hc *h
 			return nil
 		}
 		// Weight 5: above casual mail co-recipients.
-		return upsertContact(ctx, db, accountID, email, name, contact.SourceGoogle, 5, time.Now())
+		return upsertContact(ctx, db, accountID, email, name, contact.SourceGoogle, 5, time.Now().UTC())
 	}
 	ingest := func(people []*peoplev1.Person) error {
 		for _, p := range people {
