@@ -154,5 +154,6 @@ session (DankMaterialShell covers both).
 
 ## License
 
-MIT — see [LICENSE](LICENSE). UI infrastructure adapted from
-dankcalendar (MIT, Avenge Media LLC); see `quickshell/NOTICE`.
+GPL-3.0-or-later — see [LICENSE](LICENSE). The Quickshell UI adapts
+MIT-licensed infrastructure from dankcalendar (Avenge Media LLC); the
+original notices are preserved in `quickshell/NOTICE`.
