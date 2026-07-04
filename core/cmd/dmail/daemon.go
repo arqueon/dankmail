@@ -142,6 +142,14 @@ func runDaemon(shellDir string, hidden bool) error {
 		d.notificationLoop(rootCtx)
 	}()
 
+	// Retention/cleanup job (spec §4): prunes threads beyond retention
+	// (starred/snoozed exempt) and sweeps finished ops.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		_ = dsync.NewJanitor(db, cfg.RetentionDays).Run(rootCtx)
+	}()
+
 	// Engine lifecycle with reload support.
 	wg.Add(1)
 	go func() {
