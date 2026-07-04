@@ -332,13 +332,27 @@ FloatingWindow {
                             anchors.fill: parent
                             anchors.leftMargin: Theme.spacingM
                             anchors.rightMargin: Theme.spacingM
-                            spacing: Theme.spacingS
+                            spacing: Theme.spacingM
 
+                            readonly property string sender: (row.modelData.participants && row.modelData.participants.length > 0) ? row.modelData.participants[0] : ""
+                            id: rowContent
+
+                            // Gmail-style sender avatar: initial over a
+                            // stable per-sender color.
                             Rectangle {
-                                width: 8
-                                height: 8
-                                radius: 4
-                                color: row.modelData.unread ? Theme.primary : "transparent"
+                                width: 38
+                                height: 38
+                                radius: 19
+                                color: DankMailService.senderColor(rowContent.sender)
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: DankMailService.senderInitial(rowContent.sender)
+                                    color: "#1d2024"
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSizeLarge
+                                    font.weight: Font.DemiBold
+                                }
                             }
 
                             ColumnLayout {
@@ -348,14 +362,12 @@ FloatingWindow {
                                 RowLayout {
                                     Layout.fillWidth: true
 
-                                    // Sender: human name only, no quotes
-                                    // or address; the address lives in
-                                    // the preview header.
+                                    // Sender: human name only; the
+                                    // address lives in the preview.
                                     StyledText {
                                         Layout.fillWidth: true
-                                        text: (row.modelData.participants && row.modelData.participants.length > 0) ? DankMailService.displayName(row.modelData.participants[0]) : ""
-                                        font.weight: row.modelData.unread ? Font.Bold : Font.Medium
-                                        font.pixelSize: Theme.fontSizeSmall
+                                        text: DankMailService.displayName(rowContent.sender)
+                                        font.weight: row.modelData.unread ? Font.Bold : Font.Normal
                                         color: row.modelData.unread ? Theme.surfaceText : Theme.surfaceTextMedium
                                         maximumLineCount: 1
                                     }
@@ -363,15 +375,17 @@ FloatingWindow {
                                     StyledText {
                                         text: window.timeLabel(row.modelData.lastMessageAt)
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: row.modelData.unread ? Theme.primary : Theme.surfaceTextAlpha
+                                        font.weight: row.modelData.unread ? Font.Bold : Font.Normal
+                                        color: row.modelData.unread ? Theme.surfaceText : Theme.surfaceTextMedium
                                     }
                                 }
 
                                 StyledText {
                                     Layout.fillWidth: true
                                     text: row.modelData.subject || I18n.tr("(no subject)", "thread list")
-                                    font.weight: row.modelData.unread ? Font.DemiBold : Font.Normal
-                                    color: Theme.surfaceText
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: row.modelData.unread ? Font.Bold : Font.Normal
+                                    color: row.modelData.unread ? Theme.surfaceText : Theme.surfaceTextMedium
                                     maximumLineCount: 1
                                 }
 
@@ -379,7 +393,7 @@ FloatingWindow {
                                     Layout.fillWidth: true
                                     text: row.modelData.snippet || ""
                                     font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.surfaceTextAlpha
+                                    color: Theme.surfaceTextMedium
                                     maximumLineCount: 1
                                 }
                             }

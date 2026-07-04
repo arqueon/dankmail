@@ -97,6 +97,23 @@ Singleton {
         return a.name !== "" ? a.name : a.email;
     }
 
+    // senderColor: stable per-sender avatar color (Gmail-style), hashed
+    // over the display string.
+    readonly property var senderPalette: ["#7287fd", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#89dceb", "#f2cdcd", "#b4befe"]
+
+    function senderColor(raw) {
+        const s = displayName(raw);
+        let h = 0;
+        for (let i = 0; i < s.length; i++)
+            h = (h * 31 + s.charCodeAt(i)) & 0x7fffffff;
+        return senderPalette[h % senderPalette.length];
+    }
+
+    function senderInitial(raw) {
+        const s = displayName(raw);
+        return s.length > 0 ? s[0].toUpperCase() : "?";
+    }
+
     // Account wizard data (guides/presets served by the daemon, dcal
     // pattern).
     property var gmailSetupSteps: []
