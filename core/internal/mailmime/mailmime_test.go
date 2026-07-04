@@ -96,10 +96,10 @@ func TestBuildReplyRefsWithoutChain(t *testing.T) {
 
 func TestBuildReplySubjectRePrefix(t *testing.T) {
 	cases := map[string]string{
-		"Números de Bernoulli":     "Re: Números de Bernoulli",
-		"Re: ya con prefijo":       "Re: ya con prefijo",
-		"RE: mayúsculas":           "RE: mayúsculas",
-		"re: minúsculas":           "re: minúsculas",
+		"Números de Bernoulli": "Re: Números de Bernoulli",
+		"Re: ya con prefijo":   "Re: ya con prefijo",
+		"RE: mayúsculas":       "RE: mayúsculas",
+		"re: minúsculas":       "re: minúsculas",
 		// Leading whitespace: no double prefix; the parser trims the header.
 		"  Re: espacios delante": "Re: espacios delante",
 	}

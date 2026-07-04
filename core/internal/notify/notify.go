@@ -31,6 +31,9 @@ type Notification struct {
 	Urgency   Urgency
 	Sound     string // empty = server default, "none" = mute
 	Actions   []Action
+	// OnAction receives the Action.Key the user clicked (D-Bus backend
+	// only; the notify-send fallback cannot deliver actions).
+	OnAction func(actionKey string)
 }
 
 // Notifier is the daemon-facing interface; the D-Bus implementation and
@@ -41,5 +44,11 @@ type Notifier interface {
 	Close(id uint32) error
 }
 
-// TODO(anillo1): godbus implementation with action-signal dispatch,
-// capability detection ("actions", "sound"), notify-send fallback.
+// NewBest returns the D-Bus notifier when the session bus is reachable,
+// else the notify-send fallback.
+func NewBest() Notifier {
+	if n, err := NewDBus(); err == nil {
+		return n
+	}
+	return execFallback{}
+}
