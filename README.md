@@ -119,8 +119,18 @@ permanent deletion is not implemented, by design.
 
 ## Install
 
-From source (Arch/CachyOS-friendly; AUR package prepared in
-`packaging/aur/`):
+### Arch Linux (AUR)
+
+[`dankmail`](https://aur.archlinux.org/packages/dankmail) (latest
+release) or [`dankmail-git`](https://aur.archlinux.org/packages/dankmail-git)
+(builds from `main`):
+
+```sh
+paru -S dankmail        # or: yay -S dankmail
+systemctl --user enable --now dmail
+```
+
+### From source
 
 ```sh
 git clone https://github.com/arqueon/dankmail && cd dankmail
