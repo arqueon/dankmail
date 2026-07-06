@@ -90,8 +90,9 @@ permanent deletion is not implemented, by design.
   Gmail session (`authuser`).
 - **Guided Gmail wizard**: the daemon serves a step-by-step Google
   Cloud walkthrough (with direct links and the classic pitfalls called
-  out); paste the Client ID/Secret or just the downloaded
-  `client_secret_*.json`. Minimal mail scopes — `gmail.modify` +
+  out); paste the Client ID/Secret, drop the downloaded
+  `client_secret_*.json` onto the wizard, or point it at the file's
+  path. Minimal mail scopes — `gmail.modify` +
   `gmail.send`, **never** full mailbox access.
 - **IMAP accounts** (iCloud, Yahoo, Fastmail, Proton via Bridge,
   custom) with presets and a **real connection test** before anything
@@ -143,6 +144,22 @@ systemctl --user enable --now dmail
 Requirements: Go ≥ 1.22 to build; [Quickshell](https://quickshell.org)
 for the UI; a Secret Service keyring and a notification daemon in your
 session (DankMaterialShell covers both).
+
+### Where's the window?
+
+The systemd service starts the daemon **hidden** (`dmail run
+--hidden`): nothing opens on screen — dankmail lives in the system
+tray. That's by design; it's a notifier, not an app you keep open.
+To bring up the triage window:
+
+- click the **tray icon** (right-click for sync / DND / quit),
+- launch **Dank Mail** from your app menu (it runs `dmail show`),
+- or run `dmail show` / `dmail toggle` — handy for a compositor
+  keybind.
+
+If you see no tray icon either, your bar needs a StatusNotifier tray
+(DankMaterialShell, waybar `tray` module, etc.); the window is still
+reachable with `dmail show`.
 
 ## Accounts
 
