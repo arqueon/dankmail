@@ -595,13 +595,22 @@ Singleton {
     // callback({state, authUrl}) or callback({error}). Pasting the whole
     // downloaded client_secret_*.json into the ID field also works: it
     // is detected and forwarded for the daemon to parse.
-    function startGmailFlow(clientId, clientSecret, callback) {
-        const params = clientId.trim().startsWith("{") ? {
-            "clientJson": clientId
-        } : {
-            "clientId": clientId,
-            "clientSecret": clientSecret
-        };
+    function startGmailFlow(clientId, clientSecret, jsonPath, callback) {
+        let params;
+        if (jsonPath && jsonPath.trim() !== "") {
+            params = {
+                "clientJsonPath": jsonPath.trim()
+            };
+        } else if (clientId.trim().startsWith("{")) {
+            params = {
+                "clientJson": clientId
+            };
+        } else {
+            params = {
+                "clientId": clientId,
+                "clientSecret": clientSecret
+            };
+        }
         sendRequest("accounts.gmail.start", params, resp => callback(resp.error ? resp : resp.result));
     }
 

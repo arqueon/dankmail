@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	gosync "sync"
 	"time"
 
@@ -26,6 +29,20 @@ type pendingFlow struct {
 
 func newFlowRegistry() *flowRegistry {
 	return &flowRegistry{flows: map[string]*pendingFlow{}}
+}
+
+// readUserFile reads a file path coming from the GUI: file:// URLs and a
+// leading ~ are both accepted so drag-and-drop payloads work verbatim.
+func readUserFile(path string) ([]byte, error) {
+	path = strings.TrimPrefix(path, "file://")
+	if path == "~" || strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, err
+		}
+		path = filepath.Join(home, strings.TrimPrefix(path[1:], "/"))
+	}
+	return os.ReadFile(path)
 }
 
 func (r *flowRegistry) register(f *oauth.Flow, creds oauth.ClientCreds) {
@@ -72,6 +89,18 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 			parsed, err := oauth.ParseClientJSON([]byte(raw))
 			if err != nil {
 				return nil, err
+			}
+			creds = parsed
+		}
+		// …or a path to that file (picked or dropped in the GUI).
+		if path, _ := p["clientJsonPath"].(string); path != "" {
+			raw, err := readUserFile(path)
+			if err != nil {
+				return nil, err
+			}
+			parsed, err := oauth.ParseClientJSON(raw)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", path, err)
 			}
 			creds = parsed
 		}

@@ -32,6 +32,7 @@ FloatingWindow {
     // Gmail flow state.
     property string clientId: ""
     property string clientSecret: ""
+    property string clientJsonPath: ""
     property string pendingState: ""
     property string pendingAuthUrl: ""
 
@@ -80,6 +81,7 @@ FloatingWindow {
         completedEmail = "";
         clientId = DankMailService.gmailDefaultClientId;
         clientSecret = "";
+        clientJsonPath = "";
         pendingState = "";
         pendingAuthUrl = "";
         presetKey = "";
@@ -127,7 +129,7 @@ FloatingWindow {
     function startGmailFlow() {
         flowError = "";
         flowInProgress = true;
-        DankMailService.startGmailFlow(clientId.trim(), clientSecret.trim(), res => {
+        DankMailService.startGmailFlow(clientId.trim(), clientSecret.trim(), clientJsonPath.trim(), res => {
             if (res.error) {
                 flowError = res.error;
                 flowInProgress = false;
@@ -408,14 +410,6 @@ FloatingWindow {
                     wrapMode: Text.WordWrap
                 }
 
-                StyledText {
-                    Layout.fillWidth: true
-                    text: I18n.tr("Shortcut: paste the whole content of the downloaded client_secret_*.json into the Client ID field — it is detected automatically.", "account wizard")
-                    font.pixelSize: Theme.fontSizeSmall
-                    color: Theme.primary
-                    wrapMode: Text.WordWrap
-                }
-
                 DankTextField {
                     Layout.fillWidth: true
                     placeholderText: I18n.tr("Client ID", "account wizard")
@@ -429,6 +423,57 @@ FloatingWindow {
                     text: modal.clientSecret
                     echoMode: TextInput.Password
                     onTextChanged: modal.clientSecret = text
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: I18n.tr("…or skip the typing and use the downloaded client_secret_*.json:", "account wizard")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceTextMedium
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledRect {
+                    Layout.fillWidth: true
+                    implicitHeight: jsonColumn.implicitHeight + Theme.spacingL
+                    color: jsonDrop.containsDrag ? Theme.primaryBackground : Theme.surfaceContainer
+                    border.width: jsonDrop.containsDrag ? 2 : 1
+                    border.color: jsonDrop.containsDrag ? Theme.primary : Theme.outlineMedium
+
+                    ColumnLayout {
+                        id: jsonColumn
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.margins: Theme.spacingM
+                        spacing: Theme.spacingS
+
+                        DankTextField {
+                            Layout.fillWidth: true
+                            placeholderText: I18n.tr("Path to client_secret_*.json", "account wizard")
+                            text: modal.clientJsonPath
+                            onTextChanged: modal.clientJsonPath = text
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: I18n.tr("Drop the file here, or type its path. The daemon reads it locally; the secret still ends up only in your keyring.", "account wizard")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: jsonDrop.containsDrag ? Theme.primary : Theme.surfaceTextMedium
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    DropArea {
+                        id: jsonDrop
+                        anchors.fill: parent
+                        onDropped: drop => {
+                            if (drop.hasUrls && drop.urls.length > 0) {
+                                modal.clientJsonPath = String(drop.urls[0]);
+                                drop.accept();
+                            }
+                        }
+                    }
                 }
 
                 StyledText {
@@ -766,7 +811,7 @@ FloatingWindow {
 
             StyledRect {
                 visible: modal.onGmailCreds
-                readonly property bool ready: !modal.flowInProgress && (modal.clientId.trim().startsWith("{") || (modal.clientId.trim() !== "" && modal.clientSecret.trim() !== ""))
+                readonly property bool ready: !modal.flowInProgress && (modal.clientJsonPath.trim() !== "" || modal.clientId.trim().startsWith("{") || (modal.clientId.trim() !== "" && modal.clientSecret.trim() !== ""))
                 width: authLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
