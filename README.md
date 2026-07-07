@@ -7,6 +7,10 @@
 > Functionally inspired by Checker Plus for Gmail, but native,
 > browser-independent, and with generic IMAP support.
 
+<p align="center">
+  <img src="assets/screenshot.png" alt="dankmail triage window — thread list with the hover action overlay (demo data)" width="460">
+</p>
+
 **Status: working (ring 1 complete + most of ring 2's UI).** Gmail
 accounts sync, notify and triage end to end. Generic IMAP accounts can
 be added and verified (their sync engine lands in ring 2). See
