@@ -596,30 +596,43 @@ FloatingWindow {
                         // hover and make the overlay flicker.
                         HoverHandler {
                             id: rowHover
+                            // Leaving the row cancels an in-progress snooze
+                            // pick so the next hover starts on the actions.
+                            onHoveredChanged: if (!hovered)
+                                rowActions.snoozing = false
                         }
 
                         // Hover overlay: quick triage actions mirroring the
                         // preview action bar, so a thread can be dispatched
                         // without opening it. Declared after the StateLayer so
                         // its buttons capture clicks; the rest of the row still
-                        // selects the thread. Only the single-click ops live
-                        // here — snooze and reply need the preview's extra UI.
+                        // selects the thread. Snooze swaps the button row for a
+                        // compact preset picker in place — a popup would be
+                        // clipped by the list's clip:true.
                         Rectangle {
                             id: rowActions
                             anchors.right: parent.right
                             anchors.rightMargin: Theme.spacingS
                             anchors.verticalCenter: parent.verticalCenter
                             visible: rowHover.hovered
-                            width: actionRow.implicitWidth + Theme.spacingS * 2
+                            width: (snoozing ? snoozeRow.implicitWidth : actionRow.implicitWidth) + Theme.spacingS * 2
                             height: 40
                             radius: Theme.cornerRadius
                             color: Theme.surfaceContainerHigh
                             border.width: 1
                             border.color: Theme.outlineLight
 
+                            property bool snoozing: false
+
                             function clearIfOpen() {
                                 if (row.modelData.id === window.selectedThreadId)
                                     DankMailService.currentThread = null;
+                            }
+
+                            function doSnooze(key) {
+                                DankMailService.snooze([row.modelData.id], window.snoozeUntil(key));
+                                clearIfOpen();
+                                snoozing = false;
                             }
 
                             // Swallow clicks on the overlay chrome so gaps
@@ -631,6 +644,7 @@ FloatingWindow {
                             RowLayout {
                                 id: actionRow
                                 anchors.centerIn: parent
+                                visible: !rowActions.snoozing
                                 spacing: 0
 
                                 DankActionButton {
@@ -667,8 +681,72 @@ FloatingWindow {
 
                                 DankActionButton {
                                     buttonSize: 30
+                                    iconName: "snooze"
+                                    onClicked: rowActions.snoozing = true
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 30
                                     iconName: "open_in_new"
                                     onClicked: DankMailService.openWeb(row.modelData.id)
+                                }
+                            }
+
+                            // In-place snooze presets (no calendar — that lives
+                            // in the preview). Same 40px height, so nothing is
+                            // clipped by the list.
+                            RowLayout {
+                                id: snoozeRow
+                                anchors.centerIn: parent
+                                visible: rowActions.snoozing
+                                spacing: Theme.spacingXS
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "arrow_back"
+                                    onClicked: rowActions.snoozing = false
+                                }
+
+                                Repeater {
+                                    model: [
+                                        {
+                                            "key": "hour",
+                                            "label": I18n.tr("In 1 hour", "snooze")
+                                        },
+                                        {
+                                            "key": "evening",
+                                            "label": I18n.tr("This evening", "snooze")
+                                        },
+                                        {
+                                            "key": "tomorrow",
+                                            "label": I18n.tr("Tomorrow", "snooze")
+                                        },
+                                        {
+                                            "key": "nextweek",
+                                            "label": I18n.tr("Next week", "snooze")
+                                        }
+                                    ]
+
+                                    delegate: StyledRect {
+                                        id: rowSnoozeChip
+                                        required property var modelData
+                                        Layout.preferredWidth: rowSnoozeLabel.implicitWidth + Theme.spacingM
+                                        Layout.preferredHeight: 28
+                                        radius: 14
+                                        color: Theme.surfaceContainerHighest
+
+                                        StyledText {
+                                            id: rowSnoozeLabel
+                                            anchors.centerIn: parent
+                                            text: rowSnoozeChip.modelData.label
+                                            font.pixelSize: Theme.fontSizeSmall
+                                        }
+
+                                        StateLayer {
+                                            stateColor: Theme.primary
+                                            onClicked: rowActions.doSnooze(rowSnoozeChip.modelData.key)
+                                        }
+                                    }
                                 }
                             }
                         }
