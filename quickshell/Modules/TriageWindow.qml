@@ -588,6 +588,90 @@ FloatingWindow {
                             cornerRadius: 0
                             onClicked: window.selectThread(row.modelData)
                         }
+
+                        // A HoverHandler (not the StateLayer's containsMouse)
+                        // drives the overlay: it keeps reporting hovered while
+                        // the pointer is over the action buttons, which sit
+                        // above the StateLayer and would otherwise steal the
+                        // hover and make the overlay flicker.
+                        HoverHandler {
+                            id: rowHover
+                        }
+
+                        // Hover overlay: quick triage actions mirroring the
+                        // preview action bar, so a thread can be dispatched
+                        // without opening it. Declared after the StateLayer so
+                        // its buttons capture clicks; the rest of the row still
+                        // selects the thread. Only the single-click ops live
+                        // here — snooze and reply need the preview's extra UI.
+                        Rectangle {
+                            id: rowActions
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.spacingS
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: rowHover.hovered
+                            width: actionRow.implicitWidth + Theme.spacingS * 2
+                            height: 40
+                            radius: Theme.cornerRadius
+                            color: Theme.surfaceContainerHigh
+                            border.width: 1
+                            border.color: Theme.outlineLight
+
+                            function clearIfOpen() {
+                                if (row.modelData.id === window.selectedThreadId)
+                                    DankMailService.currentThread = null;
+                            }
+
+                            // Swallow clicks on the overlay chrome so gaps
+                            // between buttons don't fall through and select.
+                            MouseArea {
+                                anchors.fill: parent
+                            }
+
+                            RowLayout {
+                                id: actionRow
+                                anchors.centerIn: parent
+                                spacing: 0
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "archive"
+                                    onClicked: {
+                                        DankMailService.archive([row.modelData.id]);
+                                        rowActions.clearIfOpen();
+                                    }
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "delete"
+                                    iconColor: Theme.error
+                                    onClicked: {
+                                        DankMailService.trash([row.modelData.id]);
+                                        rowActions.clearIfOpen();
+                                    }
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: row.modelData.unread ? "drafts" : "mark_email_unread"
+                                    onClicked: row.modelData.unread ? DankMailService.markRead([row.modelData.id]) : DankMailService.markUnread([row.modelData.id])
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "star"
+                                    iconColor: row.modelData.starred ? Theme.warning : Theme.surfaceText
+                                    onClicked: row.modelData.starred ? DankMailService.unstar([row.modelData.id]) : DankMailService.star([row.modelData.id])
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "open_in_new"
+                                    onClicked: DankMailService.openWeb(row.modelData.id)
+                                }
+                            }
+                        }
                     }
                 }
 
