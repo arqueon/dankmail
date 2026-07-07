@@ -510,6 +510,23 @@ Singleton {
         });
     }
 
+    // forward sends the thread's latest message to new recipients as a
+    // fresh compose ("Fwd:" subject + optional note + quoted original,
+    // plain text). `to` is an array of addresses.
+    function forward(id, to, note, callback) {
+        sendRequest("ops.forward", {
+            "id": id,
+            "to": to,
+            "body": note
+        }, resp => {
+            if (resp.error)
+                log.warn("ops.forward:", resp.error);
+            refreshDebounce.restart();
+            if (callback)
+                callback(resp);
+        });
+    }
+
     // searchRemoteHistory sweeps the FULL mailbox history server-side
     // (Gmail q= search) and ingests the results as cache backfill; the
     // refresh then surfaces them in the local search view.

@@ -176,6 +176,67 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		})
 	})
 
+	// ops.forward sends the thread's latest message to new recipients as a
+	// fresh compose (not threaded): "Fwd:" subject, an optional note, then
+	// the quoted original. Plain text only — attachments stay in the
+	// webmail, same as reply.
+	srv.Register("ops.forward", func(ctx context.Context, p map[string]any) (any, error) {
+		id, err := intParam(p, "id")
+		if err != nil {
+			return nil, err
+		}
+		var to []string
+		if arr, ok := p["to"].([]any); ok {
+			for _, t := range arr {
+				if s, ok := t.(string); ok && strings.TrimSpace(s) != "" {
+					to = append(to, strings.TrimSpace(s))
+				}
+			}
+		}
+		if len(to) == 0 {
+			return nil, fmt.Errorf("no recipients")
+		}
+		note, _ := p["body"].(string)
+
+		detail, err := d.repo.GetThread(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if len(detail.Messages) == 0 {
+			return nil, fmt.Errorf("thread has no messages to forward")
+		}
+		last := detail.Messages[len(detail.Messages)-1]
+		accountID, err := uuid.Parse(detail.AccountID)
+		if err != nil {
+			return nil, err
+		}
+
+		subject := detail.Subject
+		if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(subject)), "fwd:") {
+			subject = "Fwd: " + subject
+		}
+		var b strings.Builder
+		if strings.TrimSpace(note) != "" {
+			b.WriteString(note)
+			b.WriteString("\n\n")
+		}
+		b.WriteString("---------- Forwarded message ----------\n")
+		b.WriteString("From: " + last.From + "\n")
+		b.WriteString("Date: " + last.Date.Format("Mon, 2 Jan 2006 15:04") + "\n")
+		b.WriteString("Subject: " + detail.Subject + "\n")
+		if len(last.To) > 0 {
+			b.WriteString("To: " + strings.Join(last.To, ", ") + "\n")
+		}
+		b.WriteString("\n")
+		b.WriteString(last.BodyText)
+
+		draft := provider.ComposeDraft{To: to, Subject: subject, Body: b.String()}
+		return "ok", d.queue.Enqueue(ctx, dsync.Op{
+			AccountID: accountID, Type: dsync.OpCompose,
+			Payload: dsync.OpPayload{Compose: &draft},
+		})
+	})
+
 	srv.Register("dnd.on", func(ctx context.Context, _ map[string]any) (any, error) {
 		d.dnd.Store(true)
 		d.bus.Publish("dnd.changed", map[string]any{"enabled": true})

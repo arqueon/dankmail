@@ -34,6 +34,7 @@ FloatingWindow {
     function selectThread(t) {
         selectedThreadId = t.id;
         replyArea.reset();
+        forwardArea.reset();
         DankMailService.loadThread(t.id, true);
     }
 
@@ -192,6 +193,7 @@ FloatingWindow {
     function openThread(threadId) {
         selectedThreadId = threadId;
         replyArea.reset();
+        forwardArea.reset();
         DankMailService.loadThread(threadId, true);
     }
 
@@ -981,9 +983,21 @@ FloatingWindow {
                             iconName: "reply"
                             iconColor: replyArea.visible ? Theme.primary : Theme.surfaceText
                             onClicked: {
+                                forwardArea.reset();
                                 replyArea.visible = !replyArea.visible;
                                 if (replyArea.visible)
                                     replyInput.forceActiveFocus();
+                            }
+                        }
+
+                        DankActionButton {
+                            iconName: "forward"
+                            iconColor: forwardArea.visible ? Theme.primary : Theme.surfaceText
+                            onClicked: {
+                                replyArea.reset();
+                                forwardArea.visible = !forwardArea.visible;
+                                if (forwardArea.visible)
+                                    forwardToInput.forceActiveFocus();
                             }
                         }
 
@@ -1367,6 +1381,145 @@ FloatingWindow {
                                         disabled: !parent.ready
                                         stateColor: Theme.primary
                                         onClicked: replyArea.send()
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Quick forward: send the latest message to new
+                    // recipients with an optional note. Plain text, no
+                    // attachments — same triage-not-management stance as reply.
+                    StyledRect {
+                        id: forwardArea
+                        visible: false
+                        Layout.fillWidth: true
+                        implicitHeight: forwardColumn.implicitHeight + Theme.spacingL
+                        color: Theme.surfaceContainerHigh
+
+                        property bool sending: false
+                        property string error: ""
+
+                        function reset() {
+                            visible = false;
+                            sending = false;
+                            error = "";
+                            forwardToInput.text = "";
+                            forwardNote.text = "";
+                        }
+
+                        function send() {
+                            const t = DankMailService.currentThread;
+                            const to = forwardToInput.text.split(",").map(s => s.trim()).filter(s => s !== "");
+                            if (!t || to.length === 0 || sending)
+                                return;
+                            sending = true;
+                            error = "";
+                            DankMailService.forward(t.id, to, forwardNote.text, resp => {
+                                forwardArea.sending = false;
+                                if (resp.error) {
+                                    forwardArea.error = resp.error;
+                                    return;
+                                }
+                                forwardArea.reset();
+                            });
+                        }
+
+                        ColumnLayout {
+                            id: forwardColumn
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.margins: Theme.spacingM
+                            spacing: Theme.spacingS
+
+                            DankTextField {
+                                id: forwardToInput
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 40
+                                iconName: "forward_to_inbox"
+                                placeholderText: I18n.tr("Forward to… (comma-separated)", "quick forward")
+                            }
+
+                            StyledRect {
+                                Layout.fillWidth: true
+                                implicitHeight: 96
+                                radius: Theme.cornerRadiusSmall
+                                color: Theme.surfaceContainer
+                                border.width: 1
+                                border.color: forwardNote.activeFocus ? Theme.primary : Theme.outlineLight
+
+                                DankFlickable {
+                                    anchors.fill: parent
+                                    anchors.margins: Theme.spacingS
+                                    contentHeight: forwardNote.implicitHeight
+                                    clip: true
+
+                                    TextEdit {
+                                        id: forwardNote
+                                        width: parent.width
+                                        wrapMode: TextEdit.Wrap
+                                        textFormat: TextEdit.PlainText
+                                        color: Theme.surfaceText
+                                        selectionColor: Theme.primarySelected
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeMedium
+
+                                        Keys.onPressed: event => {
+                                            if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
+                                                event.accepted = true;
+                                                forwardArea.send();
+                                            }
+                                        }
+
+                                        StyledText {
+                                            visible: forwardNote.text === "" && !forwardNote.activeFocus
+                                            width: parent.width
+                                            text: I18n.tr("Add a note (optional) — the message is quoted below. Ctrl+Enter sends", "quick forward")
+                                            color: Theme.surfaceTextAlpha
+                                            wrapMode: Text.WordWrap
+                                        }
+                                    }
+                                }
+                            }
+
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingS
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: forwardArea.error
+                                    visible: forwardArea.error !== ""
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.error
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                Item {
+                                    Layout.fillWidth: forwardArea.error === ""
+                                }
+
+                                StyledRect {
+                                    readonly property bool ready: forwardToInput.text.trim() !== "" && !forwardArea.sending
+                                    width: forwardSendLabel.implicitWidth + Theme.spacingXL
+                                    height: 32
+                                    radius: 16
+                                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                                    opacity: ready ? 1 : 0.6
+
+                                    StyledText {
+                                        id: forwardSendLabel
+                                        anchors.centerIn: parent
+                                        text: forwardArea.sending ? I18n.tr("Sending…", "quick forward") : I18n.tr("Forward", "quick forward")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                                    }
+
+                                    StateLayer {
+                                        disabled: !parent.ready
+                                        stateColor: Theme.primary
+                                        onClicked: forwardArea.send()
                                     }
                                 }
                             }
