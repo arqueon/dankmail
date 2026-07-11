@@ -946,48 +946,58 @@ FloatingWindow {
 
                     // Attachment chips: metadata only; clicking opens the
                     // thread in the webmail (content stays there, spec §1).
-                    Flow {
+                    // Capped at two chip rows — beyond that the area scrolls
+                    // instead of eating the body's space.
+                    DankFlickable {
                         Layout.fillWidth: true
-                        spacing: Theme.spacingS
+                        Layout.preferredHeight: Math.min(attachFlow.implicitHeight, 2 * 30 + Theme.spacingS)
                         visible: window.threadAttachments().length > 0
+                        contentHeight: attachFlow.implicitHeight
+                        clip: true
 
-                        Repeater {
-                            model: window.threadAttachments()
+                        Flow {
+                            id: attachFlow
+                            width: parent.width
+                            spacing: Theme.spacingS
 
-                            delegate: StyledRect {
-                                id: attachChip
-                                required property var modelData
-                                width: attachRow.implicitWidth + Theme.spacingL
-                                height: 30
-                                radius: 15
-                                color: Theme.surfaceContainerHigh
-                                border.width: 1
-                                border.color: Theme.outlineMedium
+                            Repeater {
+                                model: window.threadAttachments()
 
-                                RowLayout {
-                                    id: attachRow
-                                    anchors.centerIn: parent
-                                    spacing: Theme.spacingXS
+                                delegate: StyledRect {
+                                    id: attachChip
+                                    required property var modelData
+                                    width: attachRow.implicitWidth + Theme.spacingL
+                                    height: 30
+                                    radius: 15
+                                    color: Theme.surfaceContainerHigh
+                                    border.width: 1
+                                    border.color: Theme.outlineMedium
 
-                                    DankIcon {
-                                        name: attachChip.modelData.mimeType && attachChip.modelData.mimeType.startsWith("image/") ? "image" : "description"
-                                        size: Theme.iconSizeSmall
-                                        color: Theme.primary
+                                    RowLayout {
+                                        id: attachRow
+                                        anchors.centerIn: parent
+                                        spacing: Theme.spacingXS
+
+                                        DankIcon {
+                                            name: attachChip.modelData.mimeType && attachChip.modelData.mimeType.startsWith("image/") ? "image" : "description"
+                                            size: Theme.iconSizeSmall
+                                            color: Theme.primary
+                                        }
+
+                                        StyledText {
+                                            text: attachChip.modelData.filename + (window.formatSize(attachChip.modelData.size) !== "" ? "  ·  " + window.formatSize(attachChip.modelData.size) : "")
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            maximumLineCount: 1
+                                        }
                                     }
 
-                                    StyledText {
-                                        text: attachChip.modelData.filename + (window.formatSize(attachChip.modelData.size) !== "" ? "  ·  " + window.formatSize(attachChip.modelData.size) : "")
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        maximumLineCount: 1
-                                    }
-                                }
-
-                                StateLayer {
-                                    stateColor: Theme.primary
-                                    onClicked: {
-                                        const t = DankMailService.currentThread;
-                                        if (t)
-                                            DankMailService.openWeb(t.id);
+                                    StateLayer {
+                                        stateColor: Theme.primary
+                                        onClicked: {
+                                            const t = DankMailService.currentThread;
+                                            if (t)
+                                                DankMailService.openWeb(t.id);
+                                        }
                                     }
                                 }
                             }
