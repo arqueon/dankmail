@@ -83,9 +83,10 @@ permanent deletion is not implemented, by design.
   ingests results for local triage → one more click continues in the
   webmail.
 - **Spam review**: a Spam tab lists the spam folder (synced but never
-  notified) with a one-click **mark-all-read** to leave it reviewed;
-  `dmail sync --full` backfills it on accounts added before this
-  feature.
+  notified) with a one-click **mark-all-read** to leave it reviewed,
+  and per-row checkboxes to **rescue false positives in batch** ("Not
+  spam" moves them back to the inbox on the server). `dmail sync
+  --full` backfills the folder on accounts added before this feature.
 - **Snooze** with quick options and a **calendar + time picker**;
   snoozes survive daemon restarts and cancel automatically if the
   thread changes remotely.
@@ -110,10 +111,15 @@ permanent deletion is not implemented, by design.
   path. Minimal mail scopes — `gmail.modify` +
   `gmail.send`, **never** full mailbox access. The last step publishes
   your OAuth app so Google doesn't expire its tokens every 7 days.
+- **Microsoft accounts** (Outlook.com / Hotmail / Microsoft 365) via
+  the **Graph API**: delta-query incremental sync, full triage, send,
+  native webLink deep links. Bring-your-own Azure app registration
+  (public client + PKCE — no secret): `dmail account add-microsoft
+  --client-id <uuid>`; see
+  [docs/design/microsoft-provider.md](docs/design/microsoft-provider.md).
 - **IMAP accounts** (iCloud, Yahoo, Fastmail, Proton via Bridge,
   custom) with presets and a **real connection test** before anything
-  is stored; they park until the ring-2 IMAP engine. Microsoft via
-  Graph API is planned (see
+  is stored; they park until the ring-2 IMAP engine (see
   [docs/design/providers-roadmap.md](docs/design/providers-roadmap.md)).
 - **Secrets live in the system keyring**: tokens, passwords, and your
   own OAuth client (so refresh works no matter how the daemon starts).
