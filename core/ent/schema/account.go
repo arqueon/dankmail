@@ -18,7 +18,7 @@ type Account struct {
 func (Account) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("id", uuid.UUID{}).Default(uuid.New),
-		field.Enum("type").Values("gmail", "imap"),
+		field.Enum("type").Values("gmail", "imap", "microsoft"),
 		field.String("email"),
 		field.String("display_name").Default(""),
 		// Non-secret per-account config: IMAP/SMTP hosts and ports,

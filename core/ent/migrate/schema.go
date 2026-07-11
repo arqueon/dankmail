@@ -11,7 +11,7 @@ var (
 	// AccountsColumns holds the columns for the "accounts" table.
 	AccountsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"gmail", "imap"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"gmail", "imap", "microsoft"}},
 		{Name: "email", Type: field.TypeString},
 		{Name: "display_name", Type: field.TypeString, Default: ""},
 		{Name: "config", Type: field.TypeJSON},

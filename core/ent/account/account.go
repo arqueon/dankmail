@@ -118,8 +118,9 @@ type Type string
 
 // Type values.
 const (
-	TypeGmail Type = "gmail"
-	TypeImap  Type = "imap"
+	TypeGmail     Type = "gmail"
+	TypeImap      Type = "imap"
+	TypeMicrosoft Type = "microsoft"
 )
 
 func (_type Type) String() string {
@@ -129,7 +130,7 @@ func (_type Type) String() string {
 // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
 func TypeValidator(_type Type) error {
 	switch _type {
-	case TypeGmail, TypeImap:
+	case TypeGmail, TypeImap, TypeMicrosoft:
 		return nil
 	default:
 		return fmt.Errorf("account: invalid enum value for type field: %q", _type)

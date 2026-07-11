@@ -10,14 +10,35 @@ import (
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"golang.org/x/oauth2/microsoft"
 
 	"github.com/arqueon/dankmail/core/errdefs"
 	"github.com/arqueon/dankmail/core/internal/keyring"
 )
 
+// Endpoints selects the identity provider a Broker talks to. The flow
+// itself (loopback listener, state, PKCE) is provider-agnostic.
+type Endpoints struct {
+	Endpoint oauth2.Endpoint
+	Scopes   []string
+}
+
+var (
+	// GoogleEndpoints is the Gmail desktop client (has a pseudo-secret).
+	GoogleEndpoints = Endpoints{Endpoint: google.Endpoint, Scopes: GmailScopes}
+	// MicrosoftEndpoints is the Graph public client (tenant "common"
+	// covers personal + organizational accounts; no client secret —
+	// PKCE carries the proof). offline_access yields the refresh token.
+	MicrosoftEndpoints = Endpoints{
+		Endpoint: microsoft.AzureADEndpoint("common"),
+		Scopes:   GraphScopes,
+	}
+)
+
 // Broker runs the OAuth 2.0 desktop (loopback) flow and persists tokens
 // in the system keyring, keyed by account ID.
 type Broker struct {
+	endpoints    Endpoints
 	clientID     string
 	clientSecret string
 	bindAddr     string // loopback listener, e.g. "127.0.0.1:0"
@@ -26,8 +47,15 @@ type Broker struct {
 	openURL func(url string) error
 }
 
+// NewBroker keeps the historical Google-fixed constructor; provider-aware
+// callers use NewBrokerFor.
 func NewBroker(clientID, clientSecret, bindAddr string) *Broker {
+	return NewBrokerFor(GoogleEndpoints, clientID, clientSecret, bindAddr)
+}
+
+func NewBrokerFor(ep Endpoints, clientID, clientSecret, bindAddr string) *Broker {
 	return &Broker{
+		endpoints:    ep,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		bindAddr:     bindAddr,
@@ -41,8 +69,8 @@ func (b *Broker) config(redirectURL string) *oauth2.Config {
 	return &oauth2.Config{
 		ClientID:     b.clientID,
 		ClientSecret: b.clientSecret,
-		Endpoint:     google.Endpoint,
-		Scopes:       GmailScopes,
+		Endpoint:     b.endpoints.Endpoint,
+		Scopes:       b.endpoints.Scopes,
 		RedirectURL:  redirectURL,
 	}
 }

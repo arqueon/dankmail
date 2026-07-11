@@ -18,3 +18,14 @@ var GmailScopes = []string{
 	"https://www.googleapis.com/auth/contacts.readonly",
 	"https://www.googleapis.com/auth/contacts.other.readonly",
 }
+
+// GraphScopes is the Microsoft Graph equivalent, same minimality rule:
+// mailbox read/write + send, the profile (for the account's address),
+// and offline_access for the refresh token. Never Mail.ReadWrite.Shared
+// or directory scopes.
+var GraphScopes = []string{
+	"https://graph.microsoft.com/Mail.ReadWrite",
+	"https://graph.microsoft.com/Mail.Send",
+	"https://graph.microsoft.com/User.Read",
+	"offline_access",
+}
