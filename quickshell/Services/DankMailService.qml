@@ -648,6 +648,7 @@ Singleton {
             "id": accountId
         }, resp => {
             if (resp.error) {
+                log.warn("accounts.reauth:", resp.error);
                 if (callback)
                     callback(resp.error);
                 return;
