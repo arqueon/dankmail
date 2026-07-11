@@ -11,6 +11,7 @@ import (
 	"golang.org/x/oauth2"
 
 	"github.com/arqueon/dankmail/core/errdefs"
+	"github.com/arqueon/dankmail/core/internal/i18n"
 )
 
 // Flow is one in-progress OAuth consent: the loopback listener is up and
@@ -69,10 +70,10 @@ func (b *Broker) StartFlow() (*Flow, error) {
 			http.Error(w, "state mismatch", http.StatusBadRequest)
 			f.deliver(flowResult{err: errors.New("oauth: state mismatch")})
 		case q.Get("error") != "":
-			fmt.Fprintln(w, "Autorización denegada. Puedes cerrar esta pestaña.")
+			fmt.Fprintln(w, i18n.T("Authorization denied. You can close this tab."))
 			f.deliver(flowResult{err: fmt.Errorf("oauth: consent denied: %s", q.Get("error"))})
 		default:
-			fmt.Fprintln(w, "Cuenta autorizada. Puedes cerrar esta pestaña y volver a dankmail.")
+			fmt.Fprintln(w, i18n.T("Account authorized. You can close this tab and return to dankmail."))
 			f.deliver(flowResult{code: q.Get("code")})
 		}
 	})}

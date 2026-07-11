@@ -17,6 +17,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent"
 	"github.com/arqueon/dankmail/core/internal/bus"
 	"github.com/arqueon/dankmail/core/internal/contacts"
+	"github.com/arqueon/dankmail/core/internal/i18n"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/notify"
 	"github.com/arqueon/dankmail/core/internal/paths"
@@ -405,14 +406,14 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 		}
 	case "op.failed":
 		_, _ = d.notifier.Send(notify.Notification{
-			Summary: "dankmail: operación fallida",
+			Summary: i18n.T("dankmail: operation failed"),
 			Body:    fmt.Sprintf("%s: %s", str("opType"), str("error")),
 			Urgency: notify.UrgencyCritical,
 		})
 	case "account.auth":
 		_, _ = d.notifier.Send(notify.Notification{
-			Summary: "dankmail: cuenta requiere re-autenticación",
-			Body:    "Ejecuta: dmail account reauth",
+			Summary: i18n.T("dankmail: account needs re-authentication"),
+			Body:    i18n.T("Run: dmail account reauth"),
 			Urgency: notify.UrgencyCritical,
 		})
 	case "snooze.woke":
@@ -420,7 +421,7 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 			return
 		}
 		_, _ = d.notifier.Send(notify.Notification{
-			Summary: "Pospuesto despertó",
+			Summary: i18n.T("Snoozed thread woke up"),
 			Body:    str("subject"),
 			Urgency: notify.UrgencyNormal,
 		})
@@ -432,11 +433,11 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 // notification servers cap the visible buttons (commonly 3).
 func (d *daemon) notifyActions() []notify.Action {
 	labels := map[string]string{
-		"read":    "Marcar leído",
-		"archive": "Archivar",
-		"trash":   "Borrar",
-		"snooze":  "Posponer",
-		"open":    "Abrir en web",
+		"read":    i18n.T("Mark read"),
+		"archive": i18n.T("Archive"),
+		"trash":   i18n.T("Trash"),
+		"snooze":  i18n.T("Snooze"),
+		"open":    i18n.T("Open in web"),
 	}
 	var out []notify.Action
 	for _, key := range d.settings.Get().NotifyActions {
@@ -449,7 +450,7 @@ func (d *daemon) notifyActions() []notify.Action {
 
 // notificationAction routes inline notification buttons into the op
 // queue / browser, using a background context: the notification may
-// outlive the event that created it. "Borrar" is trash — never a
+// outlive the event that created it. "Trash" is exactly that — never a
 // permanent delete (spec: nunca destructivo).
 func (d *daemon) notificationAction(key string, payload map[string]any) {
 	accountID, _ := payload["accountId"].(string)

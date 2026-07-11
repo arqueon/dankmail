@@ -11,6 +11,7 @@ import (
 	"github.com/arqueon/dankmail/core/config"
 	"github.com/arqueon/dankmail/core/ent"
 	"github.com/arqueon/dankmail/core/internal/accounts"
+	"github.com/arqueon/dankmail/core/internal/i18n"
 	"github.com/arqueon/dankmail/core/internal/keyring"
 	"github.com/arqueon/dankmail/core/internal/oauth"
 	"github.com/arqueon/dankmail/core/internal/paths"
@@ -94,7 +95,7 @@ func runAccountAddIMAP(c *cobra.Command, email string) error {
 				cfg.SMTPHost, cfg.SMTPPort = p.SMTPHost, p.SMTPPort
 				cfg.WebmailURL = p.WebmailURL
 				if p.Note != "" {
-					fmt.Println("Nota:", p.Note)
+					fmt.Println(i18n.T("Note:"), p.Note)
 				}
 				found = true
 				break
@@ -124,7 +125,7 @@ func runAccountAddIMAP(c *cobra.Command, email string) error {
 		cfg.WebmailURL = v
 	}
 
-	fmt.Print("Contraseña (o app password): ")
+	fmt.Print(i18n.T("Password (or app password): "))
 	pw, err := term.ReadPassword(int(os.Stdin.Fd()))
 	fmt.Println()
 	if err != nil {
@@ -132,15 +133,15 @@ func runAccountAddIMAP(c *cobra.Command, email string) error {
 	}
 
 	return withDB(func(ctx context.Context, db *ent.Client) error {
-		fmt.Println("Probando conexión IMAP…")
+		fmt.Println(i18n.T("Testing the IMAP connection…"))
 		res, err := accounts.AddIMAP(ctx, db, cfg, email, string(pw))
 		if err != nil {
 			return err
 		}
 		if res.Created {
-			fmt.Printf("Cuenta %s añadida (%s). El sync IMAP llega en el anillo 2; queda en pausa.\n", res.Email, res.AccountID)
+			fmt.Printf(i18n.T("Account %s added (%s). IMAP syncing arrives with the next ring; the account stays parked until then.\n"), res.Email, res.AccountID)
 		} else {
-			fmt.Printf("Cuenta %s actualizada (%s).\n", res.Email, res.AccountID)
+			fmt.Printf(i18n.T("Account %s updated (%s).\n"), res.Email, res.AccountID)
 		}
 		notifyDaemonReload()
 		return nil
@@ -187,7 +188,7 @@ func runAccountAddGmail(clientJSONPath string) error {
 	}
 
 	return withDB(func(ctx context.Context, db *ent.Client) error {
-		fmt.Println("Abriendo el navegador para autorizar la cuenta…")
+		fmt.Println(i18n.T("Opening the browser to authorize the account…"))
 		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
 		tok, err := broker.Authorize(ctx)
 		if err != nil {
@@ -198,9 +199,9 @@ func runAccountAddGmail(clientJSONPath string) error {
 			return err
 		}
 		if res.Created {
-			fmt.Printf("Cuenta %s añadida (%s).\n", res.Email, res.AccountID)
+			fmt.Printf(i18n.T("Account %s added (%s).\n"), res.Email, res.AccountID)
 		} else {
-			fmt.Printf("Cuenta %s re-autorizada (%s).\n", res.Email, res.AccountID)
+			fmt.Printf(i18n.T("Account %s re-authorized (%s).\n"), res.Email, res.AccountID)
 		}
 		notifyDaemonReload()
 		return nil
@@ -219,7 +220,7 @@ func runAccountRemove(id string) error {
 		for _, key := range []string{keyring.KeyOAuthToken, keyring.KeyOAuthClient, keyring.KeyIMAPPassword, keyring.KeySMTPPassword} {
 			_ = keyring.Delete(id, key)
 		}
-		fmt.Println("Cuenta eliminada (la bandeja remota queda intacta).")
+		fmt.Println(i18n.T("Account removed (the remote mailbox is untouched)."))
 		notifyDaemonReload()
 		return nil
 	})
@@ -261,7 +262,7 @@ func runAccountReauth(id string) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("Cuenta re-autenticada.")
+		fmt.Println(i18n.T("Account re-authenticated."))
 		notifyDaemonReload()
 		return nil
 	})
@@ -270,8 +271,8 @@ func runAccountReauth(id string) error {
 // notifyDaemonReload pokes a running daemon; silence if there is none.
 func notifyDaemonReload() {
 	if err := callSimple("system.reload", nil); err == nil {
-		fmt.Println("Daemon recargado.")
+		fmt.Println(i18n.T("Daemon reloaded."))
 	} else {
-		fmt.Println("(Daemon no activo; los cambios aplican al arrancarlo.)")
+		fmt.Println(i18n.T("(Daemon not running; changes apply when it starts.)"))
 	}
 }

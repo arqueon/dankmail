@@ -85,8 +85,9 @@ permanent deletion is not implemented, by design.
   actions, account management — everything applies live.
 - **Chained actions** (configurable): open-preview→mark read,
   reply→mark read, trash→mark read, star→back to inbox.
-- Spanish and English out of the box; follows DankMaterialShell's
-  dynamic Material colors.
+- Spanish and English out of the box — UI, notifications and CLI all
+  follow `DMAIL_LANG` or the system locale (English default); follows
+  DankMaterialShell's dynamic Material colors.
 
 ### Accounts
 - **Multi-account** by design: unified chronological inbox with color
