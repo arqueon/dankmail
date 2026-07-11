@@ -1,9 +1,10 @@
 # Gmail account setup
 
 dankmail talks to Gmail through the official API with **your own OAuth
-client**. You create a (free) client ID in Google Cloud Console once;
-dankmail never sees Google's verification process because the app runs
-in testing mode with you as the only test user.
+client**. You create a (free) client ID in Google Cloud Console once.
+The app starts in testing mode with you as the only test user; the last
+step publishes it to production **without** submitting it for Google
+verification — for personal use none is needed.
 
 **The easiest path is the in-app wizard** (tray → Open Dank Mail → the
 person-add button, or the "Add a Gmail account" button when no account
@@ -39,9 +40,19 @@ The full-access scope (`https://mail.google.com/`) is never used.
 5. Create an OAuth client of type **Desktop app**
    (<https://console.cloud.google.com/auth/clients>) and copy the
    Client ID and Client Secret.
-6. Enter them in the wizard and authorize in the browser — or, for the
+6. **Publish the app** on the Audience page ("Publish app" → confirm;
+   do NOT submit for verification). Google expires the refresh tokens
+   of testing-mode apps every **7 days**, which would force a weekly
+   re-auth. After publishing, the consent screen shows "Google hasn't
+   verified this app" — click Advanced → "Go to dankmail (unsafe)";
+   that warning is expected and only appears during consent.
+7. Enter them in the wizard and authorize in the browser — or, for the
    CLI path, export `DMAIL_GOOGLE_CLIENT_ID` /
    `DMAIL_GOOGLE_CLIENT_SECRET` and run `dmail account add-gmail`.
+
+If a token does expire or is revoked (`auth_error` on the account), the
+key button in Settings → Accounts re-runs the consent with the stored
+client — no need to re-enter credentials. CLI: `dmail account reauth`.
 
 The account's address is read from the authorized Gmail profile (you
 never type it), and the token plus your OAuth client are stored in the

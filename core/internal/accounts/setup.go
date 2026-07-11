@@ -17,8 +17,11 @@ type SetupStep struct {
 }
 
 // GmailSetupSteps walks the user through creating their own Google OAuth
-// desktop client. Done once; the app stays in testing mode with the user
-// as its only test user, so Google verification never applies.
+// desktop client. Done once. The app starts in testing mode with the user
+// as its only test user; the final step publishes it to production because
+// Google expires refresh tokens of testing-mode apps every 7 days, which
+// would force a re-auth weekly. Publishing needs no verification for
+// personal use — the consent screen just shows an "unverified app" warning.
 func GmailSetupSteps() []SetupStep {
 	return []SetupStep{
 		{
@@ -58,6 +61,13 @@ func GmailSetupSteps() []SetupStep {
 			URL:         "https://console.cloud.google.com/auth/clients",
 			URLLabel:    "Open Clients page",
 			Note:        "Application type must be \"Desktop app\" — NOT a service account, API key, or web application. dankmail will only request the gmail.modify and gmail.send scopes — never full mailbox access.",
+		},
+		{
+			Title:       "Publish the app (skip the 7-day token expiry)",
+			Description: "On the Audience page click \"Publish app\" and confirm. Google expires the tokens of testing-mode apps every 7 days, which would make dankmail ask you to re-authenticate weekly. Do NOT submit for verification — for personal use it isn't needed.",
+			URL:         "https://console.cloud.google.com/auth/audience",
+			URLLabel:    "Open Audience page",
+			Note:        "After publishing, the Google consent screen shows \"Google hasn't verified this app\" — click Advanced, then \"Go to dankmail (unsafe)\" and continue. That warning is expected for a personal unverified app and only appears during consent.",
 		},
 	}
 }
