@@ -26,6 +26,8 @@ type flowRegistry struct {
 type pendingFlow struct {
 	flow  *oauth.Flow
 	creds oauth.ClientCreds
+	// kind selects the finisher on complete: "gmail" or "microsoft".
+	kind string
 }
 
 func newFlowRegistry() *flowRegistry {
@@ -46,10 +48,10 @@ func readUserFile(path string) ([]byte, error) {
 	return os.ReadFile(path)
 }
 
-func (r *flowRegistry) register(f *oauth.Flow, creds oauth.ClientCreds) {
+func (r *flowRegistry) register(f *oauth.Flow, creds oauth.ClientCreds, kind string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	r.flows[f.State()] = &pendingFlow{flow: f, creds: creds}
+	r.flows[f.State()] = &pendingFlow{flow: f, creds: creds, kind: kind}
 }
 
 func (r *flowRegistry) take(state string) (*pendingFlow, bool) {
@@ -123,13 +125,38 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		d.flows.register(flow, creds)
+		d.flows.register(flow, creds, "gmail")
 		return map[string]any{
 			"state":   flow.State(),
 			"authUrl": flow.AuthURL(),
 		}, nil
 	})
 
+	srv.Register("accounts.microsoft.setupGuide", func(ctx context.Context, _ map[string]any) (any, error) {
+		return map[string]any{"steps": accounts.MicrosoftSetupSteps()}, nil
+	})
+
+	srv.Register("accounts.microsoft.start", func(ctx context.Context, p map[string]any) (any, error) {
+		clientID, _ := p["clientId"].(string)
+		if clientID == "" {
+			return nil, fmt.Errorf("client ID is required (see the setup guide)")
+		}
+		// Public client: no secret, PKCE carries the proof.
+		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, clientID, "", d.cfg.OAuthBindAddr)
+		flow, err := broker.StartFlow()
+		if err != nil {
+			return nil, err
+		}
+		d.flows.register(flow, oauth.ClientCreds{ClientID: clientID}, "microsoft")
+		return map[string]any{
+			"state":   flow.State(),
+			"authUrl": flow.AuthURL(),
+		}, nil
+	})
+
+	// accounts.gmail.complete finishes ANY pending consent (the name
+	// predates multi-provider; the flow's kind picks the finisher, so
+	// the GUI needs a single completion call for add and re-auth alike).
 	srv.Register("accounts.gmail.complete", func(ctx context.Context, p map[string]any) (any, error) {
 		state, _ := p["state"].(string)
 		if state == "" {
@@ -137,7 +164,7 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		}
 		pending, ok := d.flows.take(state)
 		if !ok {
-			return nil, fmt.Errorf("no pending gmail flow for that state")
+			return nil, fmt.Errorf("no pending flow for that state")
 		}
 
 		waitCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
@@ -146,7 +173,13 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		res, err := accounts.FinishGmail(ctx, d.db, pending.creds, tok)
+		var res accounts.Result
+		switch pending.kind {
+		case "microsoft":
+			res, err = accounts.FinishMicrosoft(ctx, d.db, pending.creds, tok)
+		default:
+			res, err = accounts.FinishGmail(ctx, d.db, pending.creds, tok)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -165,24 +198,38 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		if acct.Type != entaccount.TypeGmail {
-			return nil, fmt.Errorf("re-authentication applies to Gmail accounts only; re-add the account to change an IMAP password")
-		}
 		// Prefer the OAuth client stored with the account at add time,
 		// falling back to env-provided creds (same order as the CLI).
 		creds, err := oauth.LoadClientCreds(idStr)
-		if err != nil || creds.ClientID == "" {
-			creds = oauth.ClientCreds{ClientID: d.cfg.GoogleClientID, ClientSecret: d.cfg.GoogleClientSecret}
+		if err != nil {
+			creds = oauth.ClientCreds{}
 		}
-		if creds.ClientID == "" || creds.ClientSecret == "" {
-			return nil, fmt.Errorf("no OAuth client stored for this account; re-add it via the wizard")
+		var broker *oauth.Broker
+		var kind string
+		switch acct.Type {
+		case entaccount.TypeGmail:
+			if creds.ClientID == "" {
+				creds = oauth.ClientCreds{ClientID: d.cfg.GoogleClientID, ClientSecret: d.cfg.GoogleClientSecret}
+			}
+			if creds.ClientID == "" || creds.ClientSecret == "" {
+				return nil, fmt.Errorf("no OAuth client stored for this account; re-add it via the wizard")
+			}
+			broker = oauth.NewBroker(creds.ClientID, creds.ClientSecret, d.cfg.OAuthBindAddr)
+			kind = "gmail"
+		case entaccount.TypeMicrosoft:
+			if creds.ClientID == "" {
+				return nil, fmt.Errorf("no OAuth client stored for this account; re-add it via the wizard")
+			}
+			broker = oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", d.cfg.OAuthBindAddr)
+			kind = "microsoft"
+		default:
+			return nil, fmt.Errorf("re-authentication applies to OAuth accounts only; re-add the account to change an IMAP password")
 		}
-		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, d.cfg.OAuthBindAddr)
 		flow, err := broker.StartFlow()
 		if err != nil {
 			return nil, err
 		}
-		d.flows.register(flow, creds)
+		d.flows.register(flow, creds, kind)
 		return map[string]any{
 			"state":   flow.State(),
 			"authUrl": flow.AuthURL(),

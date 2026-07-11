@@ -35,6 +35,17 @@ func accountCmd() *cobra.Command {
 	}
 	addGmail.Flags().String("client-json", "", "path to the client_secret_*.json downloaded from Google Console")
 
+	addMicrosoft := &cobra.Command{
+		Use:   "add-microsoft",
+		Short: "Add an Outlook.com / Microsoft 365 account (opens the browser for OAuth consent; the address is read from the authorized profile)",
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			clientID, _ := c.Flags().GetString("client-id")
+			return runAccountAddMicrosoft(clientID)
+		},
+	}
+	addMicrosoft.Flags().String("client-id", "", "Application (client) ID of your Azure app registration (public client)")
+
 	list := &cobra.Command{
 		Use:   "list",
 		Short: "List configured accounts",
@@ -81,7 +92,7 @@ func accountCmd() *cobra.Command {
 	addIMAP.Flags().Int("smtp-port", 0, "SMTP port (default 587)")
 	addIMAP.Flags().String("webmail", "", "webmail URL for deep links")
 
-	cmd.AddCommand(addGmail, addIMAP, list, remove, reauth)
+	cmd.AddCommand(addGmail, addMicrosoft, addIMAP, list, remove, reauth)
 	return cmd
 }
 
@@ -166,6 +177,36 @@ func withDB(fn func(ctx context.Context, db *ent.Client) error) error {
 	return fn(ctx, db)
 }
 
+func runAccountAddMicrosoft(clientID string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	if clientID == "" {
+		return fmt.Errorf("pass --client-id <Application (client) ID from Azure>,\nor use the in-app wizard; see docs/design/microsoft-provider.md §8")
+	}
+	return withDB(func(ctx context.Context, db *ent.Client) error {
+		fmt.Println(i18n.T("Opening the browser to authorize the account…"))
+		// Public client with PKCE — no secret exists or is stored.
+		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, clientID, "", cfg.OAuthBindAddr)
+		tok, err := broker.Authorize(ctx)
+		if err != nil {
+			return err
+		}
+		res, err := accounts.FinishMicrosoft(ctx, db, oauth.ClientCreds{ClientID: clientID}, tok)
+		if err != nil {
+			return err
+		}
+		if res.Created {
+			fmt.Printf(i18n.T("Account %s added (%s).\n"), res.Email, res.AccountID)
+		} else {
+			fmt.Printf(i18n.T("Account %s re-authorized (%s).\n"), res.Email, res.AccountID)
+		}
+		notifyDaemonReload()
+		return nil
+	})
+}
+
 func runAccountAddGmail(clientJSONPath string) error {
 	cfg, err := config.Load()
 	if err != nil {
@@ -236,15 +277,31 @@ func runAccountReauth(id string) error {
 		if err != nil {
 			return fmt.Errorf("bad account id: %w", err)
 		}
+		acct, err := db.Account.Get(ctx, uid)
+		if err != nil {
+			return err
+		}
 		// Prefer the OAuth client stored with the account at add time.
 		creds, err := oauth.LoadClientCreds(id)
-		if err != nil || creds.ClientID == "" {
-			creds = oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
+		if err != nil {
+			creds = oauth.ClientCreds{}
 		}
-		if creds.ClientID == "" || creds.ClientSecret == "" {
-			return fmt.Errorf("no OAuth client for this account; set DMAIL_GOOGLE_CLIENT_ID/SECRET or re-add via the wizard")
+		var broker *oauth.Broker
+		switch acct.Type {
+		case "microsoft":
+			if creds.ClientID == "" {
+				return fmt.Errorf("no OAuth client for this account; re-add via dmail account add-microsoft")
+			}
+			broker = oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", cfg.OAuthBindAddr)
+		default:
+			if creds.ClientID == "" {
+				creds = oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
+			}
+			if creds.ClientID == "" || creds.ClientSecret == "" {
+				return fmt.Errorf("no OAuth client for this account; set DMAIL_GOOGLE_CLIENT_ID/SECRET or re-add via the wizard")
+			}
+			broker = oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
 		}
-		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
 		tok, err := broker.Authorize(ctx)
 		if err != nil {
 			return err

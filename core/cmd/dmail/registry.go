@@ -17,6 +17,7 @@ import (
 	"github.com/arqueon/dankmail/core/internal/oauth"
 	"github.com/arqueon/dankmail/core/internal/provider"
 	"github.com/arqueon/dankmail/core/internal/provider/gmail"
+	"github.com/arqueon/dankmail/core/internal/provider/microsoft"
 )
 
 // errProviderPending marks account types whose sync provider is not
@@ -122,6 +123,22 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 			}
 		}
 		return gmail.NewWithClient(a.ID.String(), a.Email, hc, opts)
+	case account.TypeMicrosoft:
+		creds, err := oauth.LoadClientCreds(a.ID.String())
+		if err != nil || creds.ClientID == "" {
+			return nil, fmt.Errorf("no OAuth client stored for %s; re-add the account", a.Email)
+		}
+		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", r.cfg.OAuthBindAddr)
+		ts, err := broker.TokenSource(ctx, a.ID.String())
+		if err != nil {
+			return nil, err
+		}
+		hc := oauth2.NewClient(ctx, ts)
+		r.mu.Lock()
+		r.clients[a.ID] = hc
+		r.mu.Unlock()
+		opts := microsoft.Options{BodyCapBytes: r.cfg.BodyCapKB * 1024}
+		return microsoft.New(a.ID.String(), a.Email, microsoft.NewClient(hc), opts), nil
 	case account.TypeImap:
 		return nil, errProviderPending
 	default:
