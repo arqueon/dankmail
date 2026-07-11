@@ -179,7 +179,10 @@ FloatingWindow {
             const h = body.match(/^\s*#{1,6}\s+(.*)$/);
             if (h)
                 body = "<b>" + h[1] + "</b>";
-            html += `<font color="${color}">${body === "" ? "&nbsp;" : body}</font><br>`;
+            // One paragraph per source line (not <br>) so each line is its
+            // own text block: triple-click then selects the line instead of
+            // the whole body.
+            html += `<p style="margin:0"><font color="${color}">${body === "" ? "&nbsp;" : body}</font></p>`;
         }
         while (depth > 0) {
             html += "</blockquote>";
@@ -873,6 +876,71 @@ FloatingWindow {
                                 color: Theme.surfaceTextAlpha
                                 maximumLineCount: 1
                             }
+                        }
+                    }
+
+                    // Recipients of the shown (newest) message. BCC of
+                    // received mail never travels in the headers, so when
+                    // the account's own address is in neither To nor CC the
+                    // message very likely arrived via BCC — say so.
+                    ColumnLayout {
+                        id: rcptLines
+                        Layout.fillWidth: true
+                        spacing: 0
+                        visible: fromLine.lastMsg !== null && (toList.length > 0 || ccList.length > 0 || bccLikely)
+
+                        readonly property var toList: fromLine.lastMsg ? (fromLine.lastMsg.to || []) : []
+                        readonly property var ccList: fromLine.lastMsg ? (fromLine.lastMsg.cc || []) : []
+                        readonly property string ownEmail: {
+                            const t = DankMailService.currentThread;
+                            if (!t)
+                                return "";
+                            const accs = DankMailService.accounts || [];
+                            for (let i = 0; i < accs.length; i++) {
+                                if (accs[i].id === t.accountId)
+                                    return String(accs[i].email || "").toLowerCase();
+                            }
+                            return "";
+                        }
+                        readonly property bool bccLikely: {
+                            if (ownEmail === "" || !fromLine.lastMsg)
+                                return false;
+                            const all = toList.concat(ccList);
+                            for (let i = 0; i < all.length; i++) {
+                                if (String(all[i]).toLowerCase().indexOf(ownEmail) !== -1)
+                                    return false;
+                            }
+                            return true;
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            visible: rcptLines.toList.length > 0
+                            text: I18n.tr("To", "preview header") + ": " + rcptLines.toList.join(", ")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceTextAlpha
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            visible: rcptLines.ccList.length > 0
+                            text: I18n.tr("Cc", "preview header") + ": " + rcptLines.ccList.join(", ")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceTextAlpha
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            visible: rcptLines.bccLikely
+                            text: I18n.tr("Received via BCC — your address is not in To or Cc", "preview header")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.warning
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
                         }
                     }
 

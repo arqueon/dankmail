@@ -126,5 +126,10 @@
   },
   "preview footer": {
     "Plain-text preview — open in web for the full message.": "Vista previa en texto plano — abre en web para el mensaje completo."
+  },
+  "preview header": {
+    "To": "Para",
+    "Cc": "CC",
+    "Received via BCC — your address is not in To or Cc": "Recibido en CCO — tu dirección no está en Para ni CC"
   }
 }
