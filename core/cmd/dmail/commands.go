@@ -96,14 +96,22 @@ func init() {
 			RunE: runRestart},
 		&cobra.Command{Use: "kill", Short: "Stop the daemon",
 			RunE: func(cmd *cobra.Command, args []string) error { return callSimple("system.exit", nil) }},
-		&cobra.Command{Use: "sync [account-id]", Short: "Trigger a sync now", Args: cobra.MaximumNArgs(1),
-			RunE: func(cmd *cobra.Command, args []string) error {
-				params := map[string]any{}
-				if len(args) == 1 {
-					params["account"] = args[0]
-				}
-				return callSimple("system.sync", params)
-			}},
+		func() *cobra.Command {
+			var full bool
+			c := &cobra.Command{Use: "sync [account-id]", Short: "Trigger a sync now", Args: cobra.MaximumNArgs(1),
+				RunE: func(cmd *cobra.Command, args []string) error {
+					params := map[string]any{}
+					if len(args) == 1 {
+						params["account"] = args[0]
+					}
+					if full {
+						params["full"] = true
+					}
+					return callSimple("system.sync", params)
+				}}
+			c.Flags().BoolVar(&full, "full", false, "drop the sync cursor first (complete resync; repairs the cache and backfills newly monitored labels)")
+			return c
+		}(),
 		&cobra.Command{Use: "status", Short: "Accounts, unread counts, queue, last errors",
 			RunE: runStatus},
 		&cobra.Command{Use: "dnd [on|off|status]", Short: "Do-not-disturb control",

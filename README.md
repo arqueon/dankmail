@@ -82,6 +82,10 @@ permanent deletion is not implemented, by design.
   search syntax works: `from:`, `has:attachment`, `before:` …) and
   ingests results for local triage → one more click continues in the
   webmail.
+- **Spam review**: a Spam tab lists the spam folder (synced but never
+  notified) with a one-click **mark-all-read** to leave it reviewed;
+  `dmail sync --full` backfills it on accounts added before this
+  feature.
 - **Snooze** with quick options and a **calendar + time picker**;
   snoozes survive daemon restarts and cancel automatically if the
   thread changes remotely.

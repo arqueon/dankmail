@@ -3,6 +3,8 @@ package repo
 import (
 	"context"
 
+	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"github.com/google/uuid"
 
 	"github.com/arqueon/dankmail/core/ent"
@@ -19,6 +21,9 @@ type ThreadFilter struct {
 	UnreadOnly bool
 	Starred    bool
 	InboxOnly  bool
+	// Label keeps only threads carrying this provider label (e.g.
+	// "SPAM" for the spam-review view).
+	Label string
 	// Query matches subject, snippet, sender, or message body
 	// (case-folded LIKE over the local cache — FTS5 is a ring-3
 	// upgrade). While searching, snoozed threads are included.
@@ -56,6 +61,11 @@ func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.Thread
 	}
 	if f.InboxOnly {
 		q = q.Where(thread.InInboxEQ(true))
+	}
+	if f.Label != "" {
+		q = q.Where(func(s *sql.Selector) {
+			s.Where(sqljson.ValueContains(thread.FieldLabels, f.Label))
+		})
 	}
 	limit := f.Limit
 	if limit <= 0 || limit > 500 {

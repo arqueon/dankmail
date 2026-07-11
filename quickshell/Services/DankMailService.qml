@@ -45,6 +45,8 @@ Singleton {
     property bool filterUnread: false
     property bool filterStarred: false
     property string filterAccount: ""
+    // Provider label view ("SPAM" for the spam-review tab; "" = inbox).
+    property string filterLabel: ""
     // searchQuery sweeps the whole local cache (subject/sender/snippet/
     // body); empty = normal inbox view. Full-history search continues in
     // the webmail via openWebSearch.
@@ -365,11 +367,13 @@ Singleton {
     function refreshThreads() {
         threadsLoading = true;
         const params = {
-            "inbox": searchQuery === "",
+            "inbox": searchQuery === "" && filterLabel === "",
             "limit": 200
         };
         if (searchQuery !== "")
             params.query = searchQuery;
+        if (filterLabel !== "" && searchQuery === "")
+            params.label = filterLabel;
         if (filterUnread)
             params.unread = true;
         if (filterStarred)

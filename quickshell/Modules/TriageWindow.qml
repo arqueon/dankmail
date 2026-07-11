@@ -298,12 +298,16 @@ FloatingWindow {
                             {
                                 "key": "starred",
                                 "label": I18n.tr("Starred", "filter")
+                            },
+                            {
+                                "key": "spam",
+                                "label": I18n.tr("Spam", "filter")
                             }
                         ]
 
                         delegate: StyledRect {
                             required property var modelData
-                            readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred)
+                            readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && DankMailService.filterLabel === "")
 
                             width: filterLabel.implicitWidth + Theme.spacingL
                             height: 30
@@ -323,9 +327,23 @@ FloatingWindow {
                                 onClicked: {
                                     DankMailService.filterUnread = parent.modelData.key === "unread";
                                     DankMailService.filterStarred = parent.modelData.key === "starred";
+                                    DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : "";
                                     DankMailService.refreshThreads();
                                 }
                             }
+                        }
+                    }
+
+                    // Spam review: one click marks everything listed as
+                    // read, so the folder can be left "reviewed".
+                    DankActionButton {
+                        visible: DankMailService.filterLabel === "SPAM" && DankMailService.threads.some(t => t.unread)
+                        iconName: "done_all"
+                        iconColor: Theme.primary
+                        onClicked: {
+                            const ids = DankMailService.threads.filter(t => t.unread).map(t => t.id);
+                            if (ids.length)
+                                DankMailService.markRead(ids);
                         }
                     }
                 }

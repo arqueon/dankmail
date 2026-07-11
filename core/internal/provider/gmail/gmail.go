@@ -34,12 +34,15 @@ const (
 	labelStarred = "STARRED"
 	labelInbox   = "INBOX"
 	labelTrash   = "TRASH"
+	labelSpam    = "SPAM"
 )
 
 // Options tunes a Gmail provider instance.
 type Options struct {
-	// MonitoredLabels are extra label IDs synced besides INBOX (which is
-	// always monitored).
+	// MonitoredLabels are extra label IDs synced besides INBOX and SPAM
+	// (which are always monitored — SPAM so the spam folder can be
+	// reviewed and bulk-read from the triage window; it never notifies
+	// because its threads carry InInbox=false).
 	MonitoredLabels []string
 	// BodyCapBytes truncates plain-text bodies; <=0 means the 32 KiB default.
 	BodyCapBytes int
@@ -57,8 +60,8 @@ type Provider struct {
 
 // New builds a Provider for accountID/email over the given API seam.
 func New(accountID, email string, api gmailAPI, opts Options) *Provider {
-	labels := []string{labelInbox}
-	seen := map[string]bool{labelInbox: true}
+	labels := []string{labelInbox, labelSpam}
+	seen := map[string]bool{labelInbox: true, labelSpam: true}
 	for _, l := range opts.MonitoredLabels {
 		if l == "" || seen[l] {
 			continue

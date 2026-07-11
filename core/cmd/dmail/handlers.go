@@ -35,9 +35,14 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		f.UnreadOnly, _ = p["unread"].(bool)
 		f.Starred, _ = p["starred"].(bool)
 		f.InboxOnly, _ = p["inbox"].(bool)
+		f.Label, _ = p["label"].(string)
 		f.Query, _ = p["query"].(string)
 		if f.Query != "" {
 			// A search sweeps the whole cache, not just the inbox.
+			f.InboxOnly = false
+		}
+		if f.Label != "" {
+			// Labeled views (e.g. spam) live outside the inbox.
 			f.InboxOnly = false
 		}
 		if limit, ok := p["limit"].(float64); ok {
@@ -434,12 +439,24 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if engine == nil {
 			return nil, fmt.Errorf("engine not running")
 		}
+		// full=true drops the sync cursor first, forcing a complete
+		// resync (cache repair; also populates newly monitored labels
+		// like SPAM on accounts that predate them).
+		full, _ := p["full"].(bool)
+		syncOne := func(id uuid.UUID) error {
+			if full {
+				if _, err := d.db.Account.UpdateOneID(id).SetSyncCursor("").Save(ctx); err != nil {
+					return err
+				}
+			}
+			return engine.SyncAccount(ctx, id)
+		}
 		if s, ok := p["account"].(string); ok && s != "" {
 			id, err := uuid.Parse(s)
 			if err != nil {
 				return nil, fmt.Errorf("bad account id")
 			}
-			return "ok", engine.SyncAccount(ctx, id)
+			return "ok", syncOne(id)
 		}
 		accounts, err := d.repo.Accounts(ctx)
 		if err != nil {
@@ -450,7 +467,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			if err != nil {
 				continue
 			}
-			if err := engine.SyncAccount(ctx, id); err != nil {
+			if err := syncOne(id); err != nil {
 				return nil, fmt.Errorf("%s: %w", a.Email, err)
 			}
 		}
