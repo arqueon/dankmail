@@ -4,3 +4,6 @@ core/coverage.out
 *.db-wal
 *.db-shm
 .claude/
+
+# graphify (generated knowledge graph)
+graphify-out/

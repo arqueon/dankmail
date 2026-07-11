@@ -413,7 +413,7 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 	case "account.auth":
 		_, _ = d.notifier.Send(notify.Notification{
 			Summary: i18n.T("dankmail: account needs re-authentication"),
-			Body:    i18n.T("Run: dmail account reauth"),
+			Body:    i18n.T("Use the key button in Settings → Accounts, or run: dmail account reauth"),
 			Urgency: notify.UrgencyCritical,
 		})
 	case "snooze.woke":

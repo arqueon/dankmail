@@ -346,6 +346,7 @@ FloatingWindow {
                     delegate: StyledRect {
                         id: acctRow
                         required property var modelData
+                        property bool reauthPending: false
                         Layout.fillWidth: true
                         implicitHeight: 56
                         color: Theme.surfaceContainer
@@ -376,6 +377,21 @@ FloatingWindow {
                                     text: acctRow.modelData.type + " · " + acctRow.modelData.status + (acctRow.modelData.unread > 0 ? " · " + acctRow.modelData.unread + " " + I18n.tr("unread", "tray tooltip") : "")
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: acctRow.modelData.status === "active" ? Theme.surfaceTextMedium : Theme.warning
+                                }
+                            }
+
+                            // Re-run the OAuth consent with the stored client
+                            // (Gmail only; IMAP re-auth means re-adding).
+                            DankActionButton {
+                                visible: acctRow.modelData.type === "gmail"
+                                enabled: !acctRow.reauthPending
+                                iconName: acctRow.reauthPending ? "hourglass_top" : "key"
+                                iconColor: acctRow.modelData.status === "auth_error" ? Theme.warning : Theme.surfaceTextMedium
+                                onClicked: {
+                                    acctRow.reauthPending = true;
+                                    DankMailService.reauthAccount(acctRow.modelData.id, err => {
+                                        acctRow.reauthPending = false;
+                                    });
                                 }
                             }
 

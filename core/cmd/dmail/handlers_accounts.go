@@ -9,6 +9,7 @@ import (
 	gosync "sync"
 	"time"
 
+	entaccount "github.com/arqueon/dankmail/core/ent/account"
 	"github.com/arqueon/dankmail/core/internal/accounts"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/keyring"
@@ -66,6 +67,9 @@ func (r *flowRegistry) take(state string) (*pendingFlow, bool) {
 //	accounts.gmail.setupGuide → []SetupStep + env-default client creds
 //	accounts.gmail.start      → {state, authUrl}; the GUI opens the browser
 //	accounts.gmail.complete   → waits for consent, stores account+secrets
+//	accounts.reauth           → {state, authUrl} for an existing account
+//	                            (stored client creds); completed via
+//	                            accounts.gmail.complete like a fresh add
 //	accounts.flow.cancel      → abort a pending consent
 //	accounts.remove           → drop account + its keyring secrets
 func (d *daemon) registerAccountIPC(srv *ipc.Server) {
@@ -149,6 +153,40 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		d.requestReload()
 		d.bus.Publish("accounts.changed", map[string]any{"accountId": res.AccountID})
 		return res, nil
+	})
+
+	srv.Register("accounts.reauth", func(ctx context.Context, p map[string]any) (any, error) {
+		idStr, _ := p["id"].(string)
+		id, err := parseUUID(idStr)
+		if err != nil {
+			return nil, fmt.Errorf("bad account id")
+		}
+		acct, err := d.db.Account.Get(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if acct.Type != entaccount.TypeGmail {
+			return nil, fmt.Errorf("re-authentication applies to Gmail accounts only; re-add the account to change an IMAP password")
+		}
+		// Prefer the OAuth client stored with the account at add time,
+		// falling back to env-provided creds (same order as the CLI).
+		creds, err := oauth.LoadClientCreds(idStr)
+		if err != nil || creds.ClientID == "" {
+			creds = oauth.ClientCreds{ClientID: d.cfg.GoogleClientID, ClientSecret: d.cfg.GoogleClientSecret}
+		}
+		if creds.ClientID == "" || creds.ClientSecret == "" {
+			return nil, fmt.Errorf("no OAuth client stored for this account; re-add it via the wizard")
+		}
+		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, d.cfg.OAuthBindAddr)
+		flow, err := broker.StartFlow()
+		if err != nil {
+			return nil, err
+		}
+		d.flows.register(flow, creds)
+		return map[string]any{
+			"state":   flow.State(),
+			"authUrl": flow.AuthURL(),
+		}, nil
 	})
 
 	srv.Register("accounts.flow.cancel", func(ctx context.Context, p map[string]any) (any, error) {

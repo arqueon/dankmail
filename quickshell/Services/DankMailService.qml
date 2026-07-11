@@ -639,6 +639,30 @@ Singleton {
         }, resp => callback(resp.error ? resp : resp.result));
     }
 
+    // Re-runs the OAuth consent for an existing Gmail account using the
+    // client creds stored at add time (token expired or revoked). Opens
+    // the browser and resolves via the same complete step as a fresh
+    // add. callback(errorOrNull).
+    function reauthAccount(accountId, callback) {
+        sendRequest("accounts.reauth", {
+            "id": accountId
+        }, resp => {
+            if (resp.error) {
+                if (callback)
+                    callback(resp.error);
+                return;
+            }
+            Qt.openUrlExternally(resp.result.authUrl);
+            sendRequest("accounts.gmail.complete", {
+                "state": resp.result.state
+            }, done => {
+                refreshAccounts();
+                if (callback)
+                    callback(done.error || null);
+            });
+        });
+    }
+
     function cancelFlow(state) {
         sendRequest("accounts.flow.cancel", {
             "state": state

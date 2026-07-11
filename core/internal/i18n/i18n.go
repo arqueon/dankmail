@@ -53,7 +53,7 @@ var overrides = map[string]map[string]string{
 		// daemon: notification texts
 		"dankmail: operation failed":                "dankmail: operación fallida",
 		"dankmail: account needs re-authentication": "dankmail: cuenta requiere re-autenticación",
-		"Run: dmail account reauth":                 "Ejecuta: dmail account reauth",
+		"Use the key button in Settings → Accounts, or run: dmail account reauth": "Usa el botón de llave en Ajustes → Cuentas, o ejecuta: dmail account reauth",
 		"Snoozed thread woke up":                    "Pospuesto despertó",
 
 		// oauth: browser callback page
