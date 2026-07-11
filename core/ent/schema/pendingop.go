@@ -25,7 +25,7 @@ func (PendingOp) Fields() []ent.Field {
 		field.Enum("op_type").Values(
 			"mark_read", "mark_unread",
 			"star", "unstar",
-			"archive", "unarchive", "trash",
+			"archive", "unarchive", "trash", "unspam",
 			"snooze", "snooze_wake",
 			"send_reply", "compose",
 		),

@@ -139,7 +139,7 @@ var (
 	PendingOpsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "provider_thread_ids", Type: field.TypeJSON},
-		{Name: "op_type", Type: field.TypeEnum, Enums: []string{"mark_read", "mark_unread", "star", "unstar", "archive", "unarchive", "trash", "snooze", "snooze_wake", "send_reply", "compose"}},
+		{Name: "op_type", Type: field.TypeEnum, Enums: []string{"mark_read", "mark_unread", "star", "unstar", "archive", "unarchive", "trash", "unspam", "snooze", "snooze_wake", "send_reply", "compose"}},
 		{Name: "payload", Type: field.TypeJSON},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "attempts", Type: field.TypeInt, Default: 0},

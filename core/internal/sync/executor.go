@@ -180,6 +180,8 @@ func (e *Executor) call(ctx context.Context, ops []Op) error {
 		return nil
 	case OpTrash:
 		return prov.Trash(ctx, ids)
+	case OpUnspam:
+		return prov.Unspam(ctx, ids)
 	case OpSendReply:
 		if ops[0].Payload.Reply == nil || len(ops[0].ThreadIDs) == 0 {
 			return errdefs.Wrap(errdefs.KindPermanent, errBadPayload)

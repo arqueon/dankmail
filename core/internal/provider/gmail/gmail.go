@@ -94,7 +94,8 @@ func (p *Provider) Capabilities() provider.Capability {
 		provider.CapSendReply |
 		provider.CapCompose |
 		provider.CapDeepLink |
-		provider.CapHistorySync
+		provider.CapHistorySync |
+		provider.CapUnspam
 }
 
 // Sync returns remote changes since cursor and the new cursor. An empty
@@ -293,6 +294,12 @@ func (p *Provider) Unarchive(ctx context.Context, threadIDs []string) error {
 // matching what Gmail's own threads.trash does). Never a permanent delete.
 func (p *Provider) Trash(ctx context.Context, threadIDs []string) error {
 	return p.modifyAll(ctx, threadIDs, []string{labelTrash}, []string{labelInbox})
+}
+
+// Unspam rescues the threads from the spam folder ("not spam"): remove
+// SPAM, back to the inbox.
+func (p *Provider) Unspam(ctx context.Context, threadIDs []string) error {
+	return p.modifyAll(ctx, threadIDs, []string{labelInbox}, []string{labelSpam})
 }
 
 func (p *Provider) modifyAll(ctx context.Context, threadIDs []string, add, remove []string) error {

@@ -19,6 +19,7 @@ const (
 	OpArchive    OpType = "archive"
 	OpUnarchive  OpType = "unarchive"
 	OpTrash      OpType = "trash"
+	OpUnspam     OpType = "unspam"
 	OpSnooze     OpType = "snooze"
 	OpSnoozeWake OpType = "snooze_wake"
 	OpSendReply  OpType = "send_reply"

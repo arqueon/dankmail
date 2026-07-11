@@ -781,7 +781,7 @@ func TestCapabilitiesAndID(t *testing.T) {
 	}
 	want := provider.CapModifyFlags | provider.CapArchive | provider.CapTrash |
 		provider.CapSendReply | provider.CapCompose | provider.CapDeepLink |
-		provider.CapHistorySync
+		provider.CapHistorySync | provider.CapUnspam
 	if got := p.Capabilities(); got != want {
 		t.Errorf("Capabilities = %b, want %b", got, want)
 	}

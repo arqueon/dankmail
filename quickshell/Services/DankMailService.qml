@@ -438,6 +438,10 @@ Singleton {
     function archive(ids) {
         _op("ops.archive", ids);
     }
+    // "Not spam": rescue threads from the spam folder back to the inbox.
+    function unspam(ids) {
+        _op("ops.unspam", ids);
+    }
     function trash(ids) {
         _op("ops.trash", ids);
     }

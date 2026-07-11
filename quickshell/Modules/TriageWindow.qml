@@ -42,6 +42,20 @@ FloatingWindow {
         return selectedThreadId >= 0 ? [selectedThreadId] : [];
     }
 
+    // Spam-review multi-selection: ids checked for a batch rescue.
+    // Reassigned whole on every toggle so bindings re-evaluate.
+    property var spamChecked: []
+
+    function toggleSpamChecked(id) {
+        const i = spamChecked.indexOf(id);
+        const next = spamChecked.slice();
+        if (i === -1)
+            next.push(id);
+        else
+            next.splice(i, 1);
+        spamChecked = next;
+    }
+
     function snoozeUntil(kind) {
         const now = new Date();
         let d = new Date(now);
@@ -328,6 +342,7 @@ FloatingWindow {
                                     DankMailService.filterUnread = parent.modelData.key === "unread";
                                     DankMailService.filterStarred = parent.modelData.key === "starred";
                                     DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : "";
+                                    window.spamChecked = [];
                                     DankMailService.refreshThreads();
                                 }
                             }
@@ -344,6 +359,42 @@ FloatingWindow {
                             const ids = DankMailService.threads.filter(t => t.unread).map(t => t.id);
                             if (ids.length)
                                 DankMailService.markRead(ids);
+                        }
+                    }
+
+                    // "Not spam": rescue the checked threads back to the
+                    // inbox. Count chip + button appear with a selection.
+                    StyledRect {
+                        visible: DankMailService.filterLabel === "SPAM" && window.spamChecked.length > 0
+                        width: rescueRow.implicitWidth + Theme.spacingL
+                        height: 30
+                        radius: 15
+                        color: Theme.primaryContainer
+
+                        RowLayout {
+                            id: rescueRow
+                            anchors.centerIn: parent
+                            spacing: Theme.spacingXS
+
+                            DankIcon {
+                                name: "move_to_inbox"
+                                size: Theme.iconSizeSmall
+                                color: Theme.primary
+                            }
+
+                            StyledText {
+                                text: I18n.tr("Not spam", "spam review") + " (" + window.spamChecked.length + ")"
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.primary
+                            }
+                        }
+
+                        StateLayer {
+                            stateColor: Theme.primary
+                            onClicked: {
+                                DankMailService.unspam(window.spamChecked);
+                                window.spamChecked = [];
+                            }
                         }
                     }
                 }
@@ -512,6 +563,32 @@ FloatingWindow {
 
                             readonly property string sender: (row.modelData.participants && row.modelData.participants.length > 0) ? row.modelData.participants[0] : ""
                             id: rowContent
+
+                            // Spam review: check circle for the batch
+                            // "not spam" rescue (spam view only).
+                            Rectangle {
+                                visible: DankMailService.filterLabel === "SPAM"
+                                readonly property bool checked: window.spamChecked.indexOf(row.modelData.id) !== -1
+                                width: 22
+                                height: 22
+                                radius: 11
+                                color: checked ? Theme.primary : "transparent"
+                                border.width: 2
+                                border.color: checked ? Theme.primary : Theme.outlineMedium
+
+                                DankIcon {
+                                    anchors.centerIn: parent
+                                    visible: parent.checked
+                                    name: "check"
+                                    size: 14
+                                    color: Theme.surface
+                                }
+
+                                StateLayer {
+                                    stateColor: Theme.primary
+                                    onClicked: window.toggleSpamChecked(row.modelData.id)
+                                }
+                            }
 
                             // Gmail-style sender avatar: initial over a
                             // stable per-sender color.

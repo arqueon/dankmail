@@ -131,5 +131,8 @@
     "To": "Para",
     "Cc": "CC",
     "Received via BCC — your address is not in To or Cc": "Recibido en CCO — tu dirección no está en Para ni CC"
+  },
+  "spam review": {
+    "Not spam": "No es spam"
   }
 }
