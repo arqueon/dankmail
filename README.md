@@ -65,8 +65,12 @@ permanent deletion is not implemented, by design.
   rendered as indented colored blocks, the HTML→text distiller's light
   markdown rendered (labeled links, bold, headings), URLs clickable,
   **HTML-only mail distilled to text** instead of showing empty.
+- **Recipient headers**: sender address plus the To/Cc lists of the
+  shown message, with a hint when the mail arrived via BCC (your
+  address in neither).
 - **Attachments as metadata chips** (name, type, size — content never
-  downloaded; opening goes to the webmail).
+  downloaded; opening goes to the webmail), capped at two rows and
+  scrollable beyond.
 - **Quick reply** under the preview: plain text, Ctrl+Enter sends,
   reply-all as a toggle, correct threading (In-Reply-To/References).
 - **Compose** with sender-account selector and **contact
@@ -82,7 +86,9 @@ permanent deletion is not implemented, by design.
   snoozes survive daemon restarts and cancel automatically if the
   thread changes remotely.
 - **Settings window**: notification buttons, snooze preset, chained
-  actions, account management — everything applies live.
+  actions, account management — everything applies live. Expired or
+  revoked OAuth tokens re-authenticate with **one click** (the key
+  button), reusing the stored client credentials.
 - **Chained actions** (configurable): open-preview→mark read,
   reply→mark read, trash→mark read, star→back to inbox.
 - Spanish and English out of the box — UI, notifications and CLI all
@@ -98,7 +104,8 @@ permanent deletion is not implemented, by design.
   out); paste the Client ID/Secret, drop the downloaded
   `client_secret_*.json` onto the wizard, or point it at the file's
   path. Minimal mail scopes — `gmail.modify` +
-  `gmail.send`, **never** full mailbox access.
+  `gmail.send`, **never** full mailbox access. The last step publishes
+  your OAuth app so Google doesn't expire its tokens every 7 days.
 - **IMAP accounts** (iCloud, Yahoo, Fastmail, Proton via Bridge,
   custom) with presets and a **real connection test** before anything
   is stored; they park until the ring-2 IMAP engine. Microsoft via
