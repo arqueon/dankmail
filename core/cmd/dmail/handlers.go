@@ -45,6 +45,11 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			// Labeled views (e.g. spam) live outside the inbox.
 			f.InboxOnly = false
 		}
+		if f.Label == "SPAM" {
+			// Mixed threads (one spam message, thread still in the
+			// inbox) are inbox mail, not spam to review.
+			f.ExcludeInbox = true
+		}
 		if limit, ok := p["limit"].(float64); ok {
 			f.Limit = int(limit)
 		}

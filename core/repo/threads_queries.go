@@ -24,6 +24,10 @@ type ThreadFilter struct {
 	// Label keeps only threads carrying this provider label (e.g.
 	// "SPAM" for the spam-review view).
 	Label string
+	// ExcludeInbox drops threads still sitting in the inbox — the spam
+	// view uses it so mixed threads (one spam message, thread alive in
+	// the inbox) don't show up as spam.
+	ExcludeInbox bool
 	// Query matches subject, snippet, sender, or message body
 	// (case-folded LIKE over the local cache — FTS5 is a ring-3
 	// upgrade). While searching, snoozed threads are included.
@@ -66,6 +70,9 @@ func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.Thread
 		q = q.Where(func(s *sql.Selector) {
 			s.Where(sqljson.ValueContains(thread.FieldLabels, f.Label))
 		})
+	}
+	if f.ExcludeInbox {
+		q = q.Where(thread.InInboxEQ(false))
 	}
 	limit := f.Limit
 	if limit <= 0 || limit > 500 {
