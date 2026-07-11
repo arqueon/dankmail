@@ -564,30 +564,13 @@ FloatingWindow {
                             readonly property string sender: (row.modelData.participants && row.modelData.participants.length > 0) ? row.modelData.participants[0] : ""
                             id: rowContent
 
-                            // Spam review: check circle for the batch
-                            // "not spam" rescue (spam view only).
-                            Rectangle {
+                            // Spam review: reserve room for the checkbox
+                            // overlay (declared after the row's StateLayer
+                            // so it actually receives clicks).
+                            Item {
                                 visible: DankMailService.filterLabel === "SPAM"
-                                readonly property bool checked: window.spamChecked.indexOf(row.modelData.id) !== -1
-                                width: 22
-                                height: 22
-                                radius: 11
-                                color: checked ? Theme.primary : "transparent"
-                                border.width: 2
-                                border.color: checked ? Theme.primary : Theme.outlineMedium
-
-                                DankIcon {
-                                    anchors.centerIn: parent
-                                    visible: parent.checked
-                                    name: "check"
-                                    size: 14
-                                    color: Theme.surface
-                                }
-
-                                StateLayer {
-                                    stateColor: Theme.primary
-                                    onClicked: window.toggleSpamChecked(row.modelData.id)
-                                }
+                                width: 24
+                                height: 1
                             }
 
                             // Gmail-style sender avatar: initial over a
@@ -700,6 +683,40 @@ FloatingWindow {
                             // pick so the next hover starts on the actions.
                             onHoveredChanged: if (!hovered)
                                 rowActions.snoozing = false
+                        }
+
+                        // Spam review checkbox: square check for the batch
+                        // "not spam" rescue. Declared after the row's
+                        // StateLayer so its clicks aren't swallowed by the
+                        // row selection.
+                        Rectangle {
+                            visible: DankMailService.filterLabel === "SPAM"
+                            readonly property bool checked: window.spamChecked.indexOf(row.modelData.id) !== -1
+                            anchors.left: parent.left
+                            anchors.leftMargin: Theme.spacingM
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 20
+                            height: 20
+                            radius: 4
+                            color: checked ? Theme.primary : "transparent"
+                            border.width: 2
+                            border.color: checked ? Theme.primary : Theme.outlineMedium
+
+                            DankIcon {
+                                anchors.centerIn: parent
+                                visible: parent.checked
+                                name: "check"
+                                size: 14
+                                color: Theme.surface
+                            }
+
+                            MouseArea {
+                                // Larger hit target than the visible box.
+                                anchors.centerIn: parent
+                                width: 32
+                                height: 32
+                                onClicked: window.toggleSpamChecked(row.modelData.id)
+                            }
                         }
 
                         // Hover overlay: quick triage actions mirroring the
