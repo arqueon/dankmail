@@ -187,6 +187,7 @@ func threadSummary(t *ent.Thread) models.ThreadSummary {
 		SnoozedUntil:     t.SnoozedUntil,
 		MessageCount:     t.MessageCount,
 		HasAttachments:   t.HasAttachments,
+		Labels:           t.Labels,
 	}
 	if t.Edges.Account != nil {
 		s.AccountID = t.Edges.Account.ID.String()

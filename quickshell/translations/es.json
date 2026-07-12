@@ -134,5 +134,17 @@
   },
   "spam review": {
     "Not spam": "No es spam"
+  },
+  "undo banner": {
+    "1 thread archived.": "1 hilo archivado.",
+    "%1 threads archived.": "%1 hilos archivados.",
+    "1 thread deleted.": "1 hilo eliminado.",
+    "%1 threads deleted.": "%1 hilos eliminados.",
+    "1 thread moved to Inbox.": "1 hilo movido a Recibidos.",
+    "%1 threads moved to Inbox.": "%1 hilos movidos a Recibidos.",
+    "1 thread marked as Spam.": "1 hilo marcado como Spam.",
+    "%1 threads marked as Spam.": "%1 hilos marcados como Spam.",
+    "1 thread snoozed.": "1 hilo pospuesto.",
+    "%1 threads snoozed.": "%1 hilos pospuestos."
   }
 }

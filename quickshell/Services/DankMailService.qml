@@ -442,6 +442,10 @@ Singleton {
     function unspam(ids) {
         _op("ops.unspam", ids);
     }
+    // Move threads to the spam folder.
+    function spam(ids) {
+        _op("ops.spam", ids);
+    }
     function trash(ids) {
         _op("ops.trash", ids);
     }

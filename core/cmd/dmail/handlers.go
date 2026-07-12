@@ -92,6 +92,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		"ops.unarchive":  dsync.OpUnarchive,
 		"ops.trash":      dsync.OpTrash,
 		"ops.unspam":     dsync.OpUnspam,
+		"ops.spam":       dsync.OpSpam,
 	} {
 		srv.Register(method, d.simpleOpHandler(opType))
 	}

@@ -31,6 +31,7 @@ type ThreadSummary struct {
 	MessageCount     int        `json:"messageCount"`
 	HasAttachments   bool       `json:"hasAttachments"`
 	WebLink          string     `json:"webLink,omitempty"`
+	Labels           []string   `json:"labels"`
 }
 
 type AttachmentView struct {

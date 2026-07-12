@@ -50,7 +50,7 @@ func (p *Provider) ID() string { return p.accountID }
 func (p *Provider) Capabilities() provider.Capability {
 	return provider.CapModifyFlags | provider.CapArchive | provider.CapTrash |
 		provider.CapSendReply | provider.CapCompose | provider.CapDeepLink |
-		provider.CapHistorySync | provider.CapUnspam
+		provider.CapHistorySync | provider.CapUnspam | provider.CapSpam
 }
 
 // monitoredFolders are the folders whose deltas drive sync: the inbox
@@ -316,6 +316,20 @@ func (p *Provider) Trash(ctx context.Context, threadIDs []string) error {
 // Unspam rescues the threads from the junk folder back to the inbox.
 func (p *Provider) Unspam(ctx context.Context, threadIDs []string) error {
 	return p.moveFromTo(ctx, threadIDs, folderJunk, folderInbox)
+}
+
+// Spam moves the threads to the junk folder.
+func (p *Provider) Spam(ctx context.Context, threadIDs []string) error {
+	ids, err := p.folders(ctx)
+	if err != nil {
+		return classify(err)
+	}
+	return p.eachMessage(ctx, threadIDs, func(m *graphMessage) error {
+		if m.ParentFolderID == ids[folderJunk] {
+			return nil
+		}
+		return p.api.MoveMessage(ctx, m.ID, folderJunk)
+	})
 }
 
 // moveFromTo moves the threads' messages sitting in fromFolder to

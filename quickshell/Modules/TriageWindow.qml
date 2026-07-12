@@ -105,6 +105,8 @@ FloatingWindow {
             DankMailService.trash(ids);
         } else if (type === "unspam") {
             DankMailService.unspam(ids);
+        } else if (type === "spam") {
+            DankMailService.spam(ids);
         } else if (type === "snooze") {
             DankMailService.snooze(ids, extra);
         }
@@ -1297,6 +1299,18 @@ FloatingWindow {
                         }
 
                         DankActionButton {
+                            iconName: "report"
+                            iconColor: Theme.warning
+                            visible: DankMailService.currentThread && (!DankMailService.currentThread.labels || DankMailService.currentThread.labels.indexOf("SPAM") === -1)
+                            onClicked: {
+                                const ids = window.selectedIds();
+                                if (ids.length) {
+                                    window.queueUndoableAction("spam", ids);
+                                }
+                            }
+                        }
+
+                        DankActionButton {
                             iconName: DankMailService.currentThread && DankMailService.currentThread.unread ? "drafts" : "mark_email_unread"
                             onClicked: {
                                 const t = DankMailService.currentThread;
@@ -1932,6 +1946,8 @@ FloatingWindow {
                         return count === 1 ? I18n.tr("1 thread deleted.", "undo banner") : I18n.tr("%1 threads deleted.", "undo banner").arg(count);
                     } else if (type === "unspam") {
                         return count === 1 ? I18n.tr("1 thread moved to Inbox.", "undo banner") : I18n.tr("%1 threads moved to Inbox.", "undo banner").arg(count);
+                    } else if (type === "spam") {
+                        return count === 1 ? I18n.tr("1 thread marked as Spam.", "undo banner") : I18n.tr("%1 threads marked as Spam.", "undo banner").arg(count);
                     } else if (type === "snooze") {
                         return count === 1 ? I18n.tr("1 thread snoozed.", "undo banner") : I18n.tr("%1 threads snoozed.", "undo banner").arg(count);
                     }

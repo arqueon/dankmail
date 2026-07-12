@@ -103,6 +103,7 @@ type fakeProvider struct {
 	unarchived [][]string
 	trashed    [][]string
 	unspammed  [][]string
+	spammed    [][]string
 	replies    []provider.ReplyDraft
 	composed   []provider.ComposeDraft
 }
@@ -180,6 +181,16 @@ func (f *fakeProvider) Unspam(ctx context.Context, ids []string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.unspammed = append(f.unspammed, ids)
+	return nil
+}
+
+func (f *fakeProvider) Spam(ctx context.Context, ids []string) error {
+	if err := f.errFor("Spam"); err != nil {
+		return err
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.spammed = append(f.spammed, ids)
 	return nil
 }
 

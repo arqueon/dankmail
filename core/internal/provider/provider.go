@@ -40,6 +40,8 @@ const (
 	// CapUnspam: rescue threads from the spam folder back to the inbox
 	// (Gmail: remove SPAM + add INBOX; Graph: move junkemail → inbox).
 	CapUnspam
+	// CapSpam: move threads to the spam folder.
+	CapSpam
 )
 
 // Has reports whether all bits in want are set.
@@ -199,6 +201,9 @@ type Provider interface {
 	// Unspam rescues the threads from the spam folder back to the inbox
 	// ("not spam"). Requires CapUnspam.
 	Unspam(ctx context.Context, threadIDs []string) error
+
+	// Spam moves the threads to the spam folder. Requires CapSpam.
+	Spam(ctx context.Context, threadIDs []string) error
 
 	// SendReply sends a plain-text reply on the given thread, threading it
 	// correctly (In-Reply-To/References, provider thread association).

@@ -95,7 +95,8 @@ func (p *Provider) Capabilities() provider.Capability {
 		provider.CapCompose |
 		provider.CapDeepLink |
 		provider.CapHistorySync |
-		provider.CapUnspam
+		provider.CapUnspam |
+		provider.CapSpam
 }
 
 // Sync returns remote changes since cursor and the new cursor. An empty
@@ -300,6 +301,11 @@ func (p *Provider) Trash(ctx context.Context, threadIDs []string) error {
 // SPAM, back to the inbox.
 func (p *Provider) Unspam(ctx context.Context, threadIDs []string) error {
 	return p.modifyAll(ctx, threadIDs, []string{labelInbox}, []string{labelSpam})
+}
+
+// Spam moves the threads to the spam folder (add SPAM, remove INBOX).
+func (p *Provider) Spam(ctx context.Context, threadIDs []string) error {
+	return p.modifyAll(ctx, threadIDs, []string{labelSpam}, []string{labelInbox})
 }
 
 func (p *Provider) modifyAll(ctx context.Context, threadIDs []string, add, remove []string) error {

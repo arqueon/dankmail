@@ -198,6 +198,14 @@ func applyLocal(ctx context.Context, tx *ent.Tx, op *Op, rows []*ent.Thread) err
 				}
 			}
 			u.SetInInbox(true).SetLabels(labels)
+		case OpSpam:
+			labels := []string{"SPAM"}
+			for _, l := range t.Labels {
+				if l != "SPAM" && l != "INBOX" {
+					labels = append(labels, l)
+				}
+			}
+			u.SetInInbox(false).SetLabels(labels)
 		case OpSnooze:
 			if op.Payload.Snooze == nil {
 				return fmt.Errorf("sync: snooze op without payload")
