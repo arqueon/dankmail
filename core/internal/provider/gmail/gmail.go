@@ -233,7 +233,7 @@ func collectThreadIDs(dst map[string]bool, h *gmailv1.History) {
 // back as Backfill deltas (upserted into the cache, never notified).
 func (p *Provider) SearchRemote(ctx context.Context, query string, limit int) (provider.Changes, error) {
 	if limit <= 0 {
-		limit = 25
+		limit = 100
 	}
 	changes := provider.Changes{Backfill: true}
 	pageToken := ""

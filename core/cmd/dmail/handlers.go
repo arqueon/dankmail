@@ -325,8 +325,11 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			if !ok {
 				continue // provider can't search remotely; local cache only
 			}
-			searched++
-			changes, err := searcher.SearchRemote(ctx, query, 25)
+			limit := 100
+			if val, ok := p["limit"].(float64); ok && val > 0 {
+				limit = int(val)
+			}
+			changes, err := searcher.SearchRemote(ctx, query, limit)
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", a.Email, err)
 			}

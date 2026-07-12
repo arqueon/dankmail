@@ -42,18 +42,90 @@ FloatingWindow {
         return selectedThreadId >= 0 ? [selectedThreadId] : [];
     }
 
-    // Spam-review multi-selection: ids checked for a batch rescue.
-    // Reassigned whole on every toggle so bindings re-evaluate.
-    property var spamChecked: []
+    // Selections for bulk operations.
+    property var checkedIds: []
 
     function toggleSpamChecked(id) {
-        const i = spamChecked.indexOf(id);
-        const next = spamChecked.slice();
+        const i = checkedIds.indexOf(id);
+        const next = checkedIds.slice();
         if (i === -1)
             next.push(id);
         else
             next.splice(i, 1);
-        spamChecked = next;
+        checkedIds = next;
+    }
+
+    // Temporal Undo State (40-second delay for actions)
+    property var undoAction: null
+    property var temporarilyHiddenIds: []
+
+    Timer {
+        id: undoTimer
+        interval: 40000 // 40 seconds
+        repeat: false
+        onTriggered: window.flushUndoAction()
+    }
+
+    function queueUndoableAction(type, ids, extra) {
+        // 1. Flush any existing undo action
+        window.flushUndoAction();
+
+        // 2. Set up new undo action
+        let currentT = DankMailService.currentThread;
+        window.undoAction = {
+            "type": type,
+            "ids": ids,
+            "extra": extra || null,
+            "currentThread": currentT
+        };
+
+        // 3. Mark ids as temporarily hidden
+        window.temporarilyHiddenIds = ids;
+
+        // 4. Deselect thread if active
+        if (currentT && ids.indexOf(currentT.id) !== -1) {
+            DankMailService.currentThread = null;
+        }
+
+        // 5. Start timer
+        undoTimer.restart();
+    }
+
+    function flushUndoAction() {
+        if (!window.undoAction)
+            return;
+
+        const type = window.undoAction.type;
+        const ids = window.undoAction.ids;
+        const extra = window.undoAction.extra;
+
+        if (type === "archive") {
+            DankMailService.archive(ids);
+        } else if (type === "trash") {
+            DankMailService.trash(ids);
+        } else if (type === "unspam") {
+            DankMailService.unspam(ids);
+        } else if (type === "snooze") {
+            DankMailService.snooze(ids, extra);
+        }
+
+        window.undoAction = null;
+        window.temporarilyHiddenIds = [];
+    }
+
+    function triggerUndo() {
+        if (!window.undoAction)
+            return;
+
+        undoTimer.stop();
+        
+        // Restore active thread
+        if (window.undoAction.currentThread) {
+            DankMailService.currentThread = window.undoAction.currentThread;
+        }
+
+        window.undoAction = null;
+        window.temporarilyHiddenIds = [];
     }
 
     function snoozeUntil(kind) {
@@ -342,7 +414,7 @@ FloatingWindow {
                                     DankMailService.filterUnread = parent.modelData.key === "unread";
                                     DankMailService.filterStarred = parent.modelData.key === "starred";
                                     DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : "";
-                                    window.spamChecked = [];
+                                    window.checkedIds = [];
                                     DankMailService.refreshThreads();
                                 }
                             }
@@ -350,9 +422,9 @@ FloatingWindow {
                     }
 
                     // Spam review: one click marks everything listed as
-                    // read, so the folder can be left "reviewed".
+                    // read, so the folder can be left "reviewed". Only shown when nothing is selected.
                     DankActionButton {
-                        visible: DankMailService.filterLabel === "SPAM" && DankMailService.threads.some(t => t.unread)
+                        visible: DankMailService.filterLabel === "SPAM" && DankMailService.threads.some(t => t.unread) && window.checkedIds.length === 0
                         iconName: "done_all"
                         iconColor: Theme.primary
                         onClicked: {
@@ -362,38 +434,117 @@ FloatingWindow {
                         }
                     }
 
-                    // "Not spam": rescue the checked threads back to the
-                    // inbox. Count chip + button appear with a selection.
-                    StyledRect {
-                        visible: DankMailService.filterLabel === "SPAM" && window.spamChecked.length > 0
-                        width: rescueRow.implicitWidth + Theme.spacingL
-                        height: 30
-                        radius: 15
-                        color: Theme.primaryContainer
+                    // GENERAL BULK ACTIONS TOOLBAR
+                    RowLayout {
+                        visible: window.checkedIds.length > 0
+                        spacing: Theme.spacingS
 
-                        RowLayout {
-                            id: rescueRow
-                            anchors.centerIn: parent
+                        StyledText {
+                            text: I18n.tr("%1 selected", "bulk action").arg(window.checkedIds.length)
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.DemiBold
+                            color: Theme.primary
+                        }
+
+                        DankActionButton {
+                            buttonSize: 28
+                            iconName: "close"
+                            iconColor: Theme.primary
+                            onClicked: window.checkedIds = []
+                        }
+
+                        // Divider
+                        Rectangle {
+                            width: 1
+                            height: 16
+                            color: Theme.outline
+                        }
+
+                        // SPAM-specific bulk actions
+                        Row {
                             spacing: Theme.spacingXS
+                            visible: DankMailService.filterLabel === "SPAM"
 
-                            DankIcon {
-                                name: "move_to_inbox"
-                                size: Theme.iconSizeSmall
-                                color: Theme.primary
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "move_to_inbox"
+                                iconColor: Theme.primary
+                                onClicked: {
+                                    window.queueUndoableAction("unspam", window.checkedIds);
+                                    window.checkedIds = [];
+                                }
                             }
 
-                            StyledText {
-                                text: I18n.tr("Not spam", "spam review") + " (" + window.spamChecked.length + ")"
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.primary
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "delete_forever"
+                                iconColor: Theme.error
+                                onClicked: {
+                                    window.queueUndoableAction("trash", window.checkedIds);
+                                    window.checkedIds = [];
+                                }
                             }
                         }
 
-                        StateLayer {
-                            stateColor: Theme.primary
-                            onClicked: {
-                                DankMailService.unspam(window.spamChecked);
-                                window.spamChecked = [];
+                        // General bulk actions for Inbox, Unread, Starred, All
+                        Row {
+                            spacing: Theme.spacingXS
+                            visible: DankMailService.filterLabel !== "SPAM"
+
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "archive"
+                                onClicked: {
+                                    window.queueUndoableAction("archive", window.checkedIds);
+                                    window.checkedIds = [];
+                                }
+                            }
+
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "delete"
+                                iconColor: Theme.error
+                                onClicked: {
+                                    window.queueUndoableAction("trash", window.checkedIds);
+                                    window.checkedIds = [];
+                                }
+                            }
+
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "drafts"
+                                onClicked: {
+                                    DankMailService.markRead(window.checkedIds);
+                                    window.checkedIds = [];
+                                }
+                            }
+
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "mark_email_unread"
+                                onClicked: {
+                                    DankMailService.markUnread(window.checkedIds);
+                                    window.checkedIds = [];
+                                }
+                            }
+
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "star"
+                                iconColor: Theme.warning
+                                onClicked: {
+                                    DankMailService.star(window.checkedIds);
+                                    window.checkedIds = [];
+                                }
+                            }
+
+                            DankActionButton {
+                                buttonSize: 28
+                                iconName: "star_outline"
+                                onClicked: {
+                                    DankMailService.unstar(window.checkedIds);
+                                    window.checkedIds = [];
+                                }
                             }
                         }
                     }
@@ -542,9 +693,12 @@ FloatingWindow {
                         required property var modelData
 
                         readonly property bool selected: modelData.id === window.selectedThreadId
+                        readonly property bool isHidden: window.temporarilyHiddenIds.indexOf(modelData.id) !== -1
 
                         width: threadList.width
-                        height: 76
+                        height: isHidden ? 0 : 76
+                        visible: !isHidden
+                        clip: true
                         color: selected ? Theme.surfaceSelected : "transparent"
 
                         Rectangle {
@@ -564,11 +718,11 @@ FloatingWindow {
                             readonly property string sender: (row.modelData.participants && row.modelData.participants.length > 0) ? row.modelData.participants[0] : ""
                             id: rowContent
 
-                            // Spam review: reserve room for the checkbox
+                            // Multi-selection: reserve room for the checkbox
                             // overlay (declared after the row's StateLayer
                             // so it actually receives clicks).
                             Item {
-                                visible: DankMailService.filterLabel === "SPAM"
+                                visible: true
                                 width: 24
                                 height: 1
                             }
@@ -685,13 +839,12 @@ FloatingWindow {
                                 rowActions.snoozing = false
                         }
 
-                        // Spam review checkbox: square check for the batch
-                        // "not spam" rescue. Declared after the row's
-                        // StateLayer so its clicks aren't swallowed by the
-                        // row selection.
+                        // Selection checkbox: square check for batch actions.
+                        // Declared after the row's StateLayer so its clicks
+                        // aren't swallowed by the row selection.
                         Rectangle {
-                            visible: DankMailService.filterLabel === "SPAM"
-                            readonly property bool checked: window.spamChecked.indexOf(row.modelData.id) !== -1
+                            visible: true
+                            readonly property bool checked: window.checkedIds.indexOf(row.modelData.id) !== -1
                             anchors.left: parent.left
                             anchors.leftMargin: Theme.spacingM
                             anchors.verticalCenter: parent.verticalCenter
@@ -747,8 +900,7 @@ FloatingWindow {
                             }
 
                             function doSnooze(key) {
-                                DankMailService.snooze([row.modelData.id], window.snoozeUntil(key));
-                                clearIfOpen();
+                                window.queueUndoableAction("snooze", [row.modelData.id], window.snoozeUntil(key));
                                 snoozing = false;
                             }
 
@@ -768,8 +920,7 @@ FloatingWindow {
                                     buttonSize: 30
                                     iconName: "archive"
                                     onClicked: {
-                                        DankMailService.archive([row.modelData.id]);
-                                        rowActions.clearIfOpen();
+                                        window.queueUndoableAction("archive", [row.modelData.id]);
                                     }
                                 }
 
@@ -778,8 +929,7 @@ FloatingWindow {
                                     iconName: "delete"
                                     iconColor: Theme.error
                                     onClicked: {
-                                        DankMailService.trash([row.modelData.id]);
-                                        rowActions.clearIfOpen();
+                                        window.queueUndoableAction("trash", [row.modelData.id]);
                                     }
                                 }
 
@@ -995,64 +1145,69 @@ FloatingWindow {
                     // received mail never travels in the headers, so when
                     // the account's own address is in neither To nor CC the
                     // message very likely arrived via BCC — say so.
-                    ColumnLayout {
-                        id: rcptLines
+                    DankFlickable {
+                        id: rcptScroll
                         Layout.fillWidth: true
-                        spacing: 0
-                        visible: fromLine.lastMsg !== null && (toList.length > 0 || ccList.length > 0 || bccLikely)
+                        Layout.preferredHeight: Math.min(rcptLines.implicitHeight, 60)
+                        visible: fromLine.lastMsg !== null && (rcptLines.toList.length > 0 || rcptLines.ccList.length > 0 || rcptLines.bccLikely)
+                        contentHeight: rcptLines.implicitHeight
+                        clip: true
 
-                        readonly property var toList: fromLine.lastMsg ? (fromLine.lastMsg.to || []) : []
-                        readonly property var ccList: fromLine.lastMsg ? (fromLine.lastMsg.cc || []) : []
-                        readonly property string ownEmail: {
-                            const t = DankMailService.currentThread;
-                            if (!t)
+                        ColumnLayout {
+                            id: rcptLines
+                            width: rcptScroll.width
+                            spacing: 0
+
+                            readonly property var toList: fromLine.lastMsg ? (fromLine.lastMsg.to || []) : []
+                            readonly property var ccList: fromLine.lastMsg ? (fromLine.lastMsg.cc || []) : []
+                            readonly property string ownEmail: {
+                                const t = DankMailService.currentThread;
+                                if (!t)
+                                    return "";
+                                const accs = DankMailService.accounts || [];
+                                for (let i = 0; i < accs.length; i++) {
+                                    if (accs[i].id === t.accountId)
+                                        return String(accs[i].email || "").toLowerCase();
+                                }
                                 return "";
-                            const accs = DankMailService.accounts || [];
-                            for (let i = 0; i < accs.length; i++) {
-                                if (accs[i].id === t.accountId)
-                                    return String(accs[i].email || "").toLowerCase();
                             }
-                            return "";
-                        }
-                        readonly property bool bccLikely: {
-                            if (ownEmail === "" || !fromLine.lastMsg)
-                                return false;
-                            const all = toList.concat(ccList);
-                            for (let i = 0; i < all.length; i++) {
-                                if (String(all[i]).toLowerCase().indexOf(ownEmail) !== -1)
+                            readonly property bool bccLikely: {
+                                if (ownEmail === "" || !fromLine.lastMsg)
                                     return false;
+                                const all = toList.concat(ccList);
+                                for (let i = 0; i < all.length; i++) {
+                                    if (String(all[i]).toLowerCase().indexOf(ownEmail) !== -1)
+                                        return false;
+                                }
+                                return true;
                             }
-                            return true;
-                        }
 
-                        StyledText {
-                            Layout.fillWidth: true
-                            visible: rcptLines.toList.length > 0
-                            text: I18n.tr("To", "preview header") + ": " + rcptLines.toList.join(", ")
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceTextAlpha
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
-                        }
+                            StyledText {
+                                Layout.fillWidth: true
+                                visible: rcptLines.toList.length > 0
+                                text: I18n.tr("To", "preview header") + ": " + rcptLines.toList.join(", ")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceTextAlpha
+                                wrapMode: Text.WrapAnywhere
+                            }
 
-                        StyledText {
-                            Layout.fillWidth: true
-                            visible: rcptLines.ccList.length > 0
-                            text: I18n.tr("Cc", "preview header") + ": " + rcptLines.ccList.join(", ")
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceTextAlpha
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
-                        }
+                            StyledText {
+                                Layout.fillWidth: true
+                                visible: rcptLines.ccList.length > 0
+                                text: I18n.tr("Cc", "preview header") + ": " + rcptLines.ccList.join(", ")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceTextAlpha
+                                wrapMode: Text.WrapAnywhere
+                            }
 
-                        StyledText {
-                            Layout.fillWidth: true
-                            visible: rcptLines.bccLikely
-                            text: I18n.tr("Received via BCC — your address is not in To or Cc", "preview header")
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.warning
-                            elide: Text.ElideRight
-                            maximumLineCount: 1
+                            StyledText {
+                                Layout.fillWidth: true
+                                visible: rcptLines.bccLikely
+                                text: I18n.tr("Received via BCC — your address is not in To or Cc", "preview header")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.warning
+                                wrapMode: Text.WrapAnywhere
+                            }
                         }
                     }
 
@@ -1125,8 +1280,7 @@ FloatingWindow {
                             onClicked: {
                                 const ids = window.selectedIds();
                                 if (ids.length) {
-                                    DankMailService.archive(ids);
-                                    DankMailService.currentThread = null;
+                                    window.queueUndoableAction("archive", ids);
                                 }
                             }
                         }
@@ -1137,8 +1291,7 @@ FloatingWindow {
                             onClicked: {
                                 const ids = window.selectedIds();
                                 if (ids.length) {
-                                    DankMailService.trash(ids);
-                                    DankMailService.currentThread = null;
+                                    window.queueUndoableAction("trash", ids);
                                 }
                             }
                         }
@@ -1237,8 +1390,7 @@ FloatingWindow {
                         function doSnooze(until) {
                             const ids = window.selectedIds();
                             if (ids.length) {
-                                DankMailService.snooze(ids, until);
-                                DankMailService.currentThread = null;
+                                window.queueUndoableAction("snooze", ids, until);
                             }
                             snoozeMenu.visible = false;
                         }
@@ -1742,6 +1894,72 @@ FloatingWindow {
                         text: I18n.tr("Select a thread", "empty preview")
                         color: Theme.surfaceTextMedium
                     }
+                }
+            }
+        }
+    }
+
+    // Floating Undo Toast/Banner (Material 3 style)
+    StyledRect {
+        id: undoBanner
+        visible: window.undoAction !== null
+        
+        anchors.bottom: parent.bottom
+        anchors.bottomMargin: Theme.spacingL
+        anchors.horizontalCenter: parent.horizontalCenter
+        z: 999
+        
+        width: undoRow.implicitWidth + Theme.spacingXL
+        height: 40
+        radius: 8
+        color: "#2d3139" // Premium dark slate background
+        border.width: 1
+        border.color: Theme.outline
+
+        RowLayout {
+            id: undoRow
+            anchors.centerIn: parent
+            spacing: Theme.spacingM
+
+            StyledText {
+                text: {
+                    if (!window.undoAction) return "";
+                    const count = window.undoAction.ids.length;
+                    const type = window.undoAction.type;
+                    if (type === "archive") {
+                        return count === 1 ? I18n.tr("1 thread archived.", "undo banner") : I18n.tr("%1 threads archived.", "undo banner").arg(count);
+                    } else if (type === "trash") {
+                        return count === 1 ? I18n.tr("1 thread deleted.", "undo banner") : I18n.tr("%1 threads deleted.", "undo banner").arg(count);
+                    } else if (type === "unspam") {
+                        return count === 1 ? I18n.tr("1 thread moved to Inbox.", "undo banner") : I18n.tr("%1 threads moved to Inbox.", "undo banner").arg(count);
+                    } else if (type === "snooze") {
+                        return count === 1 ? I18n.tr("1 thread snoozed.", "undo banner") : I18n.tr("%1 threads snoozed.", "undo banner").arg(count);
+                    }
+                    return "";
+                }
+                color: "#f5f6f9" // High contrast light text
+                font.pixelSize: Theme.fontSizeSmall
+            }
+
+            // Undo action button
+            StyledRect {
+                width: undoText.implicitWidth + Theme.spacingM
+                height: 24
+                radius: 4
+                color: "transparent"
+
+                StyledText {
+                    id: undoText
+                    anchors.centerIn: parent
+                    text: I18n.tr("Undo", "undo banner")
+                    color: Theme.primary
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.Bold
+                }
+
+                StateLayer {
+                    stateColor: Theme.primary
+                    onClicked: window.triggerUndo()
                 }
             }
         }

@@ -101,7 +101,7 @@ func (r *realAPI) SendMessage(ctx context.Context, threadID string, raw []byte) 
 }
 
 func (r *realAPI) SearchThreads(ctx context.Context, query string, pageToken string) ([]string, string, error) {
-	call := r.svc.Users.Threads.List(userID).Q(query).Context(ctx)
+	call := r.svc.Users.Threads.List(userID).Q(query).IncludeSpamTrash(true).Context(ctx)
 	if pageToken != "" {
 		call = call.PageToken(pageToken)
 	}
