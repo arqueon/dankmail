@@ -25,6 +25,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/account"
 	"github.com/arqueon/dankmail/core/errdefs"
 	"github.com/arqueon/dankmail/core/internal/bus"
+	"github.com/arqueon/dankmail/core/internal/settings"
 )
 
 // DefaultPollInterval between provider syncs, overridable per account via
@@ -40,12 +41,13 @@ type Engine struct {
 	registry   Registry
 	reconciler *Reconciler
 	scheduler  *Scheduler
+	settings   *settings.Store
 }
 
-func NewEngine(db *ent.Client, b *bus.Bus, q *Queue, reg Registry, sched *Scheduler) *Engine {
+func NewEngine(db *ent.Client, b *bus.Bus, q *Queue, reg Registry, sched *Scheduler, set *settings.Store) *Engine {
 	return &Engine{
 		db: db, bus: b, queue: q, registry: reg,
-		reconciler: NewReconciler(db, b), scheduler: sched,
+		reconciler: NewReconciler(db, b), scheduler: sched, settings: set,
 	}
 }
 
@@ -85,22 +87,36 @@ func (e *Engine) Run(ctx context.Context) error {
 
 // runAccount is the poll loop for one account.
 func (e *Engine) runAccount(ctx context.Context, a *ent.Account) {
-	interval := DefaultPollInterval
-	if secs, ok := a.Config["pollSeconds"].(float64); ok && secs >= 10 {
-		interval = time.Duration(secs) * time.Second
-	}
-	// First sync immediately, then on the ticker.
+	// First sync immediately, then on the (live) interval.
 	_ = e.SyncAccount(ctx, a.ID)
-	tick := time.NewTicker(interval)
-	defer tick.Stop()
+	timer := time.NewTimer(e.accountInterval(a))
+	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-tick.C:
+		case <-timer.C:
 			_ = e.SyncAccount(ctx, a.ID)
+			// Re-read each tick so a settings change takes effect within
+			// one cycle without restarting the engine.
+			timer.Reset(e.accountInterval(a))
 		}
 	}
+}
+
+// accountInterval resolves the effective poll cadence: a per-account
+// Config["pollSeconds"] override wins, else the global PollSeconds from
+// settings, else the built-in default.
+func (e *Engine) accountInterval(a *ent.Account) time.Duration {
+	if secs, ok := a.Config["pollSeconds"].(float64); ok && secs >= float64(settings.MinPollSeconds) {
+		return time.Duration(secs) * time.Second
+	}
+	if e.settings != nil {
+		if secs := e.settings.Get().PollSeconds; secs >= settings.MinPollSeconds {
+			return time.Duration(secs) * time.Second
+		}
+	}
+	return DefaultPollInterval
 }
 
 // SyncAccount performs one provider sync + reconcile pass. Also invoked

@@ -110,12 +110,9 @@ FloatingWindow {
                     Layout.fillWidth: true
                     spacing: Theme.spacingS
 
+                    // Same order as the per-thread action bar in the app.
                     Repeater {
                         model: [
-                            {
-                                "key": "read",
-                                "label": I18n.tr("Mark read", "notify action")
-                            },
                             {
                                 "key": "archive",
                                 "label": I18n.tr("Archive", "notify action")
@@ -123,6 +120,10 @@ FloatingWindow {
                             {
                                 "key": "trash",
                                 "label": I18n.tr("Trash", "notify action")
+                            },
+                            {
+                                "key": "read",
+                                "label": I18n.tr("Mark read", "notify action")
                             },
                             {
                                 "key": "snooze",
@@ -308,6 +309,84 @@ FloatingWindow {
                                 const patch = {};
                                 patch[policyRow.modelData.key] = checked;
                                 DankMailService.updateSettings(patch, null);
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 1
+                    color: Theme.outlineLight
+                }
+
+                // ---- sync interval ------------------------------------
+                StyledText {
+                    text: I18n.tr("Sync interval", "settings section")
+                    font.pixelSize: Theme.fontSizeMedium
+                    font.weight: Font.DemiBold
+                    color: Theme.primary
+                }
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: I18n.tr("How often each account is polled for new mail. Shorter is snappier; all options stay well within provider rate limits.", "settings")
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: Theme.surfaceTextMedium
+                    wrapMode: Text.WordWrap
+                }
+
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingS
+
+                    Repeater {
+                        model: [
+                            {
+                                "value": 30,
+                                "label": I18n.tr("30 seconds", "sync interval")
+                            },
+                            {
+                                "value": 60,
+                                "label": I18n.tr("1 minute", "sync interval")
+                            },
+                            {
+                                "value": 120,
+                                "label": I18n.tr("2 minutes", "sync interval")
+                            },
+                            {
+                                "value": 300,
+                                "label": I18n.tr("5 minutes", "sync interval")
+                            },
+                            {
+                                "value": 900,
+                                "label": I18n.tr("15 minutes", "sync interval")
+                            }
+                        ]
+
+                        delegate: StyledRect {
+                            id: intervalChip
+                            required property var modelData
+                            readonly property bool active: (modal.s ? (modal.s.pollSeconds || 60) : 60) === modelData.value
+
+                            width: intervalChipLabel.implicitWidth + Theme.spacingL
+                            height: 30
+                            radius: 15
+                            color: active ? Theme.primaryContainer : Theme.surfaceContainerHigh
+
+                            StyledText {
+                                id: intervalChipLabel
+                                anchors.centerIn: parent
+                                text: intervalChip.modelData.label
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: intervalChip.active ? Theme.primary : Theme.surfaceTextMedium
+                            }
+
+                            StateLayer {
+                                stateColor: Theme.primary
+                                onClicked: DankMailService.updateSettings({
+                                    "pollSeconds": intervalChip.modelData.value
+                                }, null)
                             }
                         }
                     }

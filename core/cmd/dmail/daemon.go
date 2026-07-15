@@ -197,7 +197,7 @@ func (d *daemon) engineLoop(ctx context.Context) {
 			slog.Error("registry rebuild failed", "err", err)
 		}
 		scheduler := dsync.NewScheduler(d.db, d.bus, d.queue, true)
-		engine := dsync.NewEngine(d.db, d.bus, d.queue, d.registry, scheduler)
+		engine := dsync.NewEngine(d.db, d.bus, d.queue, d.registry, scheduler, d.settings)
 		d.mu.Lock()
 		d.engine = engine
 		d.mu.Unlock()

@@ -421,6 +421,9 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if mins, ok := p["snoozeMinutes"].(float64); ok {
 			s.SnoozeMinutes = int(mins)
 		}
+		if secs, ok := p["pollSeconds"].(float64); ok {
+			s.PollSeconds = int(secs)
+		}
 		if preset, ok := p["snoozePreset"].(string); ok && preset != "" {
 			s.SnoozePreset = preset
 		}

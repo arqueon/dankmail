@@ -91,7 +91,15 @@
   "settings section": {
     "Notification buttons": "Botones de notificación",
     "Chained actions": "Acciones encadenadas",
+    "Sync interval": "Intervalo de sincronización",
     "Accounts": "Cuentas"
+  },
+  "sync interval": {
+    "30 seconds": "30 segundos",
+    "1 minute": "1 minuto",
+    "2 minutes": "2 minutos",
+    "5 minutes": "5 minutos",
+    "15 minutes": "15 minutos"
   },
   "notify action": {
     "Mark read": "Marcar leído",
@@ -107,7 +115,8 @@
     "Opening the preview marks the thread read": "Abrir la vista previa marca el hilo como leído",
     "Sending a reply marks the thread read": "Enviar una respuesta marca el hilo como leído",
     "Trashing also marks read": "Enviar a papelera también marca como leído",
-    "Starring moves the thread back to the inbox": "Destacar devuelve el hilo a la bandeja"
+    "Starring moves the thread back to the inbox": "Destacar devuelve el hilo a la bandeja",
+    "How often each account is polled for new mail. Shorter is snappier; all options stay well within provider rate limits.": "Cada cuánto se consulta cada cuenta en busca de correo nuevo. Más corto es más ágil; todas las opciones quedan holgadas dentro de los límites del proveedor."
   },
   "compose": {
     "New message": "Mensaje nuevo",

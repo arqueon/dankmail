@@ -12,10 +12,18 @@ import (
 	"time"
 )
 
-// Known notification action keys, in the order they may appear as
-// buttons. Note: many notification servers cap the visible buttons
-// (commonly 3); extras are silently dropped by the server.
-var ValidNotifyActions = []string{"read", "archive", "trash", "snooze", "open"}
+// Known notification action keys, in their canonical render order — the
+// same left-to-right order the per-thread action bar uses in the app
+// (archive, trash, read, snooze, open). Validate() normalizes any stored
+// set back to this order so notifications always match the UI, regardless
+// of the order the user toggled them. Note: many notification servers cap
+// the visible buttons (commonly 3); extras are silently dropped.
+var ValidNotifyActions = []string{"archive", "trash", "read", "snooze", "open"}
+
+// MinPollSeconds floors the mail poll cadence. The UI only offers >= 30s
+// presets; this is the hard floor a hand-edited config can reach so a
+// tight interval can never hammer a provider.
+const MinPollSeconds = 10
 
 type Settings struct {
 	// NotifyActions are the inline buttons on new-mail notifications.
@@ -33,17 +41,24 @@ type Settings struct {
 	MarkReadOnReply   bool `json:"markReadOnReply"`
 	MarkReadOnTrash   bool `json:"markReadOnTrash"`
 	UnarchiveOnStar   bool `json:"unarchiveOnStar"`
+
+	// PollSeconds is how often each account is polled for new mail. Zero
+	// falls back to the built-in default; Validate floors it at
+	// MinPollSeconds. A per-account Config["pollSeconds"] override still
+	// wins over this global value.
+	PollSeconds int `json:"pollSeconds"`
 }
 
 func Defaults() Settings {
 	return Settings{
-		NotifyActions:     []string{"read", "archive", "open"},
+		NotifyActions:     []string{"archive", "read", "open"},
 		SnoozePreset:      "hour",
 		SnoozeMinutes:     60,
 		MarkReadOnPreview: true,
 		MarkReadOnReply:   true,
 		MarkReadOnTrash:   true,
 		UnarchiveOnStar:   false,
+		PollSeconds:       60,
 	}
 }
 
@@ -88,7 +103,6 @@ func (s Settings) SnoozeUntil(now time.Time) time.Time {
 // Validate normalizes s, rejecting unknown action keys.
 func (s *Settings) Validate() error {
 	seen := map[string]bool{}
-	out := make([]string, 0, len(s.NotifyActions))
 	for _, a := range s.NotifyActions {
 		ok := false
 		for _, v := range ValidNotifyActions {
@@ -100,12 +114,23 @@ func (s *Settings) Validate() error {
 		if !ok {
 			return fmt.Errorf("unknown notify action %q (valid: %v)", a, ValidNotifyActions)
 		}
-		if !seen[a] {
-			seen[a] = true
-			out = append(out, a)
+		seen[a] = true
+	}
+	// Rebuild in canonical order (dedup + app order) so the notification
+	// buttons always mirror the in-app action bar, not the toggle order.
+	out := make([]string, 0, len(seen))
+	for _, v := range ValidNotifyActions {
+		if seen[v] {
+			out = append(out, v)
 		}
 	}
 	s.NotifyActions = out
+	if s.PollSeconds <= 0 {
+		s.PollSeconds = Defaults().PollSeconds
+	}
+	if s.PollSeconds < MinPollSeconds {
+		s.PollSeconds = MinPollSeconds
+	}
 	if s.SnoozeMinutes <= 0 {
 		s.SnoozeMinutes = Defaults().SnoozeMinutes
 	}
