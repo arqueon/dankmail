@@ -35,6 +35,8 @@ const (
 	labelInbox   = "INBOX"
 	labelTrash   = "TRASH"
 	labelSpam    = "SPAM"
+	labelDraft   = "DRAFT"
+	labelSent    = "SENT"
 )
 
 // Options tunes a Gmail provider instance.
@@ -144,7 +146,9 @@ func (p *Provider) fullSync(ctx context.Context) (provider.Changes, string, erro
 					}
 					return provider.Changes{}, "", classify(err)
 				}
-				changes.Upserted = append(changes.Upserted, p.threadDelta(t))
+				if d := p.threadDelta(t); d.MessageCount > 0 {
+					changes.Upserted = append(changes.Upserted, d)
+				}
 			}
 			if next == "" {
 				break
@@ -204,7 +208,9 @@ func (p *Provider) incrementalSync(ctx context.Context, start uint64) (provider.
 			}
 			return provider.Changes{}, "", classify(err)
 		}
-		changes.Upserted = append(changes.Upserted, p.threadDelta(t))
+		if d := p.threadDelta(t); d.MessageCount > 0 {
+			changes.Upserted = append(changes.Upserted, d)
+		}
 	}
 	return changes, strconv.FormatUint(maxHistory, 10), nil
 }
@@ -254,7 +260,9 @@ func (p *Provider) SearchRemote(ctx context.Context, query string, limit int) (p
 				}
 				return provider.Changes{}, classify(err)
 			}
-			changes.Upserted = append(changes.Upserted, p.threadDelta(t))
+			if d := p.threadDelta(t); d.MessageCount > 0 {
+				changes.Upserted = append(changes.Upserted, d)
+			}
 		}
 		if next == "" {
 			break
@@ -380,15 +388,20 @@ func (p *Provider) WebLink(threadID, messageID string) (string, bool) {
 }
 
 // threadDelta maps a full Gmail thread to the provider-neutral delta.
+// Draft messages are dropped entirely (MessageDelta contract): the
+// autosaves of a reply being typed would otherwise bump the thread and
+// notify as new mail.
 func (p *Provider) threadDelta(t *gmailv1.Thread) provider.ThreadDelta {
 	d := provider.ThreadDelta{
-		ThreadID:     t.Id,
-		MessageCount: len(t.Messages),
+		ThreadID: t.Id,
 	}
 	labelSeen := map[string]bool{}
 	fromSeen := map[string]bool{}
 	var newest *gmailv1.Message
 	for _, m := range t.Messages {
+		if hasLabel(m, labelDraft) {
+			continue
+		}
 		for _, l := range m.LabelIds {
 			switch l {
 			case labelUnread:
@@ -412,6 +425,7 @@ func (p *Provider) threadDelta(t *gmailv1.Thread) provider.ThreadDelta {
 		}
 		d.Messages = append(d.Messages, p.messageDelta(m))
 	}
+	d.MessageCount = len(d.Messages)
 	if newest != nil {
 		d.Subject = headerValue(newest.Payload, "Subject")
 		d.Snippet = newest.Snippet
@@ -420,11 +434,21 @@ func (p *Provider) threadDelta(t *gmailv1.Thread) provider.ThreadDelta {
 	return d
 }
 
+func hasLabel(m *gmailv1.Message, label string) bool {
+	for _, l := range m.LabelIds {
+		if l == label {
+			return true
+		}
+	}
+	return false
+}
+
 // messageDelta maps one Gmail message (full or metadata format) to the
 // provider-neutral delta. With metadata format the body is empty.
 func (p *Provider) messageDelta(m *gmailv1.Message) provider.MessageDelta {
 	d := provider.MessageDelta{
 		MessageID: m.Id,
+		IsSent:    hasLabel(m, labelSent),
 		Snippet:   m.Snippet,
 		Date:      m.InternalDate / 1000, // ms → unix seconds
 		From:      headerValue(m.Payload, "From"),
@@ -486,7 +510,7 @@ func collectAttachments(part *gmailv1.MessagePart, acc []provider.AttachmentMeta
 // logic may care about) pass through.
 func isSystemLabel(l string) bool {
 	switch l {
-	case labelUnread, labelStarred, labelInbox, "SENT", "DRAFT", "IMPORTANT", "CHAT":
+	case labelUnread, labelStarred, labelInbox, labelSent, labelDraft, "IMPORTANT", "CHAT":
 		return true
 	}
 	return strings.HasPrefix(l, "CATEGORY_")

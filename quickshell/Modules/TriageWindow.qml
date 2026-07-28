@@ -469,6 +469,15 @@ FloatingWindow {
 
                             DankActionButton {
                                 buttonSize: 28
+                                iconName: "drafts"
+                                onClicked: {
+                                    DankMailService.markRead(window.checkedIds);
+                                    window.checkedIds = [];
+                                }
+                            }
+
+                            DankActionButton {
+                                buttonSize: 28
                                 iconName: "move_to_inbox"
                                 iconColor: Theme.primary
                                 onClicked: {

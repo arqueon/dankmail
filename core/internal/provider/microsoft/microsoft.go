@@ -161,7 +161,9 @@ func (p *Provider) Sync(ctx context.Context, cursor string) (provider.Changes, s
 		if err != nil {
 			return provider.Changes{}, "", err
 		}
-		changes.Upserted = append(changes.Upserted, delta)
+		if delta.MessageCount > 0 {
+			changes.Upserted = append(changes.Upserted, delta)
+		}
 	}
 
 	raw, err := json.Marshal(state)
@@ -179,13 +181,16 @@ func (p *Provider) threadDelta(ctx context.Context, convID string, msgs []*graph
 		return provider.ThreadDelta{}, classify(err)
 	}
 	d := provider.ThreadDelta{
-		ThreadID:     convID,
-		MessageCount: len(msgs),
+		ThreadID: convID,
 	}
 	fromSeen := map[string]bool{}
 	labelSeen := map[string]bool{}
 	var newest *graphMessage
 	for _, m := range msgs {
+		// Unsent drafts never enter the delta (MessageDelta contract).
+		if m.IsDraft {
+			continue
+		}
 		if !m.IsRead {
 			d.Unread = true
 		}
@@ -213,8 +218,11 @@ func (p *Provider) threadDelta(ctx context.Context, convID string, msgs []*graph
 		if newest == nil || m.ReceivedAt >= newest.ReceivedAt {
 			newest = m
 		}
-		d.Messages = append(d.Messages, p.messageDelta(m))
+		md := p.messageDelta(m)
+		md.IsSent = ids[folderSent] != "" && m.ParentFolderID == ids[folderSent]
+		d.Messages = append(d.Messages, md)
 	}
+	d.MessageCount = len(d.Messages)
 	if newest != nil {
 		d.Subject = newest.Subject
 		d.Snippet = newest.BodyPreview

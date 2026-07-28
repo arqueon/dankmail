@@ -21,11 +21,11 @@ const graphBase = "https://graph.microsoft.com/v1.0"
 
 // deltaSelect keeps folder deltas light: no bodies (conversations are
 // re-fetched whole when affected).
-const deltaSelect = "id,conversationId,receivedDateTime,isRead,flag,parentFolderId"
+const deltaSelect = "id,conversationId,receivedDateTime,isRead,flag,parentFolderId,isDraft"
 
 // convSelect is the full message shape used by ListConversation and
 // GetMessage: body + reply headers included.
-const convSelect = "id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,ccRecipients,receivedDateTime,isRead,flag,parentFolderId,hasAttachments,body,internetMessageHeaders"
+const convSelect = "id,conversationId,internetMessageId,subject,bodyPreview,from,toRecipients,ccRecipients,receivedDateTime,isRead,flag,parentFolderId,hasAttachments,body,internetMessageHeaders,isDraft"
 
 // Client is the real graphAPI over HTTP; hc must inject OAuth (an
 // oauth2.NewClient built from the persisting token source).
@@ -67,6 +67,7 @@ type wireMessage struct {
 	} `json:"flag"`
 	ParentFolderID string `json:"parentFolderId"`
 	HasAttachments bool   `json:"hasAttachments"`
+	IsDraft        bool   `json:"isDraft"`
 	Body           *struct {
 		ContentType string `json:"contentType"`
 		Content     string `json:"content"`
@@ -91,6 +92,7 @@ func (w *wireMessage) toGraphMessage() *graphMessage {
 		IsRead:            w.IsRead,
 		ParentFolderID:    w.ParentFolderID,
 		HasAttachments:    w.HasAttachments,
+		IsDraft:           w.IsDraft,
 		Removed:           w.Removed != nil,
 	}
 	if w.From != nil {
@@ -295,7 +297,7 @@ func (c *Client) SendMail(ctx context.Context, mime []byte) error {
 
 func (c *Client) FolderIDs(ctx context.Context) (map[string]string, error) {
 	ids := map[string]string{}
-	for _, name := range []string{folderInbox, folderJunk, folderArchive, folderTrash} {
+	for _, name := range []string{folderInbox, folderJunk, folderArchive, folderTrash, folderSent} {
 		var doc struct {
 			ID string `json:"id"`
 		}

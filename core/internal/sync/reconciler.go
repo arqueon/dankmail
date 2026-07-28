@@ -241,7 +241,9 @@ func upsertThread(ctx context.Context, tx *ent.Tx, accountID uuid.UUID, d provid
 				return nil, err
 			}
 		}
-		if notify {
+		// The user's own outgoing copies (IsSent) are stored like any
+		// message but are never an arrival.
+		if notify && !m.IsSent {
 			arrivals = append(arrivals, map[string]any{
 				"accountId": accountID.String(),
 				"threadId":  d.ThreadID,

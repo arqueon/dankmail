@@ -105,11 +105,17 @@ type AttachmentMeta struct {
 	Size     int64  `json:"size"` // bytes, provider-reported
 }
 
-// MessageDelta is the remote state of one message.
+// MessageDelta is the remote state of one message. Unsent drafts must
+// NOT appear here at all — providers drop them from deltas (a draft the
+// user is typing is not thread content, and its autosaves would bump
+// the thread and fire arrival notifications).
 type MessageDelta struct {
 	MessageID       string // provider-native message ID
 	RFC822MessageID string // Message-ID header, for deep links and reply threading
-	From            string
+	// IsSent marks the user's own copy of an outgoing message: stored
+	// like any other message but never treated as an arrival.
+	IsSent bool
+	From   string
 	To              []string
 	Cc              []string
 	Date            int64 // unix seconds

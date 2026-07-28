@@ -233,3 +233,44 @@ func TestReconcilerArrivalEventsOnlyOnIncrementalSync(t *testing.T) {
 		t.Errorf("incremental sync fired %d message.arrived events, want 1", n)
 	}
 }
+
+func TestReconcilerSentMessagesNeverArrive(t *testing.T) {
+	r := newRig(t, rules.DefaultPolicies())
+	rec := NewReconciler(r.db, r.bus)
+	ctx := context.Background()
+
+	_, events := r.bus.Subscribe(32)
+	ch := provider.Changes{
+		Upserted: []provider.ThreadDelta{delta("t1", func(d *provider.ThreadDelta) {
+			d.Messages = []provider.MessageDelta{
+				{MessageID: "m-in", From: "ada@example.com", Date: 2000},
+				{MessageID: "m-out", From: "me@example.com", Date: 2001, IsSent: true},
+			}
+		})},
+	}
+	if err := rec.Apply(ctx, r.acct.ID, ch); err != nil {
+		t.Fatal(err)
+	}
+
+	arrived := 0
+	for _, ev := range collect(events, 8, 100*time.Millisecond) {
+		if ev.Topic == "message.arrived" {
+			arrived++
+			if got := ev.Payload["messageId"]; got != "m-in" {
+				t.Errorf("arrival for %v, want only m-in", got)
+			}
+		}
+	}
+	if arrived != 1 {
+		t.Errorf("message.arrived fired %d times, want 1 (own sent copy stored but silent)", arrived)
+	}
+
+	// Both messages are still ingested.
+	n, err := r.db.Message.Query().Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n != 2 {
+		t.Errorf("messages = %d, want 2", n)
+	}
+}

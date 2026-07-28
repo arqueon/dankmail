@@ -28,6 +28,7 @@ type graphMessage struct {
 	Flagged           bool
 	ParentFolderID    string
 	HasAttachments    bool
+	IsDraft           bool
 	BodyText          string // plain text (client distills text/html)
 	// Headers carries the reply-threading headers (References, Reply-To)
 	// from internetMessageHeaders, keyed by canonical name.
@@ -54,6 +55,7 @@ const (
 	folderJunk    = "junkemail"
 	folderArchive = "archive"
 	folderTrash   = "deleteditems"
+	folderSent    = "sentitems"
 )
 
 // graphAPI is the seam between the provider and the Graph REST client —

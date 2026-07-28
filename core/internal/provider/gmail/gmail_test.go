@@ -897,3 +897,99 @@ func TestSearchRemoteHonorsLimit(t *testing.T) {
 		t.Errorf("upserted = %d, want limit 2", len(changes.Upserted))
 	}
 }
+
+// ---- drafts never enter deltas ---------------------------------------
+
+func TestSyncSkipsDrafts(t *testing.T) {
+	threads := map[string]*gmailv1.Thread{
+		// Real message + a NEWER draft autosave of the reply being typed:
+		// the draft must not become thread content, snippet, or timestamp.
+		"td": {
+			Id: "td",
+			Messages: []*gmailv1.Message{
+				{
+					Id: "m10", ThreadId: "td", InternalDate: 1700000000000,
+					LabelIds: []string{"INBOX", "UNREAD"},
+					Snippet:  "real mail",
+					Payload: &gmailv1.MessagePart{
+						MimeType: "text/plain",
+						Headers:  hdrs("From", "Ada <ada@x.example>", "Subject", "Hello"),
+						Body:     &gmailv1.MessagePartBody{Data: b64("hola")},
+					},
+				},
+				{
+					Id: "m11", ThreadId: "td", InternalDate: 1700000500000,
+					LabelIds: []string{"DRAFT"},
+					Snippet:  "my half-typed reply",
+					Payload: &gmailv1.MessagePart{
+						MimeType: "text/plain",
+						Headers:  hdrs("From", "Me <me@x.example>", "Subject", "Re: Hello"),
+						Body:     &gmailv1.MessagePartBody{Data: b64("escribiendo...")},
+					},
+				},
+			},
+		},
+		// Draft-only thread (a new compose): must not be upserted at all.
+		"tdo": {
+			Id: "tdo",
+			Messages: []*gmailv1.Message{
+				{
+					Id: "m12", ThreadId: "tdo", InternalDate: 1700000600000,
+					LabelIds: []string{"DRAFT"},
+					Snippet:  "new mail draft",
+					Payload: &gmailv1.MessagePart{
+						MimeType: "text/plain",
+						Headers:  hdrs("From", "Me <me@x.example>", "Subject", "Nuevo"),
+						Body:     &gmailv1.MessagePartBody{Data: b64("borrador")},
+					},
+				},
+			},
+		},
+	}
+	f := &fakeAPI{
+		profileEmail: "ada@example.org",
+		profileHist:  6000,
+		listPages: map[string][]listPage{
+			"INBOX": {{ids: []string{"td", "tdo"}}},
+		},
+		threads: threads,
+	}
+	p := newTestProvider(f, Options{})
+
+	changes, _, err := p.Sync(context.Background(), "")
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if len(changes.Upserted) != 1 {
+		t.Fatalf("len(Upserted) = %d, want 1 (draft-only thread skipped)", len(changes.Upserted))
+	}
+	d := changes.Upserted[0]
+	if d.ThreadID != "td" {
+		t.Fatalf("ThreadID = %q, want td", d.ThreadID)
+	}
+	if d.MessageCount != 1 || len(d.Messages) != 1 {
+		t.Errorf("MessageCount/Messages = %d/%d, want 1/1 (draft excluded)", d.MessageCount, len(d.Messages))
+	}
+	if d.Messages[0].MessageID != "m10" {
+		t.Errorf("Messages[0].MessageID = %q, want m10", d.Messages[0].MessageID)
+	}
+	if d.Snippet != "real mail" || d.Subject != "Hello" {
+		t.Errorf("Snippet/Subject = %q/%q, want from the real message, not the draft", d.Snippet, d.Subject)
+	}
+	if d.LastMessage != 1700000000 {
+		t.Errorf("LastMessage = %d, want 1700000000 (draft must not bump the thread)", d.LastMessage)
+	}
+}
+
+func TestMessageDeltaMarksSent(t *testing.T) {
+	f := &fakeAPI{threads: fixtureThreads()}
+	p := newTestProvider(f, Options{})
+	t1, _ := f.GetThread(context.Background(), "t1")
+	d := p.threadDelta(t1)
+	if d.Messages[0].IsSent {
+		t.Error("m1 IsSent = true, want false (incoming message)")
+	}
+	if !d.Messages[1].IsSent {
+		t.Error("m2 IsSent = false, want true (SENT label)")
+	}
+}
