@@ -1,0 +1,19 @@
+{
+  "id": "dankmailUnread",
+  "name": "Dank Mail Unread",
+  "description": "Live unread count and quick triage popout for the dankmail daemon in DankBar.",
+  "version": "0.1.1",
+  "author": "arqueon",
+  "type": "widget",
+  "capabilities": [
+    "dankbar-widget"
+  ],
+  "component": "./DankmailWidget.qml",
+  "icon": "mail",
+  "settings": "./DankmailSettings.qml",
+  "permissions": [
+    "process",
+    "settings_read",
+    "settings_write"
+  ]
+}
