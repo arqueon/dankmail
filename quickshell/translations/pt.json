@@ -1,0 +1,169 @@
+{
+  "tray tooltip": {
+    "unread": "não lidas"
+  },
+  "tray menu": {
+    "Open Dank Mail": "Abrir o Dank Mail",
+    "Sync now": "Sincronizar agora",
+    "Enable do-not-disturb": "Ativar não perturbe",
+    "Disable do-not-disturb": "Desativar não perturbe",
+    "Close interface (daemon keeps running)": "Fechar a interface (o daemon continua)",
+    "Stop dankmail completely": "Encerrar o dankmail por completo"
+  },
+  "filter": {
+    "All": "Todas",
+    "Unread": "Não lidas",
+    "Starred": "Com estrela",
+    "Spam": "Spam"
+  },
+  "bulk action": {
+    "%1 selected": "%1 selecionadas"
+  },
+  "header status": {
+    "Daemon offline": "Daemon desconectado"
+  },
+  "thread list": {
+    "(no subject)": "(sem assunto)"
+  },
+  "empty state": {
+    "Inbox zero": "Caixa de entrada zerada",
+    "Daemon offline": "Daemon desconectado",
+    "No accounts yet": "Nenhuma conta ainda",
+    "Add a Gmail account": "Adicionar uma conta do Gmail",
+    "No local results — search the full history or the web": "Nenhum resultado local — busque no histórico completo ou na web"
+  },
+  "search": {
+    "Search mail…": "Buscar e-mails…"
+  },
+  "account wizard title": {
+    "Add account": "Adicionar conta"
+  },
+  "provider chooser": {
+    "Official API: full triage, minimal scopes, guided OAuth setup.": "API oficial: triagem completa, escopos mínimos, configuração OAuth guiada.",
+    "Other provider (IMAP)": "Outro provedor (IMAP)",
+    "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge ou seu próprio servidor. É salvo e verificado agora; a sincronização chega com o anel IMAP."
+  },
+  "account wizard": {
+    "Choose your mail provider": "Escolha seu provedor de e-mail",
+    "IMAP account": "Conta IMAP",
+    "Pick your provider or configure a custom server. The connection is tested before anything is saved; the password goes to your system keyring.": "Escolha seu provedor ou configure um servidor próprio. A conexão é testada antes de salvar qualquer coisa; a senha vai para o chaveiro do sistema.",
+    "Email address": "Endereço de e-mail",
+    "Password (or app password)": "Senha (ou senha de app)",
+    "IMAP server": "Servidor IMAP",
+    "Port": "Porta",
+    "SMTP server (for replies, next ring)": "Servidor SMTP (para respostas, próximo anel)",
+    "Connection verified and account stored. IMAP syncing arrives with the next ring; the account stays parked until then.": "Conexão verificada e conta salva. A sincronização IMAP chega no próximo anel; até lá a conta fica em espera.",
+    "Set up your Google OAuth client": "Configure seu cliente OAuth do Google",
+    "Enter your client credentials": "Informe as credenciais do cliente",
+    "Authorize in the browser": "Autorize no navegador",
+    "Account added": "Conta adicionada",
+    "Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.": "Cole o Client ID e o Client Secret do cliente OAuth que você acabou de criar. Eles ficam no chaveiro do sistema, nunca em arquivos.",
+    "…or skip the typing and use the downloaded client_secret_*.json:": "…ou pule a digitação e use o client_secret_*.json baixado:",
+    "Path to client_secret_*.json": "Caminho do client_secret_*.json",
+    "Drop the file here, or type its path. The daemon reads it locally; the secret still ends up only in your keyring.": "Solte o arquivo aqui, ou digite o caminho dele. O daemon lê localmente; o segredo continua indo apenas para o seu chaveiro.",
+    "Client ID": "Client ID",
+    "Client Secret": "Client Secret",
+    "Waiting for you to authorize dankmail in the browser…": "Aguardando você autorizar o dankmail no navegador…",
+    "Reopen consent page": "Reabrir a página de consentimento",
+    "Syncing has started. New mail will appear shortly.": "A sincronização começou. Os e-mails novos aparecem em instantes."
+  },
+  "account wizard nav": {
+    "Back": "Voltar",
+    "Next": "Avançar",
+    "Authorize": "Autorizar",
+    "Cancel": "Cancelar",
+    "Done": "Concluir",
+    "Already have a client? Skip the guide.": "Já tem um cliente? Pule o guia.",
+    "Add account": "Adicionar conta",
+    "Testing connection…": "Testando a conexão…"
+  },
+  "empty preview": {
+    "Select a thread": "Selecione uma conversa"
+  },
+  "snooze": {
+    "In 1 hour": "Em 1 hora",
+    "This evening": "Hoje à noite",
+    "Tomorrow": "Amanhã",
+    "Next week": "Semana que vem",
+    "Pick date…": "Escolher data…",
+    "Snooze": "Adiar",
+    "Later this week": "Ainda esta semana",
+    "This weekend": "Neste fim de semana",
+    "Fixed minutes": "Minutos fixos"
+  },
+  "settings title": {
+    "Settings": "Configurações"
+  },
+  "settings section": {
+    "Notification buttons": "Botões de notificação",
+    "Chained actions": "Ações encadeadas",
+    "Sync interval": "Intervalo de sincronização",
+    "Accounts": "Contas"
+  },
+  "sync interval": {
+    "30 seconds": "30 segundos",
+    "1 minute": "1 minuto",
+    "2 minutes": "2 minutos",
+    "5 minutes": "5 minutos",
+    "15 minutes": "15 minutos"
+  },
+  "notify action": {
+    "Mark read": "Marcar como lida",
+    "Archive": "Arquivar",
+    "Trash": "Lixeira",
+    "Snooze": "Adiar",
+    "Open in web": "Abrir na web"
+  },
+  "settings": {
+    "Pick the inline actions on new-mail notifications. Most notification servers show at most 3 buttons.": "Escolha as ações embutidas nas notificações de e-mail novo. A maioria dos servidores de notificação mostra no máximo 3 botões.",
+    "Notification snooze duration (minutes)": "Duração do adiamento da notificação (minutos)",
+    "What the notification's snooze button does:": "O que o botão de adiar da notificação faz:",
+    "Opening the preview marks the thread read": "Abrir a prévia marca a conversa como lida",
+    "Sending a reply marks the thread read": "Enviar uma resposta marca a conversa como lida",
+    "Trashing also marks read": "Enviar para a lixeira também marca como lida",
+    "Starring moves the thread back to the inbox": "Dar estrela devolve a conversa para a caixa de entrada",
+    "How often each account is polled for new mail. Shorter is snappier; all options stay well within provider rate limits.": "De quanto em quanto tempo cada conta é consultada em busca de e-mails novos. Mais curto é mais ágil; todas as opções ficam bem dentro dos limites do provedor."
+  },
+  "compose": {
+    "New message": "Nova mensagem",
+    "To — type a name or address": "Para — digite um nome ou endereço",
+    "Subject": "Assunto",
+    "Write your message… Ctrl+Enter sends": "Escreva sua mensagem… Ctrl+Enter envia",
+    "Google contact suggestions need a re-consent: run 'dmail account reauth <id>' or re-add the account.": "As sugestões de contatos do Google precisam de novo consentimento: execute 'dmail account reauth <id>' ou adicione a conta de novo."
+  },
+  "quick reply": {
+    "To": "Para",
+    "To everyone on the thread": "Para todos da conversa",
+    "Reply all": "Responder a todos",
+    "Write your reply… Ctrl+Enter sends": "Escreva sua resposta… Ctrl+Enter envia",
+    "Send": "Enviar",
+    "Sending…": "Enviando…"
+  },
+  "quick forward": {
+    "Forward": "Encaminhar",
+    "Forward to… (comma-separated)": "Encaminhar para… (separado por vírgulas)",
+    "Add a note (optional) — the message is quoted below. Ctrl+Enter sends": "Adicione um recado (opcional) — a mensagem vai citada abaixo. Ctrl+Enter envia",
+    "Sending…": "Enviando…"
+  },
+  "preview footer": {
+    "Plain-text preview — open in web for the full message.": "Prévia em texto puro — abra na web para ver a mensagem completa."
+  },
+  "preview header": {
+    "To": "Para",
+    "Cc": "Cc",
+    "Received via BCC — your address is not in To or Cc": "Recebido via Cco — seu endereço não está em Para nem em Cc"
+  },
+  "undo banner": {
+    "Undo": "Desfazer",
+    "1 thread archived.": "1 conversa arquivada.",
+    "%1 threads archived.": "%1 conversas arquivadas.",
+    "1 thread deleted.": "1 conversa excluída.",
+    "%1 threads deleted.": "%1 conversas excluídas.",
+    "1 thread moved to Inbox.": "1 conversa movida para a Caixa de entrada.",
+    "%1 threads moved to Inbox.": "%1 conversas movidas para a Caixa de entrada.",
+    "1 thread marked as Spam.": "1 conversa marcada como Spam.",
+    "%1 threads marked as Spam.": "%1 conversas marcadas como Spam.",
+    "1 thread snoozed.": "1 conversa adiada.",
+    "%1 threads snoozed.": "%1 conversas adiadas."
+  }
+}

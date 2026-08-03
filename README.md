@@ -44,7 +44,7 @@ Modern email clients are bloated, distract you with HTML tracking pixels, and su
 ### 🎨 Native Shell Integration
 *   **DankMaterialShell Plugin:** Live unread count capsules, interactive popouts with status-bar widgets, and system D-Bus notification action buttons.
 *   **Dynamic Theme Sync:** Follows dynamic Material Design system colors (`dms-colors.json`).
-*   **DMAIL_LANG Locale:** follows system language settings for Spanish (`es`) and English (`en`).
+*   **DMAIL_LANG Locale:** follows system language settings for English (`en`), Spanish (`es`), and Brazilian Portuguese (`pt`).
 
 ---
 

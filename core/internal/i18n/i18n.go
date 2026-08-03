@@ -1,9 +1,11 @@
 // Package i18n localizes the daemon's and CLI's user-visible strings.
 // English is the source language and every key below is the English
 // text itself; other languages are overrides, mirroring the Quickshell
-// UI (Common/I18n.qml + translations/es.json, where en.json is empty
-// for the same reason). The locale is resolved once at startup from
-// DMAIL_LANG, then LC_ALL / LC_MESSAGES / LANG.
+// UI (Common/I18n.qml + translations/<lang>.json, where en.json is empty
+// for the same reason). Spanish and Portuguese ship today. The locale is
+// resolved once at startup from DMAIL_LANG, then LC_ALL / LC_MESSAGES /
+// LANG, and is narrowed to the base language, so pt_BR and pt_PT both
+// land on the "pt" table (its wording is Brazilian Portuguese).
 package i18n
 
 import (
@@ -51,10 +53,10 @@ var overrides = map[string]map[string]string{
 		"Open in web": "Abrir en web",
 
 		// daemon: notification texts
-		"dankmail: operation failed":                "dankmail: operación fallida",
-		"dankmail: account needs re-authentication": "dankmail: cuenta requiere re-autenticación",
+		"dankmail: operation failed":                                              "dankmail: operación fallida",
+		"dankmail: account needs re-authentication":                               "dankmail: cuenta requiere re-autenticación",
 		"Use the key button in Settings → Accounts, or run: dmail account reauth": "Usa el botón de llave en Ajustes → Cuentas, o ejecuta: dmail account reauth",
-		"Snoozed thread woke up":                    "Pospuesto despertó",
+		"Snoozed thread woke up":                                                  "Pospuesto despertó",
 
 		// oauth: browser callback page
 		"Authorization denied. You can close this tab.":                      "Autorización denegada. Puedes cerrar esta pestaña.",
@@ -73,5 +75,37 @@ var overrides = map[string]map[string]string{
 		"Account re-authenticated.":                           "Cuenta re-autenticada.",
 		"Daemon reloaded.":                                    "Daemon recargado.",
 		"(Daemon not running; changes apply when it starts.)": "(Daemon no activo; los cambios aplican al arrancarlo.)",
+	},
+	"pt": {
+		// daemon: notification action buttons
+		"Mark read":   "Marcar como lida",
+		"Archive":     "Arquivar",
+		"Trash":       "Lixeira",
+		"Snooze":      "Adiar",
+		"Open in web": "Abrir na web",
+
+		// daemon: notification texts
+		"dankmail: operation failed":                                              "dankmail: falha na operação",
+		"dankmail: account needs re-authentication":                               "dankmail: a conta precisa ser reautenticada",
+		"Use the key button in Settings → Accounts, or run: dmail account reauth": "Use o botão de chave em Configurações → Contas, ou execute: dmail account reauth",
+		"Snoozed thread woke up":                                                  "Conversa adiada voltou",
+
+		// oauth: browser callback page
+		"Authorization denied. You can close this tab.":                      "Autorização negada. Você pode fechar esta aba.",
+		"Account authorized. You can close this tab and return to dankmail.": "Conta autorizada. Você pode fechar esta aba e voltar ao dankmail.",
+
+		// cli: account management
+		"Note:":                        "Observação:",
+		"Password (or app password): ": "Senha (ou senha de app): ",
+		"Testing the IMAP connection…": "Testando a conexão IMAP…",
+		"Account %s added (%s). IMAP syncing arrives with the next ring; the account stays parked until then.\n": "Conta %s adicionada (%s). A sincronização IMAP chega no próximo anel; até lá a conta fica em espera.\n",
+		"Account %s updated (%s).\n":                          "Conta %s atualizada (%s).\n",
+		"Account %s added (%s).\n":                            "Conta %s adicionada (%s).\n",
+		"Account %s re-authorized (%s).\n":                    "Conta %s reautorizada (%s).\n",
+		"Opening the browser to authorize the account…":       "Abrindo o navegador para autorizar a conta…",
+		"Account removed (the remote mailbox is untouched).":  "Conta removida (a caixa de correio remota não foi alterada).",
+		"Account re-authenticated.":                           "Conta reautenticada.",
+		"Daemon reloaded.":                                    "Daemon recarregado.",
+		"(Daemon not running; changes apply when it starts.)": "(Daemon não está em execução; as alterações valem quando ele iniciar.)",
 	},
 }
