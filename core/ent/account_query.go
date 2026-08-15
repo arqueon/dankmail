@@ -17,6 +17,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
 	"github.com/arqueon/dankmail/core/ent/predicate"
+	"github.com/arqueon/dankmail/core/ent/secret"
 	"github.com/arqueon/dankmail/core/ent/thread"
 	"github.com/google/uuid"
 )
@@ -32,6 +33,7 @@ type AccountQuery struct {
 	withPendingOps  *PendingOpQuery
 	withNotifyRules *NotifyRuleQuery
 	withContacts    *ContactQuery
+	withSecrets     *SecretQuery
 	modifiers       []func(*sql.Selector)
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -150,6 +152,28 @@ func (_q *AccountQuery) QueryContacts() *ContactQuery {
 			sqlgraph.From(account.Table, account.FieldID, selector),
 			sqlgraph.To(contact.Table, contact.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, account.ContactsTable, account.ContactsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QuerySecrets chains the current query on the "secrets" edge.
+func (_q *AccountQuery) QuerySecrets() *SecretQuery {
+	query := (&SecretClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, selector),
+			sqlgraph.To(secret.Table, secret.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.SecretsTable, account.SecretsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -353,6 +377,7 @@ func (_q *AccountQuery) Clone() *AccountQuery {
 		withPendingOps:  _q.withPendingOps.Clone(),
 		withNotifyRules: _q.withNotifyRules.Clone(),
 		withContacts:    _q.withContacts.Clone(),
+		withSecrets:     _q.withSecrets.Clone(),
 		// clone intermediate query.
 		sql:       _q.sql.Clone(),
 		path:      _q.path,
@@ -401,6 +426,17 @@ func (_q *AccountQuery) WithContacts(opts ...func(*ContactQuery)) *AccountQuery 
 		opt(query)
 	}
 	_q.withContacts = query
+	return _q
+}
+
+// WithSecrets tells the query-builder to eager-load the nodes that are connected to
+// the "secrets" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *AccountQuery) WithSecrets(opts ...func(*SecretQuery)) *AccountQuery {
+	query := (&SecretClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withSecrets = query
 	return _q
 }
 
@@ -482,11 +518,12 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 	var (
 		nodes       = []*Account{}
 		_spec       = _q.querySpec()
-		loadedTypes = [4]bool{
+		loadedTypes = [5]bool{
 			_q.withThreads != nil,
 			_q.withPendingOps != nil,
 			_q.withNotifyRules != nil,
 			_q.withContacts != nil,
+			_q.withSecrets != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -535,6 +572,13 @@ func (_q *AccountQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Acco
 		if err := _q.loadContacts(ctx, query, nodes,
 			func(n *Account) { n.Edges.Contacts = []*Contact{} },
 			func(n *Account, e *Contact) { n.Edges.Contacts = append(n.Edges.Contacts, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withSecrets; query != nil {
+		if err := _q.loadSecrets(ctx, query, nodes,
+			func(n *Account) { n.Edges.Secrets = []*Secret{} },
+			func(n *Account, e *Secret) { n.Edges.Secrets = append(n.Edges.Secrets, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -660,6 +704,37 @@ func (_q *AccountQuery) loadContacts(ctx context.Context, query *ContactQuery, n
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "account_contacts" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *AccountQuery) loadSecrets(ctx context.Context, query *SecretQuery, nodes []*Account, init func(*Account), assign func(*Account, *Secret)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[uuid.UUID]*Account)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	query.withFKs = true
+	query.Where(predicate.Secret(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(account.SecretsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.account_secrets
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "account_secrets" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "account_secrets" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

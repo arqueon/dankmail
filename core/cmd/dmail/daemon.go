@@ -19,6 +19,7 @@ import (
 	"github.com/arqueon/dankmail/core/internal/contacts"
 	"github.com/arqueon/dankmail/core/internal/i18n"
 	"github.com/arqueon/dankmail/core/internal/ipc"
+	"github.com/arqueon/dankmail/core/internal/keyring"
 	"github.com/arqueon/dankmail/core/internal/notify"
 	"github.com/arqueon/dankmail/core/internal/paths"
 	"github.com/arqueon/dankmail/core/internal/rules"
@@ -84,6 +85,7 @@ func runDaemon(shellDir string, hidden bool) error {
 		return err
 	}
 	defer db.Close()
+	keyring.SetFallbackDB(db)
 
 	d := &daemon{
 		cfg:      cfg,

@@ -158,6 +158,8 @@ func AddIMAP(ctx context.Context, db *ent.Client, cfg IMAPConfig, email, passwor
 		if _, err := db.Account.UpdateOne(acct).
 			SetConfig(cfg.toMap()).
 			SetStatus(entaccount.StatusActive).
+			SetNeedsReauth(false).
+			SetAuthError("").
 			SetLastError("").
 			Save(ctx); err != nil {
 			return Result{}, err

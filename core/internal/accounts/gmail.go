@@ -51,6 +51,8 @@ func FinishGmail(ctx context.Context, db *ent.Client, creds oauth.ClientCreds, t
 	default:
 		if _, err := db.Account.UpdateOne(acct).
 			SetStatus(entaccount.StatusActive).
+			SetNeedsReauth(false).
+			SetAuthError("").
 			SetLastError("").
 			Save(ctx); err != nil {
 			return Result{}, err

@@ -11,6 +11,9 @@ type AccountView struct {
 	Email       string     `json:"email"`
 	DisplayName string     `json:"displayName"`
 	Status      string     `json:"status"`
+	NeedsReauth bool       `json:"needsReauth"`
+	AuthError   string     `json:"authError,omitempty"`
+	SyncNotice  string     `json:"syncNotice,omitempty"`
 	LastError   string     `json:"lastError,omitempty"`
 	LastSyncAt  *time.Time `json:"lastSyncAt,omitempty"`
 	Unread      int        `json:"unread"`

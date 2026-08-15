@@ -28,6 +28,12 @@ const (
 	FieldSyncCursor = "sync_cursor"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldNeedsReauth holds the string denoting the needs_reauth field in the database.
+	FieldNeedsReauth = "needs_reauth"
+	// FieldAuthError holds the string denoting the auth_error field in the database.
+	FieldAuthError = "auth_error"
+	// FieldSyncNotice holds the string denoting the sync_notice field in the database.
+	FieldSyncNotice = "sync_notice"
 	// FieldLastSyncAt holds the string denoting the last_sync_at field in the database.
 	FieldLastSyncAt = "last_sync_at"
 	// FieldLastError holds the string denoting the last_error field in the database.
@@ -42,6 +48,8 @@ const (
 	EdgeNotifyRules = "notify_rules"
 	// EdgeContacts holds the string denoting the contacts edge name in mutations.
 	EdgeContacts = "contacts"
+	// EdgeSecrets holds the string denoting the secrets edge name in mutations.
+	EdgeSecrets = "secrets"
 	// Table holds the table name of the account in the database.
 	Table = "accounts"
 	// ThreadsTable is the table that holds the threads relation/edge.
@@ -72,6 +80,13 @@ const (
 	ContactsInverseTable = "contacts"
 	// ContactsColumn is the table column denoting the contacts relation/edge.
 	ContactsColumn = "account_contacts"
+	// SecretsTable is the table that holds the secrets relation/edge.
+	SecretsTable = "secrets"
+	// SecretsInverseTable is the table name for the Secret entity.
+	// It exists in this package in order to avoid circular dependency with the "secret" package.
+	SecretsInverseTable = "secrets"
+	// SecretsColumn is the table column denoting the secrets relation/edge.
+	SecretsColumn = "account_secrets"
 )
 
 // Columns holds all SQL columns for account fields.
@@ -83,6 +98,9 @@ var Columns = []string{
 	FieldConfig,
 	FieldSyncCursor,
 	FieldStatus,
+	FieldNeedsReauth,
+	FieldAuthError,
+	FieldSyncNotice,
 	FieldLastSyncAt,
 	FieldLastError,
 	FieldCreatedAt,
@@ -105,6 +123,8 @@ var (
 	DefaultConfig map[string]interface{}
 	// DefaultSyncCursor holds the default value on creation for the "sync_cursor" field.
 	DefaultSyncCursor string
+	// DefaultNeedsReauth holds the default value on creation for the "needs_reauth" field.
+	DefaultNeedsReauth bool
 	// DefaultLastError holds the default value on creation for the "last_error" field.
 	DefaultLastError string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -121,6 +141,8 @@ const (
 	TypeGmail     Type = "gmail"
 	TypeImap      Type = "imap"
 	TypeMicrosoft Type = "microsoft"
+	TypeEvolution Type = "evolution"
+	TypeJmap      Type = "jmap"
 )
 
 func (_type Type) String() string {
@@ -130,7 +152,7 @@ func (_type Type) String() string {
 // TypeValidator is a validator for the "type" field enum values. It is called by the builders before save.
 func TypeValidator(_type Type) error {
 	switch _type {
-	case TypeGmail, TypeImap, TypeMicrosoft:
+	case TypeGmail, TypeImap, TypeMicrosoft, TypeEvolution, TypeJmap:
 		return nil
 	default:
 		return fmt.Errorf("account: invalid enum value for type field: %q", _type)
@@ -195,6 +217,21 @@ func BySyncCursor(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByNeedsReauth orders the results by the needs_reauth field.
+func ByNeedsReauth(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNeedsReauth, opts...).ToFunc()
+}
+
+// ByAuthError orders the results by the auth_error field.
+func ByAuthError(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAuthError, opts...).ToFunc()
+}
+
+// BySyncNotice orders the results by the sync_notice field.
+func BySyncNotice(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSyncNotice, opts...).ToFunc()
 }
 
 // ByLastSyncAt orders the results by the last_sync_at field.
@@ -267,6 +304,20 @@ func ByContacts(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newContactsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// BySecretsCount orders the results by secrets count.
+func BySecretsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newSecretsStep(), opts...)
+	}
+}
+
+// BySecrets orders the results by secrets terms.
+func BySecrets(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newSecretsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newThreadsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -293,5 +344,12 @@ func newContactsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ContactsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, ContactsTable, ContactsColumn),
+	)
+}
+func newSecretsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(SecretsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, SecretsTable, SecretsColumn),
 	)
 }

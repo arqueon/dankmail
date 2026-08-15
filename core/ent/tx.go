@@ -24,6 +24,8 @@ type Tx struct {
 	NotifyRule *NotifyRuleClient
 	// PendingOp is the client for interacting with the PendingOp builders.
 	PendingOp *PendingOpClient
+	// Secret is the client for interacting with the Secret builders.
+	Secret *SecretClient
 	// Thread is the client for interacting with the Thread builders.
 	Thread *ThreadClient
 
@@ -162,6 +164,7 @@ func (tx *Tx) init() {
 	tx.Message = NewMessageClient(tx.config)
 	tx.NotifyRule = NewNotifyRuleClient(tx.config)
 	tx.PendingOp = NewPendingOpClient(tx.config)
+	tx.Secret = NewSecretClient(tx.config)
 	tx.Thread = NewThreadClient(tx.config)
 }
 

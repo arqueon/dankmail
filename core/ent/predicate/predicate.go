@@ -21,5 +21,8 @@ type NotifyRule func(*sql.Selector)
 // PendingOp is the predicate function for pendingop builders.
 type PendingOp func(*sql.Selector)
 
+// Secret is the predicate function for secret builders.
+type Secret func(*sql.Selector)
+
 // Thread is the predicate function for thread builders.
 type Thread func(*sql.Selector)

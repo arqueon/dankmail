@@ -139,6 +139,8 @@ func (e *Engine) SyncAccount(ctx context.Context, accountID uuid.UUID) error {
 		upd := e.db.Account.UpdateOneID(accountID).SetLastError(err.Error())
 		if errdefs.KindOf(err) == errdefs.KindAuth {
 			upd.SetStatus(account.StatusAuthError)
+			upd.SetNeedsReauth(true)
+			upd.SetAuthError(err.Error())
 			e.bus.Publish("account.auth", map[string]any{"accountId": accountID.String()})
 		}
 		_, _ = upd.Save(ctx)
@@ -152,6 +154,8 @@ func (e *Engine) SyncAccount(ctx context.Context, accountID uuid.UUID) error {
 		SetSyncCursor(cursor).
 		SetLastSyncAt(time.Now().UTC()).
 		SetLastError("").
+		SetNeedsReauth(false).
+		SetAuthError("").
 		Save(ctx)
 	return err
 }

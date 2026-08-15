@@ -71,6 +71,21 @@ func SyncCursor(v string) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldSyncCursor, v))
 }
 
+// NeedsReauth applies equality check predicate on the "needs_reauth" field. It's identical to NeedsReauthEQ.
+func NeedsReauth(v bool) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldNeedsReauth, v))
+}
+
+// AuthError applies equality check predicate on the "auth_error" field. It's identical to AuthErrorEQ.
+func AuthError(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldAuthError, v))
+}
+
+// SyncNotice applies equality check predicate on the "sync_notice" field. It's identical to SyncNoticeEQ.
+func SyncNotice(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldSyncNotice, v))
+}
+
 // LastSyncAt applies equality check predicate on the "last_sync_at" field. It's identical to LastSyncAtEQ.
 func LastSyncAt(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastSyncAt, v))
@@ -321,6 +336,166 @@ func StatusNotIn(vs ...Status) predicate.Account {
 	return predicate.Account(sql.FieldNotIn(FieldStatus, vs...))
 }
 
+// NeedsReauthEQ applies the EQ predicate on the "needs_reauth" field.
+func NeedsReauthEQ(v bool) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldNeedsReauth, v))
+}
+
+// NeedsReauthNEQ applies the NEQ predicate on the "needs_reauth" field.
+func NeedsReauthNEQ(v bool) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldNeedsReauth, v))
+}
+
+// AuthErrorEQ applies the EQ predicate on the "auth_error" field.
+func AuthErrorEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldAuthError, v))
+}
+
+// AuthErrorNEQ applies the NEQ predicate on the "auth_error" field.
+func AuthErrorNEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldAuthError, v))
+}
+
+// AuthErrorIn applies the In predicate on the "auth_error" field.
+func AuthErrorIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldAuthError, vs...))
+}
+
+// AuthErrorNotIn applies the NotIn predicate on the "auth_error" field.
+func AuthErrorNotIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldAuthError, vs...))
+}
+
+// AuthErrorGT applies the GT predicate on the "auth_error" field.
+func AuthErrorGT(v string) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldAuthError, v))
+}
+
+// AuthErrorGTE applies the GTE predicate on the "auth_error" field.
+func AuthErrorGTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldAuthError, v))
+}
+
+// AuthErrorLT applies the LT predicate on the "auth_error" field.
+func AuthErrorLT(v string) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldAuthError, v))
+}
+
+// AuthErrorLTE applies the LTE predicate on the "auth_error" field.
+func AuthErrorLTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldAuthError, v))
+}
+
+// AuthErrorContains applies the Contains predicate on the "auth_error" field.
+func AuthErrorContains(v string) predicate.Account {
+	return predicate.Account(sql.FieldContains(FieldAuthError, v))
+}
+
+// AuthErrorHasPrefix applies the HasPrefix predicate on the "auth_error" field.
+func AuthErrorHasPrefix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasPrefix(FieldAuthError, v))
+}
+
+// AuthErrorHasSuffix applies the HasSuffix predicate on the "auth_error" field.
+func AuthErrorHasSuffix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasSuffix(FieldAuthError, v))
+}
+
+// AuthErrorIsNil applies the IsNil predicate on the "auth_error" field.
+func AuthErrorIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldAuthError))
+}
+
+// AuthErrorNotNil applies the NotNil predicate on the "auth_error" field.
+func AuthErrorNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldAuthError))
+}
+
+// AuthErrorEqualFold applies the EqualFold predicate on the "auth_error" field.
+func AuthErrorEqualFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldEqualFold(FieldAuthError, v))
+}
+
+// AuthErrorContainsFold applies the ContainsFold predicate on the "auth_error" field.
+func AuthErrorContainsFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldContainsFold(FieldAuthError, v))
+}
+
+// SyncNoticeEQ applies the EQ predicate on the "sync_notice" field.
+func SyncNoticeEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldEQ(FieldSyncNotice, v))
+}
+
+// SyncNoticeNEQ applies the NEQ predicate on the "sync_notice" field.
+func SyncNoticeNEQ(v string) predicate.Account {
+	return predicate.Account(sql.FieldNEQ(FieldSyncNotice, v))
+}
+
+// SyncNoticeIn applies the In predicate on the "sync_notice" field.
+func SyncNoticeIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldIn(FieldSyncNotice, vs...))
+}
+
+// SyncNoticeNotIn applies the NotIn predicate on the "sync_notice" field.
+func SyncNoticeNotIn(vs ...string) predicate.Account {
+	return predicate.Account(sql.FieldNotIn(FieldSyncNotice, vs...))
+}
+
+// SyncNoticeGT applies the GT predicate on the "sync_notice" field.
+func SyncNoticeGT(v string) predicate.Account {
+	return predicate.Account(sql.FieldGT(FieldSyncNotice, v))
+}
+
+// SyncNoticeGTE applies the GTE predicate on the "sync_notice" field.
+func SyncNoticeGTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldGTE(FieldSyncNotice, v))
+}
+
+// SyncNoticeLT applies the LT predicate on the "sync_notice" field.
+func SyncNoticeLT(v string) predicate.Account {
+	return predicate.Account(sql.FieldLT(FieldSyncNotice, v))
+}
+
+// SyncNoticeLTE applies the LTE predicate on the "sync_notice" field.
+func SyncNoticeLTE(v string) predicate.Account {
+	return predicate.Account(sql.FieldLTE(FieldSyncNotice, v))
+}
+
+// SyncNoticeContains applies the Contains predicate on the "sync_notice" field.
+func SyncNoticeContains(v string) predicate.Account {
+	return predicate.Account(sql.FieldContains(FieldSyncNotice, v))
+}
+
+// SyncNoticeHasPrefix applies the HasPrefix predicate on the "sync_notice" field.
+func SyncNoticeHasPrefix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasPrefix(FieldSyncNotice, v))
+}
+
+// SyncNoticeHasSuffix applies the HasSuffix predicate on the "sync_notice" field.
+func SyncNoticeHasSuffix(v string) predicate.Account {
+	return predicate.Account(sql.FieldHasSuffix(FieldSyncNotice, v))
+}
+
+// SyncNoticeIsNil applies the IsNil predicate on the "sync_notice" field.
+func SyncNoticeIsNil() predicate.Account {
+	return predicate.Account(sql.FieldIsNull(FieldSyncNotice))
+}
+
+// SyncNoticeNotNil applies the NotNil predicate on the "sync_notice" field.
+func SyncNoticeNotNil() predicate.Account {
+	return predicate.Account(sql.FieldNotNull(FieldSyncNotice))
+}
+
+// SyncNoticeEqualFold applies the EqualFold predicate on the "sync_notice" field.
+func SyncNoticeEqualFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldEqualFold(FieldSyncNotice, v))
+}
+
+// SyncNoticeContainsFold applies the ContainsFold predicate on the "sync_notice" field.
+func SyncNoticeContainsFold(v string) predicate.Account {
+	return predicate.Account(sql.FieldContainsFold(FieldSyncNotice, v))
+}
+
 // LastSyncAtEQ applies the EQ predicate on the "last_sync_at" field.
 func LastSyncAtEQ(v time.Time) predicate.Account {
 	return predicate.Account(sql.FieldEQ(FieldLastSyncAt, v))
@@ -560,6 +735,29 @@ func HasContacts() predicate.Account {
 func HasContactsWith(preds ...predicate.Contact) predicate.Account {
 	return predicate.Account(func(s *sql.Selector) {
 		step := newContactsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasSecrets applies the HasEdge predicate on the "secrets" edge.
+func HasSecrets() predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, SecretsTable, SecretsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasSecretsWith applies the HasEdge predicate on the "secrets" edge with a given conditions (other predicates).
+func HasSecretsWith(preds ...predicate.Secret) predicate.Account {
+	return predicate.Account(func(s *sql.Selector) {
+		step := newSecretsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

@@ -69,6 +69,18 @@ func (f PendingOpFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, e
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.PendingOpMutation", m)
 }
 
+// The SecretFunc type is an adapter to allow the use of ordinary
+// function as Secret mutator.
+type SecretFunc func(context.Context, *ent.SecretMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SecretFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SecretMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SecretMutation", m)
+}
+
 // The ThreadFunc type is an adapter to allow the use of ordinary
 // function as Thread mutator.
 type ThreadFunc func(context.Context, *ent.ThreadMutation) (ent.Value, error)

@@ -17,6 +17,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
+	"github.com/arqueon/dankmail/core/ent/secret"
 	"github.com/arqueon/dankmail/core/ent/thread"
 )
 
@@ -83,6 +84,7 @@ func checkColumn(t, c string) error {
 			message.Table:    message.ValidColumn,
 			notifyrule.Table: notifyrule.ValidColumn,
 			pendingop.Table:  pendingop.ValidColumn,
+			secret.Table:     secret.ValidColumn,
 			thread.Table:     thread.ValidColumn,
 		})
 	})

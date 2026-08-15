@@ -459,13 +459,12 @@ FloatingWindow {
                                 }
                             }
 
-                            // Re-run the OAuth consent with the stored client
-                            // (Gmail only; IMAP re-auth means re-adding).
+                            // Re-run the OAuth consent with the stored client (Gmail & Microsoft).
                             DankActionButton {
-                                visible: acctRow.modelData.type === "gmail"
+                                visible: acctRow.modelData.type === "gmail" || acctRow.modelData.type === "microsoft" || acctRow.modelData.needsReauth
                                 enabled: !acctRow.reauthPending
                                 iconName: acctRow.reauthPending ? "hourglass_top" : "key"
-                                iconColor: acctRow.modelData.status === "auth_error" ? Theme.warning : Theme.surfaceTextMedium
+                                iconColor: (acctRow.modelData.status === "auth_error" || acctRow.modelData.needsReauth) ? Theme.warning : Theme.surfaceTextMedium
                                 onClicked: {
                                     acctRow.reauthPending = true;
                                     DankMailService.reauthAccount(acctRow.modelData.id, err => {

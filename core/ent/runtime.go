@@ -11,6 +11,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
 	"github.com/arqueon/dankmail/core/ent/schema"
+	"github.com/arqueon/dankmail/core/ent/secret"
 	"github.com/arqueon/dankmail/core/ent/thread"
 	"github.com/google/uuid"
 )
@@ -33,12 +34,16 @@ func init() {
 	accountDescSyncCursor := accountFields[5].Descriptor()
 	// account.DefaultSyncCursor holds the default value on creation for the sync_cursor field.
 	account.DefaultSyncCursor = accountDescSyncCursor.Default.(string)
+	// accountDescNeedsReauth is the schema descriptor for needs_reauth field.
+	accountDescNeedsReauth := accountFields[7].Descriptor()
+	// account.DefaultNeedsReauth holds the default value on creation for the needs_reauth field.
+	account.DefaultNeedsReauth = accountDescNeedsReauth.Default.(bool)
 	// accountDescLastError is the schema descriptor for last_error field.
-	accountDescLastError := accountFields[8].Descriptor()
+	accountDescLastError := accountFields[11].Descriptor()
 	// account.DefaultLastError holds the default value on creation for the last_error field.
 	account.DefaultLastError = accountDescLastError.Default.(string)
 	// accountDescCreatedAt is the schema descriptor for created_at field.
-	accountDescCreatedAt := accountFields[9].Descriptor()
+	accountDescCreatedAt := accountFields[12].Descriptor()
 	// account.DefaultCreatedAt holds the default value on creation for the created_at field.
 	account.DefaultCreatedAt = accountDescCreatedAt.Default.(func() time.Time)
 	// accountDescID is the schema descriptor for id field.
@@ -125,6 +130,26 @@ func init() {
 	pendingopDescLastError := pendingopFields[6].Descriptor()
 	// pendingop.DefaultLastError holds the default value on creation for the last_error field.
 	pendingop.DefaultLastError = pendingopDescLastError.Default.(string)
+	secretFields := schema.Secret{}.Fields()
+	_ = secretFields
+	// secretDescKey is the schema descriptor for key field.
+	secretDescKey := secretFields[1].Descriptor()
+	// secret.KeyValidator is a validator for the "key" field. It is called by the builders before save.
+	secret.KeyValidator = secretDescKey.Validators[0].(func(string) error)
+	// secretDescCreatedAt is the schema descriptor for created_at field.
+	secretDescCreatedAt := secretFields[3].Descriptor()
+	// secret.DefaultCreatedAt holds the default value on creation for the created_at field.
+	secret.DefaultCreatedAt = secretDescCreatedAt.Default.(func() time.Time)
+	// secretDescUpdatedAt is the schema descriptor for updated_at field.
+	secretDescUpdatedAt := secretFields[4].Descriptor()
+	// secret.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	secret.DefaultUpdatedAt = secretDescUpdatedAt.Default.(func() time.Time)
+	// secret.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	secret.UpdateDefaultUpdatedAt = secretDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// secretDescID is the schema descriptor for id field.
+	secretDescID := secretFields[0].Descriptor()
+	// secret.DefaultID holds the default value on creation for the id field.
+	secret.DefaultID = secretDescID.Default.(func() uuid.UUID)
 	threadFields := schema.Thread{}.Fields()
 	_ = threadFields
 	// threadDescSubject is the schema descriptor for subject field.

@@ -16,6 +16,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/contact"
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
+	"github.com/arqueon/dankmail/core/ent/secret"
 	"github.com/arqueon/dankmail/core/ent/thread"
 	"github.com/google/uuid"
 )
@@ -84,6 +85,48 @@ func (_c *AccountCreate) SetStatus(v account.Status) *AccountCreate {
 func (_c *AccountCreate) SetNillableStatus(v *account.Status) *AccountCreate {
 	if v != nil {
 		_c.SetStatus(*v)
+	}
+	return _c
+}
+
+// SetNeedsReauth sets the "needs_reauth" field.
+func (_c *AccountCreate) SetNeedsReauth(v bool) *AccountCreate {
+	_c.mutation.SetNeedsReauth(v)
+	return _c
+}
+
+// SetNillableNeedsReauth sets the "needs_reauth" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableNeedsReauth(v *bool) *AccountCreate {
+	if v != nil {
+		_c.SetNeedsReauth(*v)
+	}
+	return _c
+}
+
+// SetAuthError sets the "auth_error" field.
+func (_c *AccountCreate) SetAuthError(v string) *AccountCreate {
+	_c.mutation.SetAuthError(v)
+	return _c
+}
+
+// SetNillableAuthError sets the "auth_error" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableAuthError(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetAuthError(*v)
+	}
+	return _c
+}
+
+// SetSyncNotice sets the "sync_notice" field.
+func (_c *AccountCreate) SetSyncNotice(v string) *AccountCreate {
+	_c.mutation.SetSyncNotice(v)
+	return _c
+}
+
+// SetNillableSyncNotice sets the "sync_notice" field if the given value is not nil.
+func (_c *AccountCreate) SetNillableSyncNotice(v *string) *AccountCreate {
+	if v != nil {
+		_c.SetSyncNotice(*v)
 	}
 	return _c
 }
@@ -204,6 +247,21 @@ func (_c *AccountCreate) AddContacts(v ...*Contact) *AccountCreate {
 	return _c.AddContactIDs(ids...)
 }
 
+// AddSecretIDs adds the "secrets" edge to the Secret entity by IDs.
+func (_c *AccountCreate) AddSecretIDs(ids ...uuid.UUID) *AccountCreate {
+	_c.mutation.AddSecretIDs(ids...)
+	return _c
+}
+
+// AddSecrets adds the "secrets" edges to the Secret entity.
+func (_c *AccountCreate) AddSecrets(v ...*Secret) *AccountCreate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddSecretIDs(ids...)
+}
+
 // Mutation returns the AccountMutation object of the builder.
 func (_c *AccountCreate) Mutation() *AccountMutation {
 	return _c.mutation
@@ -255,6 +313,10 @@ func (_c *AccountCreate) defaults() {
 		v := account.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.NeedsReauth(); !ok {
+		v := account.DefaultNeedsReauth
+		_c.mutation.SetNeedsReauth(v)
+	}
 	if _, ok := _c.mutation.LastError(); !ok {
 		v := account.DefaultLastError
 		_c.mutation.SetLastError(v)
@@ -298,6 +360,9 @@ func (_c *AccountCreate) check() error {
 		if err := account.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Account.status": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.NeedsReauth(); !ok {
+		return &ValidationError{Name: "needs_reauth", err: errors.New(`ent: missing required field "Account.needs_reauth"`)}
 	}
 	if _, ok := _c.mutation.LastError(); !ok {
 		return &ValidationError{Name: "last_error", err: errors.New(`ent: missing required field "Account.last_error"`)}
@@ -364,6 +429,18 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(account.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.NeedsReauth(); ok {
+		_spec.SetField(account.FieldNeedsReauth, field.TypeBool, value)
+		_node.NeedsReauth = value
+	}
+	if value, ok := _c.mutation.AuthError(); ok {
+		_spec.SetField(account.FieldAuthError, field.TypeString, value)
+		_node.AuthError = value
+	}
+	if value, ok := _c.mutation.SyncNotice(); ok {
+		_spec.SetField(account.FieldSyncNotice, field.TypeString, value)
+		_node.SyncNotice = value
 	}
 	if value, ok := _c.mutation.LastSyncAt(); ok {
 		_spec.SetField(account.FieldLastSyncAt, field.TypeTime, value)
@@ -434,6 +511,22 @@ func (_c *AccountCreate) createSpec() (*Account, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(contact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.SecretsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {
@@ -562,6 +655,54 @@ func (u *AccountUpsert) SetStatus(v account.Status) *AccountUpsert {
 // UpdateStatus sets the "status" field to the value that was provided on create.
 func (u *AccountUpsert) UpdateStatus() *AccountUpsert {
 	u.SetExcluded(account.FieldStatus)
+	return u
+}
+
+// SetNeedsReauth sets the "needs_reauth" field.
+func (u *AccountUpsert) SetNeedsReauth(v bool) *AccountUpsert {
+	u.Set(account.FieldNeedsReauth, v)
+	return u
+}
+
+// UpdateNeedsReauth sets the "needs_reauth" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateNeedsReauth() *AccountUpsert {
+	u.SetExcluded(account.FieldNeedsReauth)
+	return u
+}
+
+// SetAuthError sets the "auth_error" field.
+func (u *AccountUpsert) SetAuthError(v string) *AccountUpsert {
+	u.Set(account.FieldAuthError, v)
+	return u
+}
+
+// UpdateAuthError sets the "auth_error" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateAuthError() *AccountUpsert {
+	u.SetExcluded(account.FieldAuthError)
+	return u
+}
+
+// ClearAuthError clears the value of the "auth_error" field.
+func (u *AccountUpsert) ClearAuthError() *AccountUpsert {
+	u.SetNull(account.FieldAuthError)
+	return u
+}
+
+// SetSyncNotice sets the "sync_notice" field.
+func (u *AccountUpsert) SetSyncNotice(v string) *AccountUpsert {
+	u.Set(account.FieldSyncNotice, v)
+	return u
+}
+
+// UpdateSyncNotice sets the "sync_notice" field to the value that was provided on create.
+func (u *AccountUpsert) UpdateSyncNotice() *AccountUpsert {
+	u.SetExcluded(account.FieldSyncNotice)
+	return u
+}
+
+// ClearSyncNotice clears the value of the "sync_notice" field.
+func (u *AccountUpsert) ClearSyncNotice() *AccountUpsert {
+	u.SetNull(account.FieldSyncNotice)
 	return u
 }
 
@@ -727,6 +868,62 @@ func (u *AccountUpsertOne) SetStatus(v account.Status) *AccountUpsertOne {
 func (u *AccountUpsertOne) UpdateStatus() *AccountUpsertOne {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetNeedsReauth sets the "needs_reauth" field.
+func (u *AccountUpsertOne) SetNeedsReauth(v bool) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetNeedsReauth(v)
+	})
+}
+
+// UpdateNeedsReauth sets the "needs_reauth" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateNeedsReauth() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateNeedsReauth()
+	})
+}
+
+// SetAuthError sets the "auth_error" field.
+func (u *AccountUpsertOne) SetAuthError(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetAuthError(v)
+	})
+}
+
+// UpdateAuthError sets the "auth_error" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateAuthError() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateAuthError()
+	})
+}
+
+// ClearAuthError clears the value of the "auth_error" field.
+func (u *AccountUpsertOne) ClearAuthError() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearAuthError()
+	})
+}
+
+// SetSyncNotice sets the "sync_notice" field.
+func (u *AccountUpsertOne) SetSyncNotice(v string) *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetSyncNotice(v)
+	})
+}
+
+// UpdateSyncNotice sets the "sync_notice" field to the value that was provided on create.
+func (u *AccountUpsertOne) UpdateSyncNotice() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateSyncNotice()
+	})
+}
+
+// ClearSyncNotice clears the value of the "sync_notice" field.
+func (u *AccountUpsertOne) ClearSyncNotice() *AccountUpsertOne {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearSyncNotice()
 	})
 }
 
@@ -1064,6 +1261,62 @@ func (u *AccountUpsertBulk) SetStatus(v account.Status) *AccountUpsertBulk {
 func (u *AccountUpsertBulk) UpdateStatus() *AccountUpsertBulk {
 	return u.Update(func(s *AccountUpsert) {
 		s.UpdateStatus()
+	})
+}
+
+// SetNeedsReauth sets the "needs_reauth" field.
+func (u *AccountUpsertBulk) SetNeedsReauth(v bool) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetNeedsReauth(v)
+	})
+}
+
+// UpdateNeedsReauth sets the "needs_reauth" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateNeedsReauth() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateNeedsReauth()
+	})
+}
+
+// SetAuthError sets the "auth_error" field.
+func (u *AccountUpsertBulk) SetAuthError(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetAuthError(v)
+	})
+}
+
+// UpdateAuthError sets the "auth_error" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateAuthError() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateAuthError()
+	})
+}
+
+// ClearAuthError clears the value of the "auth_error" field.
+func (u *AccountUpsertBulk) ClearAuthError() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearAuthError()
+	})
+}
+
+// SetSyncNotice sets the "sync_notice" field.
+func (u *AccountUpsertBulk) SetSyncNotice(v string) *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.SetSyncNotice(v)
+	})
+}
+
+// UpdateSyncNotice sets the "sync_notice" field to the value that was provided on create.
+func (u *AccountUpsertBulk) UpdateSyncNotice() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.UpdateSyncNotice()
+	})
+}
+
+// ClearSyncNotice clears the value of the "sync_notice" field.
+func (u *AccountUpsertBulk) ClearSyncNotice() *AccountUpsertBulk {
+	return u.Update(func(s *AccountUpsert) {
+		s.ClearSyncNotice()
 	})
 }
 

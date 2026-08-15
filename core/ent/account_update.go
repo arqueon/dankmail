@@ -16,7 +16,9 @@ import (
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
 	"github.com/arqueon/dankmail/core/ent/predicate"
+	"github.com/arqueon/dankmail/core/ent/secret"
 	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/google/uuid"
 )
 
 // AccountUpdate is the builder for updating Account entities.
@@ -106,6 +108,60 @@ func (_u *AccountUpdate) SetNillableStatus(v *account.Status) *AccountUpdate {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetNeedsReauth sets the "needs_reauth" field.
+func (_u *AccountUpdate) SetNeedsReauth(v bool) *AccountUpdate {
+	_u.mutation.SetNeedsReauth(v)
+	return _u
+}
+
+// SetNillableNeedsReauth sets the "needs_reauth" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableNeedsReauth(v *bool) *AccountUpdate {
+	if v != nil {
+		_u.SetNeedsReauth(*v)
+	}
+	return _u
+}
+
+// SetAuthError sets the "auth_error" field.
+func (_u *AccountUpdate) SetAuthError(v string) *AccountUpdate {
+	_u.mutation.SetAuthError(v)
+	return _u
+}
+
+// SetNillableAuthError sets the "auth_error" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableAuthError(v *string) *AccountUpdate {
+	if v != nil {
+		_u.SetAuthError(*v)
+	}
+	return _u
+}
+
+// ClearAuthError clears the value of the "auth_error" field.
+func (_u *AccountUpdate) ClearAuthError() *AccountUpdate {
+	_u.mutation.ClearAuthError()
+	return _u
+}
+
+// SetSyncNotice sets the "sync_notice" field.
+func (_u *AccountUpdate) SetSyncNotice(v string) *AccountUpdate {
+	_u.mutation.SetSyncNotice(v)
+	return _u
+}
+
+// SetNillableSyncNotice sets the "sync_notice" field if the given value is not nil.
+func (_u *AccountUpdate) SetNillableSyncNotice(v *string) *AccountUpdate {
+	if v != nil {
+		_u.SetSyncNotice(*v)
+	}
+	return _u
+}
+
+// ClearSyncNotice clears the value of the "sync_notice" field.
+func (_u *AccountUpdate) ClearSyncNotice() *AccountUpdate {
+	_u.mutation.ClearSyncNotice()
 	return _u
 }
 
@@ -203,6 +259,21 @@ func (_u *AccountUpdate) AddContacts(v ...*Contact) *AccountUpdate {
 	return _u.AddContactIDs(ids...)
 }
 
+// AddSecretIDs adds the "secrets" edge to the Secret entity by IDs.
+func (_u *AccountUpdate) AddSecretIDs(ids ...uuid.UUID) *AccountUpdate {
+	_u.mutation.AddSecretIDs(ids...)
+	return _u
+}
+
+// AddSecrets adds the "secrets" edges to the Secret entity.
+func (_u *AccountUpdate) AddSecrets(v ...*Secret) *AccountUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddSecretIDs(ids...)
+}
+
 // Mutation returns the AccountMutation object of the builder.
 func (_u *AccountUpdate) Mutation() *AccountMutation {
 	return _u.mutation
@@ -292,6 +363,27 @@ func (_u *AccountUpdate) RemoveContacts(v ...*Contact) *AccountUpdate {
 	return _u.RemoveContactIDs(ids...)
 }
 
+// ClearSecrets clears all "secrets" edges to the Secret entity.
+func (_u *AccountUpdate) ClearSecrets() *AccountUpdate {
+	_u.mutation.ClearSecrets()
+	return _u
+}
+
+// RemoveSecretIDs removes the "secrets" edge to Secret entities by IDs.
+func (_u *AccountUpdate) RemoveSecretIDs(ids ...uuid.UUID) *AccountUpdate {
+	_u.mutation.RemoveSecretIDs(ids...)
+	return _u
+}
+
+// RemoveSecrets removes "secrets" edges to Secret entities.
+func (_u *AccountUpdate) RemoveSecrets(v ...*Secret) *AccountUpdate {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveSecretIDs(ids...)
+}
+
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *AccountUpdate) Save(ctx context.Context) (int, error) {
 	return withHooks(ctx, _u.sqlSave, _u.mutation, _u.hooks)
@@ -369,6 +461,21 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(account.FieldStatus, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.NeedsReauth(); ok {
+		_spec.SetField(account.FieldNeedsReauth, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AuthError(); ok {
+		_spec.SetField(account.FieldAuthError, field.TypeString, value)
+	}
+	if _u.mutation.AuthErrorCleared() {
+		_spec.ClearField(account.FieldAuthError, field.TypeString)
+	}
+	if value, ok := _u.mutation.SyncNotice(); ok {
+		_spec.SetField(account.FieldSyncNotice, field.TypeString, value)
+	}
+	if _u.mutation.SyncNoticeCleared() {
+		_spec.ClearField(account.FieldSyncNotice, field.TypeString)
 	}
 	if value, ok := _u.mutation.LastSyncAt(); ok {
 		_spec.SetField(account.FieldLastSyncAt, field.TypeTime, value)
@@ -559,6 +666,51 @@ func (_u *AccountUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.SecretsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSecretsIDs(); len(nodes) > 0 && !_u.mutation.SecretsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SecretsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	_spec.AddModifiers(_u.modifiers...)
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -657,6 +809,60 @@ func (_u *AccountUpdateOne) SetNillableStatus(v *account.Status) *AccountUpdateO
 	return _u
 }
 
+// SetNeedsReauth sets the "needs_reauth" field.
+func (_u *AccountUpdateOne) SetNeedsReauth(v bool) *AccountUpdateOne {
+	_u.mutation.SetNeedsReauth(v)
+	return _u
+}
+
+// SetNillableNeedsReauth sets the "needs_reauth" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableNeedsReauth(v *bool) *AccountUpdateOne {
+	if v != nil {
+		_u.SetNeedsReauth(*v)
+	}
+	return _u
+}
+
+// SetAuthError sets the "auth_error" field.
+func (_u *AccountUpdateOne) SetAuthError(v string) *AccountUpdateOne {
+	_u.mutation.SetAuthError(v)
+	return _u
+}
+
+// SetNillableAuthError sets the "auth_error" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableAuthError(v *string) *AccountUpdateOne {
+	if v != nil {
+		_u.SetAuthError(*v)
+	}
+	return _u
+}
+
+// ClearAuthError clears the value of the "auth_error" field.
+func (_u *AccountUpdateOne) ClearAuthError() *AccountUpdateOne {
+	_u.mutation.ClearAuthError()
+	return _u
+}
+
+// SetSyncNotice sets the "sync_notice" field.
+func (_u *AccountUpdateOne) SetSyncNotice(v string) *AccountUpdateOne {
+	_u.mutation.SetSyncNotice(v)
+	return _u
+}
+
+// SetNillableSyncNotice sets the "sync_notice" field if the given value is not nil.
+func (_u *AccountUpdateOne) SetNillableSyncNotice(v *string) *AccountUpdateOne {
+	if v != nil {
+		_u.SetSyncNotice(*v)
+	}
+	return _u
+}
+
+// ClearSyncNotice clears the value of the "sync_notice" field.
+func (_u *AccountUpdateOne) ClearSyncNotice() *AccountUpdateOne {
+	_u.mutation.ClearSyncNotice()
+	return _u
+}
+
 // SetLastSyncAt sets the "last_sync_at" field.
 func (_u *AccountUpdateOne) SetLastSyncAt(v time.Time) *AccountUpdateOne {
 	_u.mutation.SetLastSyncAt(v)
@@ -751,6 +957,21 @@ func (_u *AccountUpdateOne) AddContacts(v ...*Contact) *AccountUpdateOne {
 	return _u.AddContactIDs(ids...)
 }
 
+// AddSecretIDs adds the "secrets" edge to the Secret entity by IDs.
+func (_u *AccountUpdateOne) AddSecretIDs(ids ...uuid.UUID) *AccountUpdateOne {
+	_u.mutation.AddSecretIDs(ids...)
+	return _u
+}
+
+// AddSecrets adds the "secrets" edges to the Secret entity.
+func (_u *AccountUpdateOne) AddSecrets(v ...*Secret) *AccountUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddSecretIDs(ids...)
+}
+
 // Mutation returns the AccountMutation object of the builder.
 func (_u *AccountUpdateOne) Mutation() *AccountMutation {
 	return _u.mutation
@@ -838,6 +1059,27 @@ func (_u *AccountUpdateOne) RemoveContacts(v ...*Contact) *AccountUpdateOne {
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveContactIDs(ids...)
+}
+
+// ClearSecrets clears all "secrets" edges to the Secret entity.
+func (_u *AccountUpdateOne) ClearSecrets() *AccountUpdateOne {
+	_u.mutation.ClearSecrets()
+	return _u
+}
+
+// RemoveSecretIDs removes the "secrets" edge to Secret entities by IDs.
+func (_u *AccountUpdateOne) RemoveSecretIDs(ids ...uuid.UUID) *AccountUpdateOne {
+	_u.mutation.RemoveSecretIDs(ids...)
+	return _u
+}
+
+// RemoveSecrets removes "secrets" edges to Secret entities.
+func (_u *AccountUpdateOne) RemoveSecrets(v ...*Secret) *AccountUpdateOne {
+	ids := make([]uuid.UUID, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveSecretIDs(ids...)
 }
 
 // Where appends a list predicates to the AccountUpdate builder.
@@ -948,6 +1190,21 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(account.FieldStatus, field.TypeEnum, value)
 	}
+	if value, ok := _u.mutation.NeedsReauth(); ok {
+		_spec.SetField(account.FieldNeedsReauth, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AuthError(); ok {
+		_spec.SetField(account.FieldAuthError, field.TypeString, value)
+	}
+	if _u.mutation.AuthErrorCleared() {
+		_spec.ClearField(account.FieldAuthError, field.TypeString)
+	}
+	if value, ok := _u.mutation.SyncNotice(); ok {
+		_spec.SetField(account.FieldSyncNotice, field.TypeString, value)
+	}
+	if _u.mutation.SyncNoticeCleared() {
+		_spec.ClearField(account.FieldSyncNotice, field.TypeString)
+	}
 	if value, ok := _u.mutation.LastSyncAt(); ok {
 		_spec.SetField(account.FieldLastSyncAt, field.TypeTime, value)
 	}
@@ -1130,6 +1387,51 @@ func (_u *AccountUpdateOne) sqlSave(ctx context.Context) (_node *Account, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(contact.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.SecretsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedSecretsIDs(); len(nodes) > 0 && !_u.mutation.SecretsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.SecretsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   account.SecretsTable,
+			Columns: []string{account.SecretsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(secret.FieldID, field.TypeUUID),
 			},
 		}
 		for _, k := range nodes {

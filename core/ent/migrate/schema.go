@@ -11,12 +11,15 @@ var (
 	// AccountsColumns holds the columns for the "accounts" table.
 	AccountsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
-		{Name: "type", Type: field.TypeEnum, Enums: []string{"gmail", "imap", "microsoft"}},
+		{Name: "type", Type: field.TypeEnum, Enums: []string{"gmail", "imap", "microsoft", "evolution", "jmap"}},
 		{Name: "email", Type: field.TypeString},
 		{Name: "display_name", Type: field.TypeString, Default: ""},
 		{Name: "config", Type: field.TypeJSON},
 		{Name: "sync_cursor", Type: field.TypeString, Default: ""},
 		{Name: "status", Type: field.TypeEnum, Enums: []string{"active", "paused", "auth_error"}, Default: "active"},
+		{Name: "needs_reauth", Type: field.TypeBool, Default: false},
+		{Name: "auth_error", Type: field.TypeString, Nullable: true},
+		{Name: "sync_notice", Type: field.TypeString, Nullable: true},
 		{Name: "last_sync_at", Type: field.TypeTime, Nullable: true},
 		{Name: "last_error", Type: field.TypeString, Default: ""},
 		{Name: "created_at", Type: field.TypeTime},
@@ -174,6 +177,36 @@ var (
 			},
 		},
 	}
+	// SecretsColumns holds the columns for the "secrets" table.
+	SecretsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "key", Type: field.TypeString},
+		{Name: "value", Type: field.TypeBytes},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "account_secrets", Type: field.TypeUUID},
+	}
+	// SecretsTable holds the schema information for the "secrets" table.
+	SecretsTable = &schema.Table{
+		Name:       "secrets",
+		Columns:    SecretsColumns,
+		PrimaryKey: []*schema.Column{SecretsColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "secrets_accounts_secrets",
+				Columns:    []*schema.Column{SecretsColumns[5]},
+				RefColumns: []*schema.Column{AccountsColumns[0]},
+				OnDelete:   schema.Cascade,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "secret_key_account_secrets",
+				Unique:  true,
+				Columns: []*schema.Column{SecretsColumns[1], SecretsColumns[5]},
+			},
+		},
+	}
 	// ThreadsColumns holds the columns for the "threads" table.
 	ThreadsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -229,6 +262,7 @@ var (
 		MessagesTable,
 		NotifyRulesTable,
 		PendingOpsTable,
+		SecretsTable,
 		ThreadsTable,
 	}
 )
@@ -238,5 +272,6 @@ func init() {
 	MessagesTable.ForeignKeys[0].RefTable = ThreadsTable
 	NotifyRulesTable.ForeignKeys[0].RefTable = AccountsTable
 	PendingOpsTable.ForeignKeys[0].RefTable = AccountsTable
+	SecretsTable.ForeignKeys[0].RefTable = AccountsTable
 	ThreadsTable.ForeignKeys[0].RefTable = AccountsTable
 }

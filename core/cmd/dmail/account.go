@@ -174,6 +174,7 @@ func withDB(fn func(ctx context.Context, db *ent.Client) error) error {
 		return err
 	}
 	defer db.Close()
+	keyring.SetFallbackDB(db)
 	return fn(ctx, db)
 }
 

@@ -10,7 +10,7 @@ import (
 
 // Account is a configured mail account (one per provider instance).
 // Secrets (OAuth tokens, IMAP passwords) live in the system keyring keyed
-// by the account ID — never in this table.
+// by the account ID — with fallback to the secrets table when keyring is unavailable.
 type Account struct {
 	ent.Schema
 }
@@ -18,7 +18,7 @@ type Account struct {
 func (Account) Fields() []ent.Field {
 	return []ent.Field{
 		field.UUID("id", uuid.UUID{}).Default(uuid.New),
-		field.Enum("type").Values("gmail", "imap", "microsoft"),
+		field.Enum("type").Values("gmail", "imap", "microsoft", "evolution", "jmap"),
 		field.String("email"),
 		field.String("display_name").Default(""),
 		// Non-secret per-account config: IMAP/SMTP hosts and ports,
@@ -29,6 +29,9 @@ func (Account) Fields() []ent.Field {
 		// Empty means "initial full sync pending".
 		field.String("sync_cursor").Default(""),
 		field.Enum("status").Values("active", "paused", "auth_error").Default("active"),
+		field.Bool("needs_reauth").Default(false),
+		field.String("auth_error").Optional(),
+		field.String("sync_notice").Optional(),
 		field.Time("last_sync_at").Optional().Nillable(),
 		field.String("last_error").Default(""),
 		field.Time("created_at").Default(utcNow).Immutable(),
@@ -41,5 +44,6 @@ func (Account) Edges() []ent.Edge {
 		edge.To("pending_ops", PendingOp.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("notify_rules", NotifyRule.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 		edge.To("contacts", Contact.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
+		edge.To("secrets", Secret.Type).Annotations(entsql.OnDelete(entsql.Cascade)),
 	}
 }

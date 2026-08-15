@@ -31,6 +31,12 @@ type Account struct {
 	SyncCursor string `json:"sync_cursor,omitempty"`
 	// Status holds the value of the "status" field.
 	Status account.Status `json:"status,omitempty"`
+	// NeedsReauth holds the value of the "needs_reauth" field.
+	NeedsReauth bool `json:"needs_reauth,omitempty"`
+	// AuthError holds the value of the "auth_error" field.
+	AuthError string `json:"auth_error,omitempty"`
+	// SyncNotice holds the value of the "sync_notice" field.
+	SyncNotice string `json:"sync_notice,omitempty"`
 	// LastSyncAt holds the value of the "last_sync_at" field.
 	LastSyncAt *time.Time `json:"last_sync_at,omitempty"`
 	// LastError holds the value of the "last_error" field.
@@ -53,9 +59,11 @@ type AccountEdges struct {
 	NotifyRules []*NotifyRule `json:"notify_rules,omitempty"`
 	// Contacts holds the value of the contacts edge.
 	Contacts []*Contact `json:"contacts,omitempty"`
+	// Secrets holds the value of the secrets edge.
+	Secrets []*Secret `json:"secrets,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [4]bool
+	loadedTypes [5]bool
 }
 
 // ThreadsOrErr returns the Threads value or an error if the edge
@@ -94,6 +102,15 @@ func (e AccountEdges) ContactsOrErr() ([]*Contact, error) {
 	return nil, &NotLoadedError{edge: "contacts"}
 }
 
+// SecretsOrErr returns the Secrets value or an error if the edge
+// was not loaded in eager-loading.
+func (e AccountEdges) SecretsOrErr() ([]*Secret, error) {
+	if e.loadedTypes[4] {
+		return e.Secrets, nil
+	}
+	return nil, &NotLoadedError{edge: "secrets"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Account) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -101,7 +118,9 @@ func (*Account) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case account.FieldConfig:
 			values[i] = new([]byte)
-		case account.FieldType, account.FieldEmail, account.FieldDisplayName, account.FieldSyncCursor, account.FieldStatus, account.FieldLastError:
+		case account.FieldNeedsReauth:
+			values[i] = new(sql.NullBool)
+		case account.FieldType, account.FieldEmail, account.FieldDisplayName, account.FieldSyncCursor, account.FieldStatus, account.FieldAuthError, account.FieldSyncNotice, account.FieldLastError:
 			values[i] = new(sql.NullString)
 		case account.FieldLastSyncAt, account.FieldCreatedAt:
 			values[i] = new(sql.NullTime)
@@ -166,6 +185,24 @@ func (_m *Account) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Status = account.Status(value.String)
 			}
+		case account.FieldNeedsReauth:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field needs_reauth", values[i])
+			} else if value.Valid {
+				_m.NeedsReauth = value.Bool
+			}
+		case account.FieldAuthError:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field auth_error", values[i])
+			} else if value.Valid {
+				_m.AuthError = value.String
+			}
+		case account.FieldSyncNotice:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field sync_notice", values[i])
+			} else if value.Valid {
+				_m.SyncNotice = value.String
+			}
 		case account.FieldLastSyncAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field last_sync_at", values[i])
@@ -218,6 +255,11 @@ func (_m *Account) QueryContacts() *ContactQuery {
 	return NewAccountClient(_m.config).QueryContacts(_m)
 }
 
+// QuerySecrets queries the "secrets" edge of the Account entity.
+func (_m *Account) QuerySecrets() *SecretQuery {
+	return NewAccountClient(_m.config).QuerySecrets(_m)
+}
+
 // Update returns a builder for updating this Account.
 // Note that you need to call Account.Unwrap() before calling this method if this Account
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -258,6 +300,15 @@ func (_m *Account) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))
+	builder.WriteString(", ")
+	builder.WriteString("needs_reauth=")
+	builder.WriteString(fmt.Sprintf("%v", _m.NeedsReauth))
+	builder.WriteString(", ")
+	builder.WriteString("auth_error=")
+	builder.WriteString(_m.AuthError)
+	builder.WriteString(", ")
+	builder.WriteString("sync_notice=")
+	builder.WriteString(_m.SyncNotice)
 	builder.WriteString(", ")
 	if v := _m.LastSyncAt; v != nil {
 		builder.WriteString("last_sync_at=")

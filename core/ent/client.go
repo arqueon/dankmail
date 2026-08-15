@@ -21,6 +21,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent/message"
 	"github.com/arqueon/dankmail/core/ent/notifyrule"
 	"github.com/arqueon/dankmail/core/ent/pendingop"
+	"github.com/arqueon/dankmail/core/ent/secret"
 	"github.com/arqueon/dankmail/core/ent/thread"
 
 	stdsql "database/sql"
@@ -41,6 +42,8 @@ type Client struct {
 	NotifyRule *NotifyRuleClient
 	// PendingOp is the client for interacting with the PendingOp builders.
 	PendingOp *PendingOpClient
+	// Secret is the client for interacting with the Secret builders.
+	Secret *SecretClient
 	// Thread is the client for interacting with the Thread builders.
 	Thread *ThreadClient
 }
@@ -59,6 +62,7 @@ func (c *Client) init() {
 	c.Message = NewMessageClient(c.config)
 	c.NotifyRule = NewNotifyRuleClient(c.config)
 	c.PendingOp = NewPendingOpClient(c.config)
+	c.Secret = NewSecretClient(c.config)
 	c.Thread = NewThreadClient(c.config)
 }
 
@@ -157,6 +161,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Message:    NewMessageClient(cfg),
 		NotifyRule: NewNotifyRuleClient(cfg),
 		PendingOp:  NewPendingOpClient(cfg),
+		Secret:     NewSecretClient(cfg),
 		Thread:     NewThreadClient(cfg),
 	}, nil
 }
@@ -182,6 +187,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Message:    NewMessageClient(cfg),
 		NotifyRule: NewNotifyRuleClient(cfg),
 		PendingOp:  NewPendingOpClient(cfg),
+		Secret:     NewSecretClient(cfg),
 		Thread:     NewThreadClient(cfg),
 	}, nil
 }
@@ -212,7 +218,7 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.Account, c.Contact, c.Message, c.NotifyRule, c.PendingOp, c.Thread,
+		c.Account, c.Contact, c.Message, c.NotifyRule, c.PendingOp, c.Secret, c.Thread,
 	} {
 		n.Use(hooks...)
 	}
@@ -222,7 +228,7 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.Account, c.Contact, c.Message, c.NotifyRule, c.PendingOp, c.Thread,
+		c.Account, c.Contact, c.Message, c.NotifyRule, c.PendingOp, c.Secret, c.Thread,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -241,6 +247,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.NotifyRule.mutate(ctx, m)
 	case *PendingOpMutation:
 		return c.PendingOp.mutate(ctx, m)
+	case *SecretMutation:
+		return c.Secret.mutate(ctx, m)
 	case *ThreadMutation:
 		return c.Thread.mutate(ctx, m)
 	default:
@@ -413,6 +421,22 @@ func (c *AccountClient) QueryContacts(_m *Account) *ContactQuery {
 			sqlgraph.From(account.Table, account.FieldID, id),
 			sqlgraph.To(contact.Table, contact.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, account.ContactsTable, account.ContactsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySecrets queries the secrets edge of a Account.
+func (c *AccountClient) QuerySecrets(_m *Account) *SecretQuery {
+	query := (&SecretClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(account.Table, account.FieldID, id),
+			sqlgraph.To(secret.Table, secret.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, account.SecretsTable, account.SecretsColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -1041,6 +1065,155 @@ func (c *PendingOpClient) mutate(ctx context.Context, m *PendingOpMutation) (Val
 	}
 }
 
+// SecretClient is a client for the Secret schema.
+type SecretClient struct {
+	config
+}
+
+// NewSecretClient returns a client for the Secret from the given config.
+func NewSecretClient(c config) *SecretClient {
+	return &SecretClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `secret.Hooks(f(g(h())))`.
+func (c *SecretClient) Use(hooks ...Hook) {
+	c.hooks.Secret = append(c.hooks.Secret, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `secret.Intercept(f(g(h())))`.
+func (c *SecretClient) Intercept(interceptors ...Interceptor) {
+	c.inters.Secret = append(c.inters.Secret, interceptors...)
+}
+
+// Create returns a builder for creating a Secret entity.
+func (c *SecretClient) Create() *SecretCreate {
+	mutation := newSecretMutation(c.config, OpCreate)
+	return &SecretCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of Secret entities.
+func (c *SecretClient) CreateBulk(builders ...*SecretCreate) *SecretCreateBulk {
+	return &SecretCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SecretClient) MapCreateBulk(slice any, setFunc func(*SecretCreate, int)) *SecretCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SecretCreateBulk{err: fmt.Errorf("calling to SecretClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SecretCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SecretCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Secret.
+func (c *SecretClient) Update() *SecretUpdate {
+	mutation := newSecretMutation(c.config, OpUpdate)
+	return &SecretUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SecretClient) UpdateOne(_m *Secret) *SecretUpdateOne {
+	mutation := newSecretMutation(c.config, OpUpdateOne, withSecret(_m))
+	return &SecretUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SecretClient) UpdateOneID(id uuid.UUID) *SecretUpdateOne {
+	mutation := newSecretMutation(c.config, OpUpdateOne, withSecretID(id))
+	return &SecretUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Secret.
+func (c *SecretClient) Delete() *SecretDelete {
+	mutation := newSecretMutation(c.config, OpDelete)
+	return &SecretDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SecretClient) DeleteOne(_m *Secret) *SecretDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SecretClient) DeleteOneID(id uuid.UUID) *SecretDeleteOne {
+	builder := c.Delete().Where(secret.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SecretDeleteOne{builder}
+}
+
+// Query returns a query builder for Secret.
+func (c *SecretClient) Query() *SecretQuery {
+	return &SecretQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSecret},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a Secret entity by its id.
+func (c *SecretClient) Get(ctx context.Context, id uuid.UUID) (*Secret, error) {
+	return c.Query().Where(secret.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SecretClient) GetX(ctx context.Context, id uuid.UUID) *Secret {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAccount queries the account edge of a Secret.
+func (c *SecretClient) QueryAccount(_m *Secret) *AccountQuery {
+	query := (&AccountClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(secret.Table, secret.FieldID, id),
+			sqlgraph.To(account.Table, account.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, secret.AccountTable, secret.AccountColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *SecretClient) Hooks() []Hook {
+	return c.hooks.Secret
+}
+
+// Interceptors returns the client interceptors.
+func (c *SecretClient) Interceptors() []Interceptor {
+	return c.inters.Secret
+}
+
+func (c *SecretClient) mutate(ctx context.Context, m *SecretMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SecretCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SecretUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SecretUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SecretDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown Secret mutation op: %q", m.Op())
+	}
+}
+
 // ThreadClient is a client for the Thread schema.
 type ThreadClient struct {
 	config
@@ -1209,10 +1382,11 @@ func (c *ThreadClient) mutate(ctx context.Context, m *ThreadMutation) (Value, er
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		Account, Contact, Message, NotifyRule, PendingOp, Thread []ent.Hook
+		Account, Contact, Message, NotifyRule, PendingOp, Secret, Thread []ent.Hook
 	}
 	inters struct {
-		Account, Contact, Message, NotifyRule, PendingOp, Thread []ent.Interceptor
+		Account, Contact, Message, NotifyRule, PendingOp, Secret,
+		Thread []ent.Interceptor
 	}
 )
 
