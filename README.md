@@ -1,11 +1,24 @@
 # 📬 dankmail
 
 > **Triage your inbox, preserve your focus.**  
-> A lightning-fast, keyboard-driven mail triage system for Linux. Unified multi-account inbox, local-first cache, and distraction-free plain-text markdown distiller — wrapped in a dynamic Material Design shell.
+> A lightning-fast, keyboard-driven mail triage system for Linux: a unified multi-account inbox, local-first cache, and distraction-free plain-text markdown distiller. Ships as a **standalone desktop app** (Go daemon `dmail` + Quickshell UI) **and** an optional **DankMaterialShell** widget — the same `dmail` daemon powers both.
 
 <p align="center">
   <img src="assets/screenshot.png" alt="dankmail triage window" width="550" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
 </p>
+
+---
+
+## 🗂️ Two artifacts, one project
+
+`dankmail` ships **two things** from this repository:
+
+| Artifact | What it is | Requires |
+|---|---|---|
+| **dankmail** (app) | Standalone mail-triage desktop app: `dmail` daemon, CLI, and Quickshell UI. Works on any Wayland compositor. | Go, Quickshell |
+| **Dankmail Unread** (plugin) | Optional DankMaterialShell bar widget (unread capsules, triage popout) that talks to the same `dmail` daemon. | DMS + dankmail |
+
+The app is fully functional on its own; the plugin is an optional shell integration, **not** a separate mail client. Plugin source lives in [`dms-plugin/`](dms-plugin); install it with `make install-dms-plugin`.
 
 ---
 
@@ -42,7 +55,7 @@ Modern email clients are bloated, distract you with HTML tracking pixels, and su
 *   **Material 3 Undo Banner:** Shows a floating banner at the bottom with a prominent "Undo" button. Click it to instantly restore the thread's state.
 
 ### 🎨 Native Shell Integration
-*   **DankMaterialShell Plugin:** The shell companion is part of this same Dankmail project—not a separate mail client—and uses the same `dmail` daemon. It provides live unread count capsules, truthful per-account counters, interactive triage actions, and a focused quick-reply entry. Its canonical source ships in [`dms-plugin/`](dms-plugin) — install it with `make install-dms-plugin`.
+*   **DankMaterialShell Plugin:** The shell companion is part of this same Dankmail project—not a separate mail client—and uses the same `dmail` daemon. It provides live unread count capsules, truthful per-account counters, interactive triage actions, and a focused quick-reply entry. **This integration is optional — the app works standalone without DankMaterialShell.** Its canonical source ships in [`dms-plugin/`](dms-plugin) — install it with `make install-dms-plugin`.
 *   **Dynamic Theme Sync:** Follows dynamic Material Design system colors (`dms-colors.json`).
 *   **DMAIL_LANG Locale:** follows system language settings for English (`en`), Spanish (`es`), and Brazilian Portuguese (`pt`).
 
