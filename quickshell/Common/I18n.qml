@@ -8,7 +8,9 @@ import qs.Services
 
 // Translation singleton (pattern from dankcalendar, trimmed): source
 // strings are English; ../translations/<lang>.json provides overrides,
-// shaped {"context": {"term": "translation"}}. es ships from day one.
+// shaped {"context": {"term": "translation"}}. es and pt ship today.
+// The locale is narrowed to its base language, so pt_BR and pt_PT both
+// load pt.json (its wording is Brazilian Portuguese).
 Singleton {
     id: root
 

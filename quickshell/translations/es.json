@@ -13,7 +13,11 @@
   "filter": {
     "All": "Todos",
     "Unread": "No leídos",
-    "Starred": "Destacados"
+    "Starred": "Destacados",
+    "Spam": "Spam"
+  },
+  "bulk action": {
+    "%1 selected": "%1 seleccionados"
   },
   "header status": {
     "Daemon offline": "Daemon desconectado"
@@ -54,7 +58,9 @@
     "Authorize in the browser": "Autoriza en el navegador",
     "Account added": "Cuenta añadida",
     "Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.": "Pega el Client ID y el Client Secret del cliente OAuth que acabas de crear. Se guardan en el keyring del sistema, nunca en archivos.",
-    "Shortcut: paste the whole content of the downloaded client_secret_*.json into the Client ID field — it is detected automatically.": "Atajo: pega el contenido completo del client_secret_*.json descargado en el campo Client ID — se detecta automáticamente.",
+    "…or skip the typing and use the downloaded client_secret_*.json:": "…o sáltate el tecleo y usa el client_secret_*.json descargado:",
+    "Path to client_secret_*.json": "Ruta al client_secret_*.json",
+    "Drop the file here, or type its path. The daemon reads it locally; the secret still ends up only in your keyring.": "Suelta el archivo aquí, o escribe su ruta. El daemon lo lee localmente; el secreto sigue acabando solo en tu keyring.",
     "Client ID": "Client ID",
     "Client Secret": "Client Secret",
     "Waiting for you to authorize dankmail in the browser…": "Esperando a que autorices dankmail en el navegador…",
@@ -133,6 +139,12 @@
     "Send": "Enviar",
     "Sending…": "Enviando…"
   },
+  "quick forward": {
+    "Forward": "Reenviar",
+    "Forward to… (comma-separated)": "Reenviar a… (separado por comas)",
+    "Add a note (optional) — the message is quoted below. Ctrl+Enter sends": "Añade una nota (opcional) — el mensaje va citado abajo. Ctrl+Enter envía",
+    "Sending…": "Enviando…"
+  },
   "preview footer": {
     "Plain-text preview — open in web for the full message.": "Vista previa en texto plano — abre en web para el mensaje completo."
   },
@@ -141,10 +153,8 @@
     "Cc": "CC",
     "Received via BCC — your address is not in To or Cc": "Recibido en CCO — tu dirección no está en Para ni CC"
   },
-  "spam review": {
-    "Not spam": "No es spam"
-  },
   "undo banner": {
+    "Undo": "Deshacer",
     "1 thread archived.": "1 hilo archivado.",
     "%1 threads archived.": "%1 hilos archivados.",
     "1 thread deleted.": "1 hilo eliminado.",
