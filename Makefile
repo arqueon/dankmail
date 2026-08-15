@@ -23,7 +23,11 @@ SHELL_INSTALL_DIR=$(DATA_DIR)/quickshell/$(SHELL_NAME)
 ASSETS_DIR=assets
 DESKTOP_ID=org.arqueon.dankmail
 
-.PHONY: all build dev run clean test fmt vet generate install install-bin install-shell install-icon install-desktop install-systemd uninstall uninstall-bin uninstall-shell uninstall-icon uninstall-desktop uninstall-systemd help
+DMS_PLUGIN_DIR=dms-plugin
+DMS_PLUGIN_ID=dankmailUnread
+DMS_PLUGIN_INSTALL_DIR=$(USER_CONFIG_HOME)/DankMaterialShell/plugins/$(DMS_PLUGIN_ID)
+
+.PHONY: all build dev run clean test fmt vet generate install install-bin install-shell install-icon install-desktop install-systemd install-dms-plugin uninstall uninstall-bin uninstall-shell uninstall-icon uninstall-desktop uninstall-systemd uninstall-dms-plugin help
 
 all: build
 
@@ -80,11 +84,21 @@ install-systemd:
 	@chmod 644 $(SYSTEMD_USER_DIR)/$(BINARY_NAME).service
 	@if [ -n "$(SUDO_USER)" ]; then chown $(SUDO_USER) $(SYSTEMD_USER_DIR)/$(BINARY_NAME).service; fi
 
+# The DankMaterialShell widget lives in the user's DMS plugin directory, so
+# this target writes to $(USER_CONFIG_HOME) like install-systemd, not DESTDIR.
+install-dms-plugin:
+	@echo "Installing DankMaterialShell plugin to $(DMS_PLUGIN_INSTALL_DIR)..."
+	@mkdir -p $(DMS_PLUGIN_INSTALL_DIR)
+	@install -m 644 $(DMS_PLUGIN_DIR)/plugin.json $(DMS_PLUGIN_DIR)/*.qml $(DMS_PLUGIN_INSTALL_DIR)/
+	@if [ -n "$(SUDO_USER)" ]; then chown -R $(SUDO_USER) $(DMS_PLUGIN_INSTALL_DIR); fi
+	@echo "Enable it in DankMaterialShell: Settings > Plugins > $(DMS_PLUGIN_ID)."
+
 install: install-bin install-shell install-icon install-desktop
 	@echo ""
 	@echo "Installation complete."
 	@echo "Launch with 'dmail show' or the Dank Mail desktop entry."
 	@echo "Optional: 'make install-systemd' then 'systemctl --user enable --now dmail'."
+	@echo "Optional: 'make install-dms-plugin' for the DankMaterialShell bar widget."
 
 uninstall-bin:
 	@rm -f $(INSTALL_DIR)/$(BINARY_NAME)
@@ -104,7 +118,10 @@ uninstall-systemd:
 	@rm -f $(SYSTEMD_USER_DIR)/$(BINARY_NAME).service
 	@echo "Stop/disable the service manually if running: systemctl --user disable --now $(BINARY_NAME)"
 
-uninstall: uninstall-desktop uninstall-icon uninstall-shell uninstall-bin uninstall-systemd
+uninstall-dms-plugin:
+	@rm -rf $(DMS_PLUGIN_INSTALL_DIR)
+
+uninstall: uninstall-desktop uninstall-icon uninstall-shell uninstall-bin uninstall-systemd uninstall-dms-plugin
 	@echo "Uninstallation complete."
 
 help:
@@ -118,4 +135,5 @@ help:
 	@echo "Install (PREFIX=$(PREFIX)):"
 	@echo "  install            - Binary, shell files, icon, desktop entry"
 	@echo "  install-systemd    - Optional systemd user unit (autostarts with the session)"
+	@echo "  install-dms-plugin - Optional DankMaterialShell bar widget (unread count + triage popout)"
 	@echo "  uninstall          - Remove everything"
