@@ -9,36 +9,31 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Dank Mail Unread"
+        text: "Dankmail Unread"
         font.pixelSize: Theme.fontSizeLarge
-        font.weight: Font.Bold
+        font.weight: Font.Medium
         color: Theme.surfaceText
     }
 
     StyledText {
         width: parent.width
-        text: "Shows the unread count from the dankmail daemon. Left click opens the triage popout; right click toggles the dankmail window."
+        text: "Live unread badge and triage popout for dankmail. Left click opens the popout, middle click toggles the app, and right click syncs."
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
     }
 
-    StringSetting {
-        settingKey: "dmailBin"
-        label: "dmail binary"
-        description: "Path to the dmail binary (leave default if installed with PREFIX=~/.local)."
-        defaultValue: ""
-        placeholder: "~/.local/bin/dmail"
+    ToggleSetting {
+        settingKey: "hideWhenZero"
+        label: "Hide when inbox is clear"
+        description: "Collapse the pill while there is no unread mail"
+        defaultValue: false
     }
 
-    SliderSetting {
-        settingKey: "maxThreads"
-        label: "Popout threads"
-        description: "Maximum unread threads listed in the popout."
-        defaultValue: 10
-        minimum: 3
-        maximum: 30
-        unit: ""
-        leftIcon: "mail"
+    ToggleSetting {
+        settingKey: "showDndDot"
+        label: "Do-not-disturb indicator"
+        description: "Show a small dot while dankmail's DND mode is active"
+        defaultValue: true
     }
 }

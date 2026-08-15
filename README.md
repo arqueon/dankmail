@@ -42,7 +42,7 @@ Modern email clients are bloated, distract you with HTML tracking pixels, and su
 *   **Material 3 Undo Banner:** Shows a floating banner at the bottom with a prominent "Undo" button. Click it to instantly restore the thread's state.
 
 ### 🎨 Native Shell Integration
-*   **DankMaterialShell Plugin:** Live unread count capsules, interactive popouts with status-bar widgets, and system D-Bus notification action buttons. Ships in [`dms-plugin/`](dms-plugin) — install it with `make install-dms-plugin`.
+*   **DankMaterialShell Plugin:** The shell companion is part of this same Dankmail project—not a separate mail client—and uses the same `dmail` daemon. It provides live unread count capsules, truthful per-account counters, interactive triage actions, and a focused quick-reply entry. Its canonical source ships in [`dms-plugin/`](dms-plugin) — install it with `make install-dms-plugin`.
 *   **Dynamic Theme Sync:** Follows dynamic Material Design system colors (`dms-colors.json`).
 *   **DMAIL_LANG Locale:** follows system language settings for English (`en`), Spanish (`es`), and Brazilian Portuguese (`pt`).
 

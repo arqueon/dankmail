@@ -1,8 +1,8 @@
 {
   "id": "dankmailUnread",
-  "name": "Dank Mail Unread",
-  "description": "Live unread count and quick triage popout for the dankmail daemon in DankBar.",
-  "version": "0.1.1",
+  "name": "Dankmail Unread",
+  "description": "The DankMaterialShell companion shipped with Dankmail, powered by its dmail daemon.",
+  "version": "0.2.0",
   "author": "arqueon",
   "type": "widget",
   "capabilities": [
@@ -11,6 +11,9 @@
   "component": "./DankmailWidget.qml",
   "icon": "mail",
   "settings": "./DankmailSettings.qml",
+  "dependencies": [
+    "dmail"
+  ],
   "permissions": [
     "process",
     "settings_read",

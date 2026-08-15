@@ -288,6 +288,12 @@ FloatingWindow {
         DankMailService.loadThread(threadId, true);
     }
 
+    function openReply(threadId) {
+        openThread(threadId);
+        replyArea.visible = true;
+        Qt.callLater(() => replyInput.forceActiveFocus());
+    }
+
     function openCompose() {
         composeModal.show();
     }

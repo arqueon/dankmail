@@ -138,6 +138,7 @@ Singleton {
     signal windowActionRequested(string action)
     signal composeRequested
     signal showThreadRequested(int threadId)
+    signal replyThreadRequested(int threadId)
     signal opFailed(string opType, string error)
 
     Component.onCompleted: socketProbe.running = true
@@ -286,6 +287,11 @@ Singleton {
             windowActionRequested("show");
             if (event.payload && event.payload.id !== undefined)
                 showThreadRequested(event.payload.id);
+            break;
+        case "ui.replyThread":
+            windowActionRequested("show");
+            if (event.payload && event.payload.id !== undefined)
+                replyThreadRequested(event.payload.id);
             break;
         case "op.failed":
             {

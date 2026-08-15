@@ -282,14 +282,20 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		d.bus.Publish("ui.compose", nil)
 		return "ok", nil
 	})
-	// ui.showThread shows the window focused on one thread (local id).
+	// ui.showThread shows the window focused on one thread (local id). The
+	// optional reply intent opens the existing quick-reply composer; older
+	// daemons ignore that extra parameter and still open the thread safely.
 	srv.Register("ui.showThread", func(ctx context.Context, p map[string]any) (any, error) {
 		id, err := intParam(p, "id")
 		if err != nil {
 			return nil, err
 		}
 		d.ensureUIVisible()
-		d.bus.Publish("ui.showThread", map[string]any{"id": id})
+		topic := "ui.showThread"
+		if reply, _ := p["reply"].(bool); reply {
+			topic = "ui.replyThread"
+		}
+		d.bus.Publish(topic, map[string]any{"id": id})
 		return "ok", nil
 	})
 	// threads.searchRemote sweeps the FULL mailbox history server-side

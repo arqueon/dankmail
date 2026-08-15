@@ -61,14 +61,19 @@ ShellRoot {
     // Pending intents (dcal pattern): the window may not exist yet when
     // an open-thread/compose event arrives; stash and apply on load.
     property int pendingThreadId: -1
+    property bool pendingReply: false
     property bool pendingCompose: false
 
     function applyPending() {
         if (!windowLoader.item)
             return;
         if (pendingThreadId >= 0) {
-            windowLoader.item.openThread(pendingThreadId);
+            if (pendingReply)
+                windowLoader.item.openReply(pendingThreadId);
+            else
+                windowLoader.item.openThread(pendingThreadId);
             pendingThreadId = -1;
+            pendingReply = false;
         }
         if (pendingCompose) {
             windowLoader.item.openCompose();
@@ -83,6 +88,13 @@ ShellRoot {
         }
         function onShowThreadRequested(threadId) {
             root.pendingThreadId = threadId;
+            root.pendingReply = false;
+            root.showAndFocus();
+            root.applyPending();
+        }
+        function onReplyThreadRequested(threadId) {
+            root.pendingThreadId = threadId;
+            root.pendingReply = true;
             root.showAndFocus();
             root.applyPending();
         }
