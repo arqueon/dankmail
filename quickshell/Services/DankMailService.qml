@@ -40,7 +40,6 @@ Singleton {
     property var currentThread: null
     property bool threadsLoading: false
     property bool dndEnabled: false
-
     // Triage filters (drive refreshThreads).
     property bool filterUnread: false
     property bool filterStarred: false
@@ -125,6 +124,7 @@ Singleton {
     property var gmailSetupSteps: []
     property string gmailDefaultClientId: ""
     property bool gmailHasDefaultCreds: false
+    property var microsoftSetupSteps: []
     property var imapPresets: []
 
     // Daemon settings (notification actions, snooze default, chained
@@ -339,6 +339,7 @@ Singleton {
         refreshThreads();
         refreshDnd();
         refreshGmailSetupSteps();
+        refreshMicrosoftSetupSteps();
         refreshSettings();
     }
 
@@ -614,6 +615,13 @@ Singleton {
             gmailDefaultClientId = resp.result.defaultClientId || "";
             gmailHasDefaultCreds = !!resp.result.hasDefaultCreds;
         });
+    }
+
+    function refreshMicrosoftSetupSteps() {
+        sendRequest("accounts.microsoft.setupGuide", null, resp => {
+            if (!resp.error && resp.result)
+                microsoftSetupSteps = resp.result.steps || [];
+        });
         sendRequest("accounts.imap.presets", null, resp => {
             if (!resp.error && resp.result)
                 imapPresets = resp.result;
@@ -647,6 +655,12 @@ Singleton {
             };
         }
         sendRequest("accounts.gmail.start", params, resp => callback(resp.error ? resp : resp.result));
+    }
+
+    function startMicrosoftFlow(clientId, callback) {
+        sendRequest("accounts.microsoft.start", {
+            "clientId": clientId.trim()
+        }, resp => callback(resp.error ? resp : resp.result));
     }
 
     // Long-running: resolves when the user finishes (or the daemon times

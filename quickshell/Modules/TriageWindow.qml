@@ -1770,13 +1770,23 @@ FloatingWindow {
 
                         property bool sending: false
                         property string error: ""
+                        property var suggestions: []
 
                         function reset() {
                             visible = false;
                             sending = false;
                             error = "";
+                            suggestions = [];
                             forwardToInput.text = "";
                             forwardNote.text = "";
+                        }
+
+                        function addSuggestion(email) {
+                            const parts = forwardToInput.text.split(",");
+                            parts[parts.length - 1] = email.trim();
+                            forwardToInput.text = parts.map(s => s.trim()).filter(s => s !== "").join(", ") + ", ";
+                            suggestions = [];
+                            forwardToInput.forceActiveFocus();
                         }
 
                         function send() {
@@ -1810,6 +1820,78 @@ FloatingWindow {
                                 Layout.preferredHeight: 40
                                 iconName: "forward_to_inbox"
                                 placeholderText: I18n.tr("Forward to… (comma-separated)", "quick forward")
+                                onTextChanged: forwardSuggestDebounce.restart()
+                                onAccepted: {
+                                    if (forwardArea.suggestions.length > 0)
+                                        forwardArea.addSuggestion(forwardArea.suggestions[0].email);
+                                }
+
+                                Timer {
+                                    id: forwardSuggestDebounce
+                                    interval: 200
+                                    repeat: false
+                                    onTriggered: {
+                                        const parts = forwardToInput.text.split(",");
+                                        const q = parts[parts.length - 1].trim();
+                                        if (q === "") {
+                                            forwardArea.suggestions = [];
+                                            return;
+                                        }
+                                        const thread = DankMailService.currentThread;
+                                        DankMailService.searchContacts(q, thread ? thread.accountId : "", list => forwardArea.suggestions = list);
+                                    }
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+                                visible: forwardArea.suggestions.length > 0
+
+                                Repeater {
+                                    model: forwardArea.suggestions
+
+                                    delegate: StyledRect {
+                                        id: forwardSuggestion
+                                        required property var modelData
+                                        Layout.fillWidth: true
+                                        implicitHeight: 36
+                                        radius: Theme.cornerRadiusSmall
+                                        color: Theme.surfaceContainer
+
+                                        RowLayout {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: Theme.spacingM
+                                            anchors.rightMargin: Theme.spacingM
+                                            spacing: Theme.spacingS
+
+                                            DankIcon {
+                                                name: forwardSuggestion.modelData.source === "google" ? "person" : "history"
+                                                size: Theme.iconSizeSmall
+                                                color: Theme.surfaceTextMedium
+                                            }
+
+                                            StyledText {
+                                                text: forwardSuggestion.modelData.name !== "" ? forwardSuggestion.modelData.name : forwardSuggestion.modelData.email
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: Font.Medium
+                                            }
+
+                                            StyledText {
+                                                Layout.fillWidth: true
+                                                text: forwardSuggestion.modelData.name !== "" ? forwardSuggestion.modelData.email : ""
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: Theme.surfaceTextAlpha
+                                                maximumLineCount: 1
+                                            }
+                                        }
+
+                                        StateLayer {
+                                            stateColor: Theme.primary
+                                            onClicked: forwardArea.addSuggestion(forwardSuggestion.modelData.email)
+                                        }
+                                    }
+                                }
                             }
 
                             StyledRect {

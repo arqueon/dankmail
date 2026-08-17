@@ -19,8 +19,9 @@ import (
 // Endpoints selects the identity provider a Broker talks to. The flow
 // itself (loopback listener, state, PKCE) is provider-agnostic.
 type Endpoints struct {
-	Endpoint oauth2.Endpoint
-	Scopes   []string
+	Endpoint     oauth2.Endpoint
+	Scopes       []string
+	RedirectHost string
 }
 
 var (
@@ -30,8 +31,9 @@ var (
 	// covers personal + organizational accounts; no client secret —
 	// PKCE carries the proof). offline_access yields the refresh token.
 	MicrosoftEndpoints = Endpoints{
-		Endpoint: microsoft.AzureADEndpoint("common"),
-		Scopes:   GraphScopes,
+		Endpoint:     microsoft.AzureADEndpoint("common"),
+		Scopes:       GraphScopes,
+		RedirectHost: "localhost",
 	}
 )
 

@@ -78,10 +78,17 @@ func MicrosoftSetupSteps() []SetupStep {
 		},
 		{
 			Title:       "Add the desktop platform",
-			Description: "In your new app: Authentication → \"Add a platform\" → \"Mobile and desktop applications\" → custom redirect URI: http://localhost — then set \"Allow public client flows\" to Yes and save.",
+			Description: "In your new app: Authentication → \"Add a platform\" → \"Mobile and desktop applications\" → custom redirect URI: http://localhost/callback — then set \"Allow public client flows\" to Yes and save.",
 			URL:         "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
 			URLLabel:    "Open App registrations",
 			Note:        "No client secret is created: dankmail is a public client and the PKCE exchange carries the proof. The only mail permissions ever requested are Mail.ReadWrite and Mail.Send (plus User.Read for the address).",
+		},
+		{
+			Title:       "Add delegated Microsoft Graph permissions",
+			Description: "Open API permissions → Add a permission → Microsoft Graph → Delegated permissions. Add Mail.ReadWrite, Mail.Send, User.Read and offline_access. Do not choose Application permissions or any *.Shared permission.",
+			URL:         "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
+			URLLabel:    "Open App registrations",
+			Note:        "Delegated permissions limit dankmail to the signed-in mailbox. Mail.ReadWrite does not include sending, so Mail.Send is required separately; offline_access keeps background sync authorized.",
 		},
 		{
 			Title:       "Copy the Application (client) ID",
