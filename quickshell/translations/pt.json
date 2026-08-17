@@ -40,8 +40,10 @@
   },
   "provider chooser": {
     "Official API: full triage, minimal scopes, guided OAuth setup.": "API oficial: triagem completa, escopos mínimos, configuração OAuth guiada.",
+    "Outlook / Microsoft 365": "Outlook / Microsoft 365",
+    "Microsoft Graph: full triage and secure OAuth sign-in; no mailbox password is stored.": "Microsoft Graph: triagem completa e login OAuth seguro; nenhuma senha da caixa postal é armazenada.",
     "Other provider (IMAP)": "Outro provedor (IMAP)",
-    "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge ou seu próprio servidor. É salvo e verificado agora; a sincronização chega com o anel IMAP."
+    "iCloud, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Yahoo, Fastmail, Proton Bridge ou seu próprio servidor. É salvo e verificado agora; a sincronização chega com o anel IMAP."
   },
   "account wizard": {
     "Choose your mail provider": "Escolha seu provedor de e-mail",
@@ -54,10 +56,12 @@
     "SMTP server (for replies, next ring)": "Servidor SMTP (para respostas, próximo anel)",
     "Connection verified and account stored. IMAP syncing arrives with the next ring; the account stays parked until then.": "Conexão verificada e conta salva. A sincronização IMAP chega no próximo anel; até lá a conta fica em espera.",
     "Set up your Google OAuth client": "Configure seu cliente OAuth do Google",
+    "Set up your Microsoft OAuth client": "Configure seu cliente OAuth da Microsoft",
     "Enter your client credentials": "Informe as credenciais do cliente",
     "Authorize in the browser": "Autorize no navegador",
     "Account added": "Conta adicionada",
     "Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.": "Cole o Client ID e o Client Secret do cliente OAuth que você acabou de criar. Eles ficam no chaveiro do sistema, nunca em arquivos.",
+    "Paste the Application (client) ID of the public Microsoft client you just created. No client secret or mailbox password is needed.": "Cole o ID do aplicativo (cliente) público da Microsoft que você acabou de criar. Não é necessário segredo do cliente nem senha da caixa postal.",
     "…or skip the typing and use the downloaded client_secret_*.json:": "…ou pule a digitação e use o client_secret_*.json baixado:",
     "Path to client_secret_*.json": "Caminho do client_secret_*.json",
     "Drop the file here, or type its path. The daemon reads it locally; the secret still ends up only in your keyring.": "Solte o arquivo aqui, ou digite o caminho dele. O daemon lê localmente; o segredo continua indo apenas para o seu chaveiro.",

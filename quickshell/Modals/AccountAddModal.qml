@@ -6,11 +6,12 @@ import qs.Services
 import qs.Widgets
 
 // Guided "add account" wizard, modeled on dankcalendar's
-// AccountAddModal. First a provider chooser (Gmail / generic IMAP),
+// AccountAddModal. First a provider chooser (Gmail / Microsoft / generic IMAP),
 // then the provider-specific flow:
 //   gmail — setup guide served by the daemon, client credentials, OAuth
 //           consent in the browser (daemon-run loopback flow);
-//   imap  — provider presets (iCloud, Outlook, Yahoo, Fastmail, Proton
+//   microsoft — guided public-client setup and OAuth/PKCE via Graph;
+//   imap  — provider presets (iCloud, Yahoo, Fastmail, Proton
 //           Bridge, custom) + credentials; the daemon tests the
 //           connection before storing anything.
 FloatingWindow {
@@ -23,7 +24,7 @@ FloatingWindow {
     color: Theme.surface
     visible: false
 
-    property string selectedProvider: "" // "" | "gmail" | "imap"
+    property string selectedProvider: "" // "" | "gmail" | "microsoft" | "imap"
     property int wizardStep: 0
     property string flowError: ""
     property bool flowInProgress: false
@@ -33,6 +34,7 @@ FloatingWindow {
     property string clientId: ""
     property string clientSecret: ""
     property string clientJsonPath: ""
+    property string microsoftClientId: ""
     property string pendingState: ""
     property string pendingAuthUrl: ""
 
@@ -49,22 +51,24 @@ FloatingWindow {
     property string imapSmtpPort: "587"
     property string imapWebmail: ""
 
-    readonly property var steps: DankMailService.gmailSetupSteps
+    readonly property bool onOAuth: selectedProvider === "gmail" || selectedProvider === "microsoft"
+    readonly property var steps: selectedProvider === "microsoft" ? DankMailService.microsoftSetupSteps : DankMailService.gmailSetupSteps
     readonly property int guideCount: steps.length
     readonly property int credsStep: guideCount
     readonly property int browserStep: guideCount + 1
-    readonly property int gmailDoneStep: guideCount + 2
+    readonly property int oauthDoneStep: guideCount + 2
 
     readonly property bool onProviderSelect: selectedProvider === ""
-    readonly property bool onGmailGuide: selectedProvider === "gmail" && wizardStep < guideCount && guideCount > 0
-    readonly property bool onGmailCreds: selectedProvider === "gmail" && wizardStep === credsStep
-    readonly property bool onGmailBrowser: selectedProvider === "gmail" && wizardStep === browserStep
+    readonly property bool onOAuthGuide: onOAuth && wizardStep < guideCount && guideCount > 0
+    readonly property bool onOAuthCreds: onOAuth && wizardStep === credsStep
+    readonly property bool onOAuthBrowser: onOAuth && wizardStep === browserStep
     readonly property bool onImapForm: selectedProvider === "imap" && wizardStep === 0
-    readonly property bool onDone: (selectedProvider === "gmail" && wizardStep === gmailDoneStep) || (selectedProvider === "imap" && wizardStep === 1)
+    readonly property bool onDone: (onOAuth && wizardStep === oauthDoneStep) || (selectedProvider === "imap" && wizardStep === 1)
 
     function show() {
         resetState();
         DankMailService.refreshGmailSetupSteps();
+        DankMailService.refreshMicrosoftSetupSteps();
         visible = true;
     }
 
@@ -82,6 +86,7 @@ FloatingWindow {
         clientId = DankMailService.gmailDefaultClientId;
         clientSecret = "";
         clientJsonPath = "";
+        microsoftClientId = "";
         pendingState = "";
         pendingAuthUrl = "";
         presetKey = "";
@@ -149,7 +154,35 @@ FloatingWindow {
                 }
                 completedEmail = done.email || "";
                 pendingState = "";
-                wizardStep = gmailDoneStep;
+                wizardStep = oauthDoneStep;
+            });
+        });
+    }
+
+    function startMicrosoftFlow() {
+        flowError = "";
+        flowInProgress = true;
+        DankMailService.startMicrosoftFlow(microsoftClientId, res => {
+            if (res.error) {
+                flowError = res.error;
+                flowInProgress = false;
+                return;
+            }
+            pendingState = res.state;
+            pendingAuthUrl = res.authUrl;
+            wizardStep = browserStep;
+            Qt.openUrlExternally(res.authUrl);
+            DankMailService.completeGmailFlow(res.state, done => {
+                flowInProgress = false;
+                if (done.error) {
+                    flowError = done.error;
+                    wizardStep = credsStep;
+                    pendingState = "";
+                    return;
+                }
+                completedEmail = done.email || "";
+                pendingState = "";
+                wizardStep = oauthDoneStep;
             });
         });
     }
@@ -203,11 +236,15 @@ FloatingWindow {
                 text: {
                     if (modal.onProviderSelect)
                         return I18n.tr("Choose your mail provider", "account wizard");
-                    if (modal.onGmailGuide)
-                        return I18n.tr("Set up your Google OAuth client", "account wizard") + "  ·  " + (modal.wizardStep + 1) + "/" + modal.guideCount;
-                    if (modal.onGmailCreds)
+                    if (modal.onOAuthGuide) {
+                        const heading = modal.selectedProvider === "microsoft"
+                            ? I18n.tr("Set up your Microsoft OAuth client", "account wizard")
+                            : I18n.tr("Set up your Google OAuth client", "account wizard");
+                        return heading + "  ·  " + (modal.wizardStep + 1) + "/" + modal.guideCount;
+                    }
+                    if (modal.onOAuthCreds)
                         return I18n.tr("Enter your client credentials", "account wizard");
-                    if (modal.onGmailBrowser)
+                    if (modal.onOAuthBrowser)
                         return I18n.tr("Authorize in the browser", "account wizard");
                     if (modal.onImapForm)
                         return I18n.tr("IMAP account", "account wizard");
@@ -249,10 +286,16 @@ FloatingWindow {
                             "desc": I18n.tr("Official API: full triage, minimal scopes, guided OAuth setup.", "provider chooser")
                         },
                         {
+                            "key": "microsoft",
+                            "icon": "window",
+                            "title": I18n.tr("Outlook / Microsoft 365", "provider chooser"),
+                            "desc": I18n.tr("Microsoft Graph: full triage and secure OAuth sign-in; no mailbox password is stored.", "provider chooser")
+                        },
+                        {
                             "key": "imap",
                             "icon": "dns",
                             "title": I18n.tr("Other provider (IMAP)", "provider chooser"),
-                            "desc": I18n.tr("iCloud, Outlook, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.", "provider chooser")
+                            "desc": I18n.tr("iCloud, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.", "provider chooser")
                         }
                     ]
 
@@ -321,7 +364,7 @@ FloatingWindow {
             ColumnLayout {
                 id: guidePage
                 anchors.fill: parent
-                visible: modal.onGmailGuide
+                visible: modal.onOAuthGuide
                 spacing: Theme.spacingL
 
                 readonly property var step: (modal.wizardStep < modal.steps.length) ? modal.steps[modal.wizardStep] : null
@@ -400,12 +443,12 @@ FloatingWindow {
             // ---- gmail: credentials page ---------------------------------
             ColumnLayout {
                 anchors.fill: parent
-                visible: modal.onGmailCreds
+                visible: modal.onOAuthCreds
                 spacing: Theme.spacingL
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: I18n.tr("Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.", "account wizard")
+                    text: modal.selectedProvider === "microsoft" ? I18n.tr("Paste the Application (client) ID of the public Microsoft client you just created. No client secret or mailbox password is needed.", "account wizard") : I18n.tr("Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.", "account wizard")
                     color: Theme.surfaceTextMedium
                     wrapMode: Text.WordWrap
                 }
@@ -413,11 +456,17 @@ FloatingWindow {
                 DankTextField {
                     Layout.fillWidth: true
                     placeholderText: I18n.tr("Client ID", "account wizard")
-                    text: modal.clientId
-                    onTextChanged: modal.clientId = text
+                    text: modal.selectedProvider === "microsoft" ? modal.microsoftClientId : modal.clientId
+                    onTextChanged: {
+                        if (modal.selectedProvider === "microsoft")
+                            modal.microsoftClientId = text;
+                        else
+                            modal.clientId = text;
+                    }
                 }
 
                 DankTextField {
+                    visible: modal.selectedProvider === "gmail"
                     Layout.fillWidth: true
                     placeholderText: I18n.tr("Client Secret", "account wizard")
                     text: modal.clientSecret
@@ -426,6 +475,7 @@ FloatingWindow {
                 }
 
                 StyledText {
+                    visible: modal.selectedProvider === "gmail"
                     Layout.fillWidth: true
                     text: I18n.tr("…or skip the typing and use the downloaded client_secret_*.json:", "account wizard")
                     font.pixelSize: Theme.fontSizeSmall
@@ -434,6 +484,7 @@ FloatingWindow {
                 }
 
                 StyledRect {
+                    visible: modal.selectedProvider === "gmail"
                     Layout.fillWidth: true
                     implicitHeight: jsonColumn.implicitHeight + Theme.spacingL
                     color: jsonDrop.containsDrag ? Theme.primaryBackground : Theme.surfaceContainer
@@ -493,7 +544,7 @@ FloatingWindow {
             // ---- gmail: browser wait page --------------------------------
             ColumnLayout {
                 anchors.fill: parent
-                visible: modal.onGmailBrowser
+                visible: modal.onOAuthBrowser
                 spacing: Theme.spacingL
 
                 Item {
@@ -750,7 +801,7 @@ FloatingWindow {
             spacing: Theme.spacingM
 
             StyledRect {
-                visible: !modal.onProviderSelect && !modal.onDone && !modal.onGmailBrowser
+                visible: !modal.onProviderSelect && !modal.onDone && !modal.onOAuthBrowser
                 width: backLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
@@ -769,7 +820,7 @@ FloatingWindow {
             }
 
             StyledText {
-                visible: modal.onGmailGuide
+                visible: modal.onOAuthGuide
                 text: I18n.tr("Already have a client? Skip the guide.", "account wizard nav")
                 color: Theme.primary
                 font.pixelSize: Theme.fontSizeSmall
@@ -790,7 +841,7 @@ FloatingWindow {
             }
 
             StyledRect {
-                visible: modal.onGmailGuide
+                visible: modal.onOAuthGuide
                 width: nextLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
@@ -810,8 +861,8 @@ FloatingWindow {
             }
 
             StyledRect {
-                visible: modal.onGmailCreds
-                readonly property bool ready: !modal.flowInProgress && (modal.clientJsonPath.trim() !== "" || modal.clientId.trim().startsWith("{") || (modal.clientId.trim() !== "" && modal.clientSecret.trim() !== ""))
+                visible: modal.onOAuthCreds
+                readonly property bool ready: !modal.flowInProgress && (modal.selectedProvider === "microsoft" ? modal.microsoftClientId.trim() !== "" : (modal.clientJsonPath.trim() !== "" || modal.clientId.trim().startsWith("{") || (modal.clientId.trim() !== "" && modal.clientSecret.trim() !== "")))
                 width: authLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
@@ -828,7 +879,7 @@ FloatingWindow {
                 StateLayer {
                     disabled: !parent.ready
                     stateColor: Theme.primary
-                    onClicked: modal.startGmailFlow()
+                    onClicked: modal.selectedProvider === "microsoft" ? modal.startMicrosoftFlow() : modal.startGmailFlow()
                 }
             }
 
@@ -856,7 +907,7 @@ FloatingWindow {
             }
 
             StyledRect {
-                visible: modal.onGmailBrowser
+                visible: modal.onOAuthBrowser
                 width: cancelLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18

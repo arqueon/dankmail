@@ -13,7 +13,7 @@ el provider en sí está por implementarse.
 
 - **App registration de Azure** creada por el usuario (mismo modelo
   bring-your-own-client que Gmail): public client (Mobile & desktop),
-  redirect `http://localhost` (loopback), "Allow public client flows"
+  redirect `http://localhost/callback` (loopback; Microsoft ignores the ephemeral port), "Allow public client flows"
   activado, supported account types = *Personal Microsoft accounts and
   work/school accounts* (tenant `common`).
 - **Sin client secret**: el broker ya hace PKCE S256 en todos los flujos;
@@ -136,9 +136,11 @@ CapHistorySync | CapDeepLink`.
    registration*: nombre libre (p. ej. "dankmail"), supported account
    types = **Personal Microsoft accounts and work/school accounts**.
 2. **Authentication** → *Add a platform* → **Mobile and desktop
-   applications** → redirect URI `http://localhost` → y activar **Allow
+   applications** → redirect URI `http://localhost/callback` → y activar **Allow
    public client flows = Yes**.
-3. Copiar el **Application (client) ID** — es lo único que pide el
+3. **API permissions** → Microsoft Graph → **Delegated permissions**:
+   `Mail.ReadWrite`, `Mail.Send`, `User.Read` y `offline_access`.
+4. Copiar el **Application (client) ID** — es lo único que pide el
    wizard (no se crea ningún secret).
 
 Cuentas personales (hotmail.com/outlook.com/live.com) funcionan con

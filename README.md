@@ -113,12 +113,14 @@ make install-dms-plugin
 
 ## 🔑 Account Setup
 
-*   **Gmail**: Open the triage window, click the settings cog, and follow the guided step-by-step assistant. It sets up your secure client ID and consent screen using minimal scopes (`gmail.modify` + `gmail.send`). Read [docs/gmail-setup.md](docs/gmail-setup.md) for details.
-*   **Microsoft**: Connect Microsoft 365, Outlook, or Hotmail accounts using the Graph API:
+*   **Gmail**: Open the triage window, choose Add account → Gmail, and follow the guided OAuth assistant. Enable the Gmail and People APIs; dankmail requests `gmail.modify`, `gmail.send`, `contacts.readonly`, and `contacts.other.readonly`—never the unrestricted `mail.google.com` scope. Read [docs/gmail-setup.md](docs/gmail-setup.md) for details.
+*   **Microsoft**: Choose Add account → Outlook / Microsoft 365. The assistant creates a public desktop client and signs in through Microsoft Graph with delegated `Mail.ReadWrite`, `Mail.Send`, `User.Read`, and `offline_access` permissions. No mailbox password or client secret is stored. CLI equivalent:
     ```bash
     dmail account add-microsoft --client-id <azure-client-uuid>
     ```
-*   **Generic IMAP**: Fastmail, iCloud, Yahoo, and Proton Bridge presets are supported and parked in Ring 2.
+*   **Generic IMAP**: Fastmail, iCloud, Yahoo, and Proton Bridge presets are supported and parked in Ring 2. Outlook is intentionally not offered through password-based IMAP; use the native Microsoft OAuth provider.
+
+Compose and quick-forward recipient fields share the same autocomplete index: Google People contacts plus addresses learned from cached mail.
 
 ---
 

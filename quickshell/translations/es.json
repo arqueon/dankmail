@@ -40,8 +40,10 @@
   },
   "provider chooser": {
     "Official API: full triage, minimal scopes, guided OAuth setup.": "API oficial: triage completo, scopes mínimos, configuración OAuth guiada.",
+    "Outlook / Microsoft 365": "Outlook / Microsoft 365",
+    "Microsoft Graph: full triage and secure OAuth sign-in; no mailbox password is stored.": "Microsoft Graph: triage completo e inicio de sesión OAuth seguro; no se guarda la contraseña del correo.",
     "Other provider (IMAP)": "Otro proveedor (IMAP)",
-    "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Outlook, Yahoo, Fastmail, Proton Bridge o tu propio servidor. Se guarda y verifica ahora; la sincronización llega con el anillo IMAP."
+    "iCloud, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Yahoo, Fastmail, Proton Bridge o tu propio servidor. Se guarda y verifica ahora; la sincronización llega con el anillo IMAP."
   },
   "account wizard": {
     "Choose your mail provider": "Elige tu proveedor de correo",
@@ -54,10 +56,12 @@
     "SMTP server (for replies, next ring)": "Servidor SMTP (para responder, siguiente anillo)",
     "Connection verified and account stored. IMAP syncing arrives with the next ring; the account stays parked until then.": "Conexión verificada y cuenta guardada. La sincronización IMAP llega en el siguiente anillo; la cuenta queda en pausa hasta entonces.",
     "Set up your Google OAuth client": "Configura tu cliente OAuth de Google",
+    "Set up your Microsoft OAuth client": "Configura tu cliente OAuth de Microsoft",
     "Enter your client credentials": "Introduce las credenciales del cliente",
     "Authorize in the browser": "Autoriza en el navegador",
     "Account added": "Cuenta añadida",
     "Paste the Client ID and Client Secret of the OAuth client you just created. They are stored in your system keyring, never in files.": "Pega el Client ID y el Client Secret del cliente OAuth que acabas de crear. Se guardan en el keyring del sistema, nunca en archivos.",
+    "Paste the Application (client) ID of the public Microsoft client you just created. No client secret or mailbox password is needed.": "Pega el identificador de aplicación (cliente) del cliente público de Microsoft que acabas de crear. No se necesita secreto de cliente ni contraseña del correo.",
     "…or skip the typing and use the downloaded client_secret_*.json:": "…o sáltate el tecleo y usa el client_secret_*.json descargado:",
     "Path to client_secret_*.json": "Ruta al client_secret_*.json",
     "Drop the file here, or type its path. The daemon reads it locally; the secret still ends up only in your keyring.": "Suelta el archivo aquí, o escribe su ruta. El daemon lo lee localmente; el secreto sigue acabando solo en tu keyring.",

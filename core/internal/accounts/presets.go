@@ -28,14 +28,6 @@ func IMAPPresets() []IMAPPreset {
 			NoteURL:    "https://support.apple.com/102654",
 		},
 		{
-			Key: "outlook", Label: "Outlook / Hotmail",
-			Host: "outlook.office365.com", Port: 993, Security: "tls",
-			SMTPHost: "smtp-mail.outlook.com", SMTPPort: 587,
-			WebmailURL: "https://outlook.live.com/mail",
-			Note:       "Microsoft is retiring basic auth and app passwords for IMAP; if login fails here, your account needs the native Microsoft provider (Graph API), which is on the dankmail roadmap.",
-			NoteURL:    "https://support.microsoft.com/account-billing/9bf6bb53-7c1f-48f9-9b21-c62d7a0e6b7c",
-		},
-		{
 			Key: "yahoo", Label: "Yahoo Mail",
 			Host: "imap.mail.yahoo.com", Port: 993, Security: "tls",
 			SMTPHost: "smtp.mail.yahoo.com", SMTPPort: 587,

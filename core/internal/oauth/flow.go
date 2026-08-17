@@ -45,8 +45,18 @@ func (b *Broker) StartFlow() (*Flow, error) {
 		return nil, err
 	}
 
+	redirectAddr := ln.Addr().String()
+	if b.endpoints.RedirectHost != "" {
+		_, port, splitErr := net.SplitHostPort(redirectAddr)
+		if splitErr != nil {
+			_ = ln.Close()
+			return nil, fmt.Errorf("oauth: parse loopback listener: %w", splitErr)
+		}
+		redirectAddr = net.JoinHostPort(b.endpoints.RedirectHost, port)
+	}
+
 	f := &Flow{
-		cfg:      b.config(fmt.Sprintf("http://%s/callback", ln.Addr().String())),
+		cfg:      b.config(fmt.Sprintf("http://%s/callback", redirectAddr)),
 		verifier: oauth2.GenerateVerifier(),
 		state:    state,
 		ln:       ln,

@@ -14,10 +14,17 @@ variables needed. Credentials and tokens land in your system keyring,
 stored per account. The steps are served by the daemon over IPC
 (`accounts.gmail.setupGuide`), same pattern as dankcalendar.
 
-Scopes requested — and the only ones dankmail will ever request:
+APIs to enable:
+
+- **Gmail API** — mail triage, replies, and compose
+- **People API** — read-only recipient autocomplete
+
+Scopes requested:
 
 - `gmail.modify` — read messages, change labels (read/star/archive/trash)
 - `gmail.send` — send replies and new messages
+- `contacts.readonly` — suggest saved Google contacts
+- `contacts.other.readonly` — suggest Google “Other contacts”
 
 The full-access scope (`https://mail.google.com/`) is never used.
 
@@ -32,21 +39,27 @@ The full-access scope (`https://mail.google.com/`) is never used.
    key, neither of which works for a personal mailbox. The credential
    dankmail needs is an **OAuth client ID (Desktop app)**, created in
    step 5 once the consent screen exists.
-3. Configure the Google Auth Platform
+3. Enable the **People API**:
+   <https://console.cloud.google.com/apis/library/people.googleapis.com>.
+4. Configure the Google Auth Platform
    (<https://console.cloud.google.com/auth/overview>): app name anything,
-   support email your own, audience **External**. Nothing is published.
-4. Add yourself as **test user** on the Audience page
+   support email your own, audience **External**.
+5. On **Data Access** (<https://console.cloud.google.com/auth/scopes>),
+   add `gmail.modify`, `gmail.send`, `contacts.readonly`, and
+   `contacts.other.readonly`. The configured scopes must match those
+   requested during sign-in.
+6. Add yourself as **test user** on the Audience page
    (<https://console.cloud.google.com/auth/audience>).
-5. Create an OAuth client of type **Desktop app**
+7. Create an OAuth client of type **Desktop app**
    (<https://console.cloud.google.com/auth/clients>) and copy the
    Client ID and Client Secret.
-6. **Publish the app** on the Audience page ("Publish app" → confirm;
+8. **Publish the app** on the Audience page ("Publish app" → confirm;
    do NOT submit for verification). Google expires the refresh tokens
    of testing-mode apps every **7 days**, which would force a weekly
    re-auth. After publishing, the consent screen shows "Google hasn't
    verified this app" — click Advanced → "Go to dankmail (unsafe)";
    that warning is expected and only appears during consent.
-7. Enter them in the wizard and authorize in the browser — or, for the
+9. Enter them in the wizard and authorize in the browser — or, for the
    CLI path, export `DMAIL_GOOGLE_CLIENT_ID` /
    `DMAIL_GOOGLE_CLIENT_SECRET` and run `dmail account add-gmail`.
 

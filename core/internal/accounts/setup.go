@@ -38,16 +38,23 @@ func GmailSetupSteps() []SetupStep {
 			Note:        "Ignore the \"Create credentials\" button the console shows afterwards — it steers you toward a service account or API key, which dankmail cannot use. The right credential is an OAuth client ID (Desktop app), created in the later steps after the consent screen is configured.",
 		},
 		{
-			Title:       "Enable the People API (optional)",
-			Description: "Also enable the People API if you want your Google contacts in the compose autocomplete. Skipping it is fine: suggestions then come only from people you've corresponded with.",
+			Title:       "Enable the People API",
+			Description: "Enable the People API so the two read-only contacts permissions requested by dankmail can feed compose autocomplete. Correspondents found in cached mail are also suggested.",
 			URL:         "https://console.cloud.google.com/apis/library/people.googleapis.com",
 			URLLabel:    "Enable People API",
 		},
 		{
 			Title:       "Configure the Google Auth Platform",
-			Description: "Click \"Get started\" on the overview page. App name: anything (e.g. \"dankmail\"). User support email: your own address. Audience: \"External\". Then agree and finish — nothing here is ever published.",
+			Description: "Click \"Get started\" on the overview page. App name: anything (e.g. \"dankmail\"). User support email: your own address. Audience: \"External\". Then agree and finish the initial configuration.",
 			URL:         "https://console.cloud.google.com/auth/overview",
 			URLLabel:    "Open Google Auth Platform",
+		},
+		{
+			Title:       "Declare the permissions dankmail uses",
+			Description: "On Data Access, add gmail.modify, gmail.send, contacts.readonly and contacts.other.readonly. These must match the permissions requested during sign-in; dankmail never asks for the unrestricted mail.google.com scope.",
+			URL:         "https://console.cloud.google.com/auth/scopes",
+			URLLabel:    "Open Data Access",
+			Note:        "Mail modification and sending power triage and replies. Both contacts permissions are read-only and only power recipient suggestions.",
 		},
 		{
 			Title:       "Add yourself as a test user",
@@ -60,7 +67,7 @@ func GmailSetupSteps() []SetupStep {
 			Description: "On the Clients page click \"Create client\" (in older consoles: Credentials → Create credentials → OAuth client ID), choose \"Desktop app\", and create it. Copy the Client ID and Client Secret for the next step.",
 			URL:         "https://console.cloud.google.com/auth/clients",
 			URLLabel:    "Open Clients page",
-			Note:        "Application type must be \"Desktop app\" — NOT a service account, API key, or web application. dankmail will only request the gmail.modify and gmail.send scopes — never full mailbox access.",
+			Note:        "Application type must be \"Desktop app\" — NOT a service account, API key, or web application. The downloaded JSON contains the client ID and desktop-client secret used by the loopback OAuth flow.",
 		},
 		{
 			Title:       "Publish the app (skip the 7-day token expiry)",
