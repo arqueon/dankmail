@@ -9,6 +9,7 @@ license=('GPL-3.0-or-later')
 depends=('quickshell' 'xdg-utils')
 makedepends=('go' 'git')
 optdepends=('gnome-keyring: Secret Service storage for tokens and passwords')
+install=dankmail.install
 provides=('dankmail')
 conflicts=('dankmail')
 source=("dankmail::git+$url.git")

@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/arqueon/dankmail/core/internal/i18n"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/paths"
 	"github.com/arqueon/dankmail/core/models"
@@ -249,6 +250,16 @@ func defaultShellDir() string {
 }
 
 func runRestart(cmd *cobra.Command, args []string) error {
+	// Under systemd a clean stop is final (Restart=on-failure) and a
+	// self-spawned replacement escapes the unit, so while the unit is
+	// active the restart must go through systemd itself.
+	if exec.Command("systemctl", "--user", "is-active", "--quiet", "dmail.service").Run() == nil {
+		if out, err := exec.Command("systemctl", "--user", "restart", "dmail.service").CombinedOutput(); err != nil {
+			return fmt.Errorf("%s: %w", strings.TrimSpace(string(out)), err)
+		}
+		fmt.Println(i18n.T("Daemon restarted (dmail.service)."))
+		return nil
+	}
 	if err := callSimple("system.exit", nil); err == nil {
 		time.Sleep(500 * time.Millisecond)
 	}

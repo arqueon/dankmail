@@ -75,6 +75,7 @@ var overrides = map[string]map[string]string{
 		"Account re-authenticated.":                           "Cuenta re-autenticada.",
 		"Daemon reloaded.":                                    "Daemon recargado.",
 		"(Daemon not running; changes apply when it starts.)": "(Daemon no activo; los cambios aplican al arrancarlo.)",
+		"Daemon restarted (dmail.service).":                   "Daemon reiniciado (dmail.service).",
 	},
 	"pt": {
 		// daemon: notification action buttons
@@ -107,5 +108,6 @@ var overrides = map[string]map[string]string{
 		"Account re-authenticated.":                           "Conta reautenticada.",
 		"Daemon reloaded.":                                    "Daemon recarregado.",
 		"(Daemon not running; changes apply when it starts.)": "(Daemon não está em execução; as alterações valem quando ele iniciar.)",
+		"Daemon restarted (dmail.service).":                   "Daemon reiniciado (dmail.service).",
 	},
 }
