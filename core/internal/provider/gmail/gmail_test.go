@@ -286,8 +286,8 @@ func TestInitialSync(t *testing.T) {
 	if !changes.FullResync {
 		t.Error("FullResync = false, want true")
 	}
-	if cursor != "5000" {
-		t.Errorf("cursor = %q, want %q", cursor, "5000")
+	if cursor != "labels-v2:5000" {
+		t.Errorf("cursor = %q, want %q", cursor, "labels-v2:5000")
 	}
 	if f.calls[0] != "GetProfile" {
 		t.Errorf("first call = %q, want GetProfile before listing", f.calls[0])
@@ -365,6 +365,47 @@ func TestInitialSync(t *testing.T) {
 	}
 }
 
+func TestInitialSyncIncludesStarredOutsideInbox(t *testing.T) {
+	f := &fakeAPI{
+		profileEmail: "ada@example.org",
+		profileHist:  5000,
+		listPages: map[string][]listPage{
+			"STARRED": {{ids: []string{"t3"}}},
+		},
+		threads: fixtureThreads(),
+	}
+	f.threads["t3"].Messages[0].LabelIds = append(f.threads["t3"].Messages[0].LabelIds, "STARRED")
+	p := newTestProvider(f, Options{})
+
+	changes, _, err := p.Sync(context.Background(), "")
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if len(changes.Upserted) != 1 {
+		t.Fatalf("len(Upserted) = %d, want 1", len(changes.Upserted))
+	}
+	got := changes.Upserted[0]
+	if got.ThreadID != "t3" || got.InInbox || !got.Starred {
+		t.Fatalf("thread = %+v, want starred t3 outside inbox", got)
+	}
+}
+
+func TestLegacyCursorForcesFullSyncForStarredMigration(t *testing.T) {
+	f := &fakeAPI{profileHist: 6000, listPages: map[string][]listPage{}}
+	p := newTestProvider(f, Options{})
+
+	changes, cursor, err := p.Sync(context.Background(), "5000")
+	if err != nil {
+		t.Fatalf("Sync: %v", err)
+	}
+	if !changes.FullResync || cursor != "labels-v2:6000" {
+		t.Fatalf("changes.FullResync=%v cursor=%q, want true and labels-v2:6000", changes.FullResync, cursor)
+	}
+	if len(f.calls) == 0 || f.calls[0] != "GetProfile" {
+		t.Fatalf("calls = %v, want full-sync GetProfile first", f.calls)
+	}
+}
+
 func TestInitialSyncBodyTruncation(t *testing.T) {
 	tests := []struct {
 		name string
@@ -434,15 +475,15 @@ func TestIncrementalSync(t *testing.T) {
 	}
 	p := newTestProvider(f, Options{})
 
-	changes, cursor, err := p.Sync(context.Background(), "5000")
+	changes, cursor, err := p.Sync(context.Background(), "labels-v2:5000")
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
 	if changes.FullResync {
 		t.Error("FullResync = true, want false")
 	}
-	if cursor != "6000" {
-		t.Errorf("cursor = %q, want 6000 (max historyId seen)", cursor)
+	if cursor != "labels-v2:6000" {
+		t.Errorf("cursor = %q, want labels-v2:6000 (max historyId seen)", cursor)
 	}
 	var got []string
 	for _, d := range changes.Upserted {
@@ -467,15 +508,15 @@ func TestIncrementalSyncNoChanges(t *testing.T) {
 		histPages: []*gmailv1.ListHistoryResponse{{HistoryId: 5500}},
 	}
 	p := newTestProvider(f, Options{})
-	changes, cursor, err := p.Sync(context.Background(), "5000")
+	changes, cursor, err := p.Sync(context.Background(), "labels-v2:5000")
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
 	if len(changes.Upserted) != 0 || len(changes.RemovedThreadIDs) != 0 || changes.FullResync {
 		t.Errorf("changes = %+v, want empty", changes)
 	}
-	if cursor != "5500" {
-		t.Errorf("cursor = %q, want 5500", cursor)
+	if cursor != "labels-v2:5500" {
+		t.Errorf("cursor = %q, want labels-v2:5500", cursor)
 	}
 }
 
@@ -489,15 +530,15 @@ func TestIncrementalSyncHistoryExpired(t *testing.T) {
 	}
 	p := newTestProvider(f, Options{})
 
-	changes, cursor, err := p.Sync(context.Background(), "42")
+	changes, cursor, err := p.Sync(context.Background(), "labels-v2:42")
 	if err != nil {
 		t.Fatalf("Sync: %v", err)
 	}
 	if !changes.FullResync {
 		t.Error("FullResync = false, want true after history 404")
 	}
-	if cursor != "7777" {
-		t.Errorf("cursor = %q, want profile historyId 7777", cursor)
+	if cursor != "labels-v2:7777" {
+		t.Errorf("cursor = %q, want profile historyId labels-v2:7777", cursor)
 	}
 	if len(changes.Upserted) != 1 || changes.Upserted[0].ThreadID != "t2" {
 		t.Errorf("Upserted = %+v, want [t2]", changes.Upserted)

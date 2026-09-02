@@ -25,7 +25,10 @@ import (
 
 // defaultBodyCap is the plain-text body truncation limit when Options
 // does not set one (spec: 32 KiB).
-const defaultBodyCap = 32 * 1024
+const (
+	defaultBodyCap = 32 * 1024
+	cursorV2Prefix = "labels-v2:"
+)
 
 // Gmail system label IDs the provider maps to flags or filters out of
 // ThreadDelta.Labels.
@@ -41,8 +44,8 @@ const (
 
 // Options tunes a Gmail provider instance.
 type Options struct {
-	// MonitoredLabels are extra label IDs synced besides INBOX and SPAM
-	// (which are always monitored — SPAM so the spam folder can be
+	// MonitoredLabels are extra label IDs synced besides INBOX, STARRED,
+	// and SPAM (which are always monitored — SPAM so the spam folder can be
 	// reviewed and bulk-read from the triage window; it never notifies
 	// because its threads carry InInbox=false).
 	MonitoredLabels []string
@@ -56,14 +59,14 @@ type Provider struct {
 	accountID string
 	email     string
 	api       gmailAPI
-	labels    []string // INBOX + monitored labels, deduped, in order
+	labels    []string // INBOX + STARRED + SPAM + monitored labels, deduped
 	bodyCap   int
 }
 
 // New builds a Provider for accountID/email over the given API seam.
 func New(accountID, email string, api gmailAPI, opts Options) *Provider {
-	labels := []string{labelInbox, labelSpam}
-	seen := map[string]bool{labelInbox: true, labelSpam: true}
+	labels := []string{labelInbox, labelStarred, labelSpam}
+	seen := map[string]bool{labelInbox: true, labelStarred: true, labelSpam: true}
 	for _, l := range opts.MonitoredLabels {
 		if l == "" || seen[l] {
 			continue
@@ -105,10 +108,12 @@ func (p *Provider) Capabilities() provider.Capability {
 // or unparseable cursor, and an expired one (history 404), trigger the
 // full-resync path.
 func (p *Provider) Sync(ctx context.Context, cursor string) (provider.Changes, string, error) {
-	if cursor == "" {
+	// v2 added STARRED to the always-monitored labels. Treat old numeric
+	// cursors as stale once so existing accounts import archived stars.
+	if cursor == "" || !strings.HasPrefix(cursor, cursorV2Prefix) {
 		return p.fullSync(ctx)
 	}
-	start, err := strconv.ParseUint(cursor, 10, 64)
+	start, err := strconv.ParseUint(strings.TrimPrefix(cursor, cursorV2Prefix), 10, 64)
 	if err != nil {
 		// A corrupt cursor is equivalent to an expired one.
 		return p.fullSync(ctx)
@@ -156,7 +161,7 @@ func (p *Provider) fullSync(ctx context.Context) (provider.Changes, string, erro
 			pageToken = next
 		}
 	}
-	return changes, strconv.FormatUint(historyID, 10), nil
+	return changes, cursorV2Prefix + strconv.FormatUint(historyID, 10), nil
 }
 
 // incrementalSync replays history since start. Affected threads are
@@ -212,7 +217,7 @@ func (p *Provider) incrementalSync(ctx context.Context, start uint64) (provider.
 			changes.Upserted = append(changes.Upserted, d)
 		}
 	}
-	return changes, strconv.FormatUint(maxHistory, 10), nil
+	return changes, cursorV2Prefix + strconv.FormatUint(maxHistory, 10), nil
 }
 
 func collectThreadIDs(dst map[string]bool, h *gmailv1.History) {

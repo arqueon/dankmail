@@ -374,7 +374,9 @@ Singleton {
     function refreshThreads() {
         threadsLoading = true;
         const params = {
-            "inbox": searchQuery === "" && filterLabel === "",
+            // Starred is a mailbox-wide view. Keeping inbox=true here
+            // accidentally reduced it to "starred AND in inbox".
+            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred,
             "limit": 200
         };
         if (searchQuery !== "")

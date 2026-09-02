@@ -21,6 +21,7 @@ PluginComponent {
     property bool dnd: false
     property var accounts: []
     property var threads: []
+    property string mailboxView: "inbox"
     property bool syncing: false
     property int _reqId: 0
     property int _statusReqId: -1
@@ -67,7 +68,8 @@ PluginComponent {
             "id": root._threadsReqId,
             "method": "threads.list",
             "params": {
-                "inbox": true,
+                "inbox": root.mailboxView === "inbox",
+                "starred": root.mailboxView === "starred",
                 "limit": 20
             }
         });
@@ -469,6 +471,43 @@ PluginComponent {
                 }
             }
 
+            Row {
+                visible: root.daemonConnected
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: Theme.spacingXS
+
+                Repeater {
+                    model: [
+                        { "key": "inbox", "label": "Recibidos" },
+                        { "key": "starred", "label": "Destacados" }
+                    ]
+
+                    delegate: Rectangle {
+                        required property var modelData
+                        readonly property bool active: root.mailboxView === modelData.key
+                        width: viewLabel.implicitWidth + Theme.spacingL
+                        height: 28
+                        radius: 14
+                        color: active ? Theme.primaryContainer : "transparent"
+
+                        StyledText {
+                            id: viewLabel
+                            anchors.centerIn: parent
+                            text: parent.modelData.label
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: parent.active ? Theme.primary : Theme.surfaceVariantText
+                        }
+
+                        TapHandler {
+                            onTapped: {
+                                root.mailboxView = parent.modelData.key;
+                                root.refreshStatus();
+                            }
+                        }
+                    }
+                }
+            }
+
             Item {
                 width: parent.width
                 // The list scrolls inside a fixed viewport when it grows
@@ -499,7 +538,7 @@ PluginComponent {
                     StyledText {
                         visible: root.daemonConnected && root.threads.length === 0
                         width: parent.width
-                        text: "Sin correos en la bandeja."
+                        text: root.mailboxView === "starred" ? "Sin correos destacados." : "Sin correos en la bandeja."
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                     }
