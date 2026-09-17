@@ -225,7 +225,7 @@ func (e *Executor) handleFailure(ctx context.Context, ops []Op, ids []int, callE
 
 	case errdefs.Retryable(callErr) && ops[0].Attempts+1 < MaxAttempts:
 		attempt := ops[0].Attempts + 1
-		delay := e.backoff[min(attempt-1, len(e.backoff)-1)]
+		delay := max(e.backoff[min(attempt-1, len(e.backoff)-1)], errdefs.RetryAfter(callErr))
 		_, err := e.db.PendingOp.Update().
 			Where(pendingop.IDIn(ids...)).
 			SetState(pendingop.StatePending).

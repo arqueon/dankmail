@@ -108,6 +108,7 @@ func (p *Provider) Capabilities() provider.Capability {
 // or unparseable cursor, and an expired one (history 404), trigger the
 // full-resync path.
 func (p *Provider) Sync(ctx context.Context, cursor string) (provider.Changes, string, error) {
+	ctx = withRetryBudget(ctx)
 	// v2 added STARRED to the always-monitored labels. Treat old numeric
 	// cursors as stale once so existing accounts import archived stars.
 	if cursor == "" || !strings.HasPrefix(cursor, cursorV2Prefix) {
@@ -244,6 +245,7 @@ func collectThreadIDs(dst map[string]bool, h *gmailv1.History) {
 // of the FULL mailbox history via Gmail's search syntax. Results come
 // back as Backfill deltas (upserted into the cache, never notified).
 func (p *Provider) SearchRemote(ctx context.Context, query string, limit int) (provider.Changes, error) {
+	ctx = withRetryBudget(ctx)
 	if limit <= 0 {
 		limit = 100
 	}
@@ -322,6 +324,7 @@ func (p *Provider) Spam(ctx context.Context, threadIDs []string) error {
 }
 
 func (p *Provider) modifyAll(ctx context.Context, threadIDs []string, add, remove []string) error {
+	ctx = withRetryBudget(ctx)
 	for _, id := range threadIDs {
 		if err := p.api.ModifyThread(ctx, id, add, remove); err != nil {
 			return classify(err)
@@ -349,6 +352,7 @@ func flagsToLabels(flags []provider.Flag) ([]string, error) {
 // SendReply fetches the original message headers, builds a threaded
 // plain-text MIME reply, and sends it on the given thread.
 func (p *Provider) SendReply(ctx context.Context, threadID string, r provider.ReplyDraft) error {
+	ctx = withRetryBudget(ctx)
 	origMsg, err := p.api.GetMessageMetadata(ctx, r.InReplyToMessageID)
 	if err != nil {
 		return classify(err)
@@ -365,6 +369,7 @@ func (p *Provider) SendReply(ctx context.Context, threadID string, r provider.Re
 
 // Compose sends a new plain-text message (no thread association).
 func (p *Provider) Compose(ctx context.Context, m provider.ComposeDraft) error {
+	ctx = withRetryBudget(ctx)
 	raw, err := mailmime.BuildCompose(p.email, m)
 	if err != nil {
 		return errdefs.Wrap(errdefs.KindPermanent, err)

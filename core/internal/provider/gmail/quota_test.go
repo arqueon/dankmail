@@ -31,20 +31,21 @@ func TestQuotaPacesByCostAndHonorsCooldown(t *testing.T) {
 	q, sleeps := fakeQuota()
 	ctx := context.Background()
 	for _, cost := range []int{40, 20, 10} {
-		if err := q.wait(ctx, cost); err != nil {
+		if err := q.wait(ctx, cost, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
 	if !reflect.DeepEqual(*sleeps, []time.Duration{time.Second, time.Second / 2}) {
 		t.Fatalf("waits %v", *sleeps)
 	}
-	q.cooldown(time.Minute)
-	q.cooldown(time.Second)
-	if err := q.wait(ctx, 1); err != nil {
-		t.Fatal(err)
+	q.cooldown(time.Minute, &googleapi.Error{Code: 429})
+	q.cooldown(time.Second, &googleapi.Error{Code: 429})
+	var deferred *deferredRetry
+	if err := q.wait(ctx, 1, nil); !errors.As(err, &deferred) || deferred.RetryAfter() != time.Minute {
+		t.Fatalf("missing one-minute deferral: %v", err)
 	}
-	if got := (*sleeps)[2]; got != time.Minute {
-		t.Fatalf("cooldown shortened: %v", got)
+	if len(*sleeps) != 2 {
+		t.Fatalf("long cooldown slept inline: %v", *sleeps)
 	}
 }
 
@@ -56,9 +57,9 @@ func TestReadRetryDelay(t *testing.T) {
 		want  time.Duration
 		retry bool
 	}{
-		{"quota", &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "rateLimitExceeded"}}}, time.Minute, true},
-		{"user quota", &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "userRateLimitExceeded"}}}, time.Minute, true},
-		{"429", &googleapi.Error{Code: 429}, time.Minute, true},
+		{"quota", &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "rateLimitExceeded"}}}, time.Second, true},
+		{"user quota", &googleapi.Error{Code: 403, Errors: []googleapi.ErrorItem{{Reason: "userRateLimitExceeded"}}}, time.Second, true},
+		{"429", &googleapi.Error{Code: 429}, time.Second, true},
 		{"server", &googleapi.Error{Code: 503}, time.Second, true},
 		{"retry seconds", &googleapi.Error{Code: 429, Header: http.Header{"Retry-After": []string{"180"}}}, 3 * time.Minute, true},
 		{"retry date", &googleapi.Error{Code: 429, Header: http.Header{"Retry-After": []string{now.Add(4 * time.Minute).Format(http.TimeFormat)}}}, 4 * time.Minute, true},
@@ -75,18 +76,25 @@ func TestReadRetryDelay(t *testing.T) {
 			}
 		})
 	}
-	if d, _ := readRetryDelay(&googleapi.Error{Code: 429}, 4, now); d != 2*time.Minute {
+	if d, _ := readRetryDelay(&googleapi.Error{Code: 429}, 4, now); d != 16*time.Second {
 		t.Fatalf("backoff %v", d)
 	}
 }
 
 func TestReadRetriesAreBoundedAndCancellable(t *testing.T) {
-	q, _ := fakeQuota()
+	q, sleeps := fakeQuota()
 	r := &realAPI{quota: q}
 	calls := 0
 	_, err := readCall(context.Background(), r, 40, func() (*int, error) { calls++; return nil, &googleapi.Error{Code: 429} })
-	if err == nil || calls != maxReadRetries+1 {
+	if err == nil || calls < 2 || calls > maxReadRetries+1 {
 		t.Fatalf("calls=%d err=%v", calls, err)
+	}
+	var slept time.Duration
+	for _, delay := range *sleeps {
+		slept += delay
+	}
+	if slept > maxInlineRetryWait {
+		t.Fatalf("unbounded retry wait: %v", slept)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	calls = 0

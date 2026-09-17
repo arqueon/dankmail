@@ -28,6 +28,10 @@ func classify(err error) error {
 	if errors.As(err, &classified) {
 		return err
 	}
+	var deferred *deferredRetry
+	if errors.As(err, &deferred) && deferred.cause == nil {
+		return errdefs.Wrap(errdefs.KindRateLimit, err)
+	}
 	var ge *googleapi.Error
 	if errors.As(err, &ge) {
 		switch {

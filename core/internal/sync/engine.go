@@ -16,6 +16,8 @@ package sync
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	gosync "sync"
 	"time"
 
@@ -89,20 +91,43 @@ func (e *Engine) Run(ctx context.Context) error {
 // runAccount is the poll loop for one account.
 func (e *Engine) runAccount(ctx context.Context, a *ent.Account) {
 	// First sync immediately, then on the (live) interval.
-	_ = e.SyncAccount(ctx, a.ID)
-	timer := time.NewTimer(e.accountInterval(a))
+	err := e.SyncAccount(ctx, a.ID)
+	timer := time.NewTimer(e.nextSyncDelay(a, err))
 	defer timer.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-timer.C:
-			_ = e.SyncAccount(ctx, a.ID)
+			err := e.SyncAccount(ctx, a.ID)
 			// Re-read each tick so a settings change takes effect within
 			// one cycle without restarting the engine.
-			timer.Reset(e.accountInterval(a))
+			timer.Reset(e.nextSyncDelay(a, err))
 		}
 	}
+}
+
+func (e *Engine) nextSyncDelay(a *ent.Account, err error) time.Duration {
+	return max(e.accountInterval(a), errdefs.RetryAfter(err))
+}
+
+// SyncAll visits every account even if one is deferred or fails. Successful
+// accounts persist their changes; failures are reported together afterwards.
+func (e *Engine) SyncAll(ctx context.Context, full bool) error {
+	accounts, err := e.db.Account.Query().All(ctx)
+	if err != nil {
+		return err
+	}
+	var failures []error
+	for _, a := range accounts {
+		if ctx.Err() != nil {
+			return errors.Join(append(failures, ctx.Err())...)
+		}
+		if err := e.syncAccount(ctx, a.ID, full); err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", a.Email, err))
+		}
+	}
+	return errors.Join(failures...)
 }
 
 // accountInterval resolves the effective poll cadence: a per-account

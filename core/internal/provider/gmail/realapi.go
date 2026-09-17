@@ -43,6 +43,7 @@ func NewWithClient(accountID, email string, hc *http.Client, opts Options) (*Pro
 	if err != nil {
 		return nil, errdefs.Wrap(errdefs.KindPermanent, err)
 	}
+	api.quota = accountQuota(accountID)
 	return New(accountID, email, api, opts), nil
 }
 
@@ -89,18 +90,21 @@ func (r *realAPI) ListHistory(ctx context.Context, startHistoryID uint64, pageTo
 }
 
 func (r *realAPI) ModifyThread(ctx context.Context, threadID string, addLabelIDs, removeLabelIDs []string) error {
-	if err := r.quota.wait(ctx, 10); err != nil {
+	if err := r.waitQuota(ctx, 10); err != nil {
 		return err
 	}
 	_, err := r.svc.Users.Threads.Modify(userID, threadID, &gmailv1.ModifyThreadRequest{
 		AddLabelIds:    addLabelIDs,
 		RemoveLabelIds: removeLabelIDs,
 	}).Context(ctx).Do()
+	if deferred := r.deferFailure(err, 0); deferred != nil {
+		return deferred
+	}
 	return err
 }
 
 func (r *realAPI) SendMessage(ctx context.Context, threadID string, raw []byte) error {
-	if err := r.quota.wait(ctx, 100); err != nil {
+	if err := r.waitQuota(ctx, 100); err != nil {
 		return err
 	}
 	msg := &gmailv1.Message{Raw: base64.RawURLEncoding.EncodeToString(raw)}
@@ -108,6 +112,9 @@ func (r *realAPI) SendMessage(ctx context.Context, threadID string, raw []byte) 
 		msg.ThreadId = threadID
 	}
 	_, err := r.svc.Users.Messages.Send(userID, msg).Context(ctx).Do()
+	if deferred := r.deferFailure(err, 0); deferred != nil {
+		return deferred
+	}
 	return err
 }
 

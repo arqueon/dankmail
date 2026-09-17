@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"os/exec"
@@ -302,54 +303,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 	// (providers implementing RemoteSearcher, i.e. Gmail) and ingests the
 	// results as cache backfill — old threads become previewable and
 	// triageable locally, with notifications suppressed.
-	srv.Register("threads.searchRemote", func(ctx context.Context, p map[string]any) (any, error) {
-		query, _ := p["query"].(string)
-		if strings.TrimSpace(query) == "" {
-			return nil, fmt.Errorf("empty query")
-		}
-		wanted, _ := p["account"].(string)
-
-		accounts, err := d.repo.Accounts(ctx)
-		if err != nil {
-			return nil, err
-		}
-		rec := dsync.NewReconciler(d.db, d.bus)
-		found := 0
-		searched := 0
-		for _, a := range accounts {
-			if wanted != "" && a.ID != wanted {
-				continue
-			}
-			id, err := parseUUID(a.ID)
-			if err != nil {
-				continue
-			}
-			prov, ok := d.registry.Provider(id)
-			if !ok {
-				continue
-			}
-			searcher, ok := prov.(provider.RemoteSearcher)
-			if !ok {
-				continue // provider can't search remotely; local cache only
-			}
-			limit := 100
-			if val, ok := p["limit"].(float64); ok && val > 0 {
-				limit = int(val)
-			}
-			changes, err := searcher.SearchRemote(ctx, query, limit)
-			if err != nil {
-				return nil, fmt.Errorf("%s: %w", a.Email, err)
-			}
-			if err := rec.Apply(ctx, id, changes); err != nil {
-				return nil, err
-			}
-			found += len(changes.Upserted)
-		}
-		if searched == 0 {
-			return nil, fmt.Errorf("no account supports remote search")
-		}
-		return map[string]any{"ingested": found}, nil
-	})
+	srv.Register("threads.searchRemote", d.searchRemote)
 
 	// ui.openSearch continues a local search in the account's webmail
 	// (full history lives there; the local cache only spans retention).
@@ -475,20 +429,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			}
 			return "ok", syncOne(id)
 		}
-		accounts, err := d.repo.Accounts(ctx)
-		if err != nil {
-			return nil, err
-		}
-		for _, a := range accounts {
-			id, err := uuid.Parse(a.ID)
-			if err != nil {
-				continue
-			}
-			if err := syncOne(id); err != nil {
-				return nil, fmt.Errorf("%s: %w", a.Email, err)
-			}
-		}
-		return "ok", nil
+		return "ok", engine.SyncAll(ctx, full)
 	})
 	srv.Register("system.reload", func(ctx context.Context, _ map[string]any) (any, error) {
 		d.requestReload()
@@ -578,4 +519,59 @@ func timeParam(p map[string]any, key string) (time.Time, error) {
 		return time.Time{}, fmt.Errorf("bad %q: %w (want RFC3339)", key, err)
 	}
 	return t, nil
+}
+
+func (d *daemon) searchRemote(ctx context.Context, p map[string]any) (any, error) {
+	query, _ := p["query"].(string)
+	if strings.TrimSpace(query) == "" {
+		return nil, fmt.Errorf("empty query")
+	}
+	wanted, _ := p["account"].(string)
+
+	accounts, err := d.repo.Accounts(ctx)
+	if err != nil {
+		return nil, err
+	}
+	rec := dsync.NewReconciler(d.db, d.bus)
+	found := 0
+	searched := 0
+	var failures []error
+	for _, a := range accounts {
+		if ctx.Err() != nil {
+			return nil, errors.Join(append(failures, ctx.Err())...)
+		}
+		if wanted != "" && a.ID != wanted {
+			continue
+		}
+		id, err := parseUUID(a.ID)
+		if err != nil {
+			continue
+		}
+		prov, ok := d.registry.Provider(id)
+		if !ok {
+			continue
+		}
+		searcher, ok := prov.(provider.RemoteSearcher)
+		if !ok {
+			continue // provider can't search remotely; local cache only
+		}
+		searched++
+		limit := 100
+		if val, ok := p["limit"].(float64); ok && val > 0 {
+			limit = int(val)
+		}
+		changes, err := searcher.SearchRemote(ctx, query, limit)
+		if err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", a.Email, err))
+			continue
+		}
+		if err := rec.Apply(ctx, id, changes); err != nil {
+			return nil, err
+		}
+		found += len(changes.Upserted)
+	}
+	if searched == 0 {
+		return nil, fmt.Errorf("no account supports remote search")
+	}
+	return map[string]any{"ingested": found}, errors.Join(failures...)
 }
