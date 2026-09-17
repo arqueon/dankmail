@@ -9,7 +9,6 @@ import (
 	gosync "sync"
 
 	"github.com/google/uuid"
-	"golang.org/x/oauth2"
 
 	"github.com/arqueon/dankmail/core/config"
 	"github.com/arqueon/dankmail/core/ent"
@@ -106,11 +105,10 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 			creds = oauth.ClientCreds{ClientID: r.cfg.GoogleClientID, ClientSecret: r.cfg.GoogleClientSecret}
 		}
 		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, r.cfg.OAuthBindAddr)
-		ts, err := broker.TokenSource(ctx, a.ID.String())
+		hc, err := broker.Client(ctx, a.ID.String())
 		if err != nil {
 			return nil, err
 		}
-		hc := oauth2.NewClient(ctx, ts)
 		r.mu.Lock()
 		r.clients[a.ID] = hc
 		r.mu.Unlock()
@@ -129,11 +127,10 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 			return nil, fmt.Errorf("no OAuth client stored for %s; re-add the account", a.Email)
 		}
 		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", r.cfg.OAuthBindAddr)
-		ts, err := broker.TokenSource(ctx, a.ID.String())
+		hc, err := broker.Client(ctx, a.ID.String())
 		if err != nil {
 			return nil, err
 		}
-		hc := oauth2.NewClient(ctx, ts)
 		r.mu.Lock()
 		r.clients[a.ID] = hc
 		r.mu.Unlock()

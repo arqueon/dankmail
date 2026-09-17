@@ -464,9 +464,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		full, _ := p["full"].(bool)
 		syncOne := func(id uuid.UUID) error {
 			if full {
-				if _, err := d.db.Account.UpdateOneID(id).SetSyncCursor("").Save(ctx); err != nil {
-					return err
-				}
+				return engine.FullSyncAccount(ctx, id)
 			}
 			return engine.SyncAccount(ctx, id)
 		}

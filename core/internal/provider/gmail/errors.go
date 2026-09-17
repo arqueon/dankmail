@@ -24,6 +24,10 @@ func classify(err error) error {
 	if err == nil {
 		return nil
 	}
+	var classified *errdefs.Error
+	if errors.As(err, &classified) {
+		return err
+	}
 	var ge *googleapi.Error
 	if errors.As(err, &ge) {
 		switch {

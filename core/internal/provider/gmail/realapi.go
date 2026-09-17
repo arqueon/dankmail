@@ -22,7 +22,8 @@ var metadataHeaders = []string{
 // realAPI implements gmailAPI over google.golang.org/api/gmail/v1.
 // It returns raw errors; classification happens in the Provider.
 type realAPI struct {
-	svc *gmailv1.Service
+	svc   *gmailv1.Service
+	quota *quotaGate
 }
 
 // newRealAPI builds the seam over an OAuth-authenticated *http.Client
@@ -32,7 +33,7 @@ func newRealAPI(hc *http.Client) (*realAPI, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &realAPI{svc: svc}, nil
+	return &realAPI{svc: svc, quota: newQuotaGate()}, nil
 }
 
 // NewWithClient builds a Provider over the real Gmail API using an
@@ -53,7 +54,7 @@ func (r *realAPI) ListThreads(ctx context.Context, labelIDs []string, pageToken 
 	if pageToken != "" {
 		call = call.PageToken(pageToken)
 	}
-	resp, err := call.Do()
+	resp, err := readCall(ctx, r, 10, func() (*gmailv1.ListThreadsResponse, error) { return call.Do() })
 	if err != nil {
 		return nil, "", err
 	}
@@ -65,14 +66,18 @@ func (r *realAPI) ListThreads(ctx context.Context, labelIDs []string, pageToken 
 }
 
 func (r *realAPI) GetThread(ctx context.Context, id string) (*gmailv1.Thread, error) {
-	return r.svc.Users.Threads.Get(userID, id).Format("full").Context(ctx).Do()
+	return readCall(ctx, r, 40, func() (*gmailv1.Thread, error) {
+		return r.svc.Users.Threads.Get(userID, id).Format("full").Context(ctx).Do()
+	})
 }
 
 func (r *realAPI) GetMessageMetadata(ctx context.Context, id string) (*gmailv1.Message, error) {
-	return r.svc.Users.Messages.Get(userID, id).
-		Format("metadata").
-		MetadataHeaders(metadataHeaders...).
-		Context(ctx).Do()
+	return readCall(ctx, r, 20, func() (*gmailv1.Message, error) {
+		return r.svc.Users.Messages.Get(userID, id).
+			Format("metadata").
+			MetadataHeaders(metadataHeaders...).
+			Context(ctx).Do()
+	})
 }
 
 func (r *realAPI) ListHistory(ctx context.Context, startHistoryID uint64, pageToken string) (*gmailv1.ListHistoryResponse, error) {
@@ -80,10 +85,13 @@ func (r *realAPI) ListHistory(ctx context.Context, startHistoryID uint64, pageTo
 	if pageToken != "" {
 		call = call.PageToken(pageToken)
 	}
-	return call.Do()
+	return readCall(ctx, r, 2, func() (*gmailv1.ListHistoryResponse, error) { return call.Do() })
 }
 
 func (r *realAPI) ModifyThread(ctx context.Context, threadID string, addLabelIDs, removeLabelIDs []string) error {
+	if err := r.quota.wait(ctx, 10); err != nil {
+		return err
+	}
 	_, err := r.svc.Users.Threads.Modify(userID, threadID, &gmailv1.ModifyThreadRequest{
 		AddLabelIds:    addLabelIDs,
 		RemoveLabelIds: removeLabelIDs,
@@ -92,6 +100,9 @@ func (r *realAPI) ModifyThread(ctx context.Context, threadID string, addLabelIDs
 }
 
 func (r *realAPI) SendMessage(ctx context.Context, threadID string, raw []byte) error {
+	if err := r.quota.wait(ctx, 100); err != nil {
+		return err
+	}
 	msg := &gmailv1.Message{Raw: base64.RawURLEncoding.EncodeToString(raw)}
 	if threadID != "" {
 		msg.ThreadId = threadID
@@ -105,7 +116,7 @@ func (r *realAPI) SearchThreads(ctx context.Context, query string, pageToken str
 	if pageToken != "" {
 		call = call.PageToken(pageToken)
 	}
-	resp, err := call.Do()
+	resp, err := readCall(ctx, r, 10, func() (*gmailv1.ListThreadsResponse, error) { return call.Do() })
 	if err != nil {
 		return nil, "", err
 	}
@@ -117,7 +128,7 @@ func (r *realAPI) SearchThreads(ctx context.Context, query string, pageToken str
 }
 
 func (r *realAPI) GetProfile(ctx context.Context) (string, uint64, error) {
-	p, err := r.svc.Users.GetProfile(userID).Context(ctx).Do()
+	p, err := readCall(ctx, r, 1, func() (*gmailv1.Profile, error) { return r.svc.Users.GetProfile(userID).Context(ctx).Do() })
 	if err != nil {
 		return "", 0, err
 	}

@@ -71,3 +71,9 @@ The account's address is read from the authorized Gmail profile (you
 never type it), and the token plus your OAuth client are stored in the
 system keyring per account — so token refresh works no matter how the
 daemon is started (systemd, terminal, etc.).
+
+## Synchronization and quota errors
+
+A quota-specific 403 or 429 is a temporary usage limit, not a request for new consent. DankMail paces requests and retries the failing read while retaining progress in memory. See [Gmail synchronization and quota limits](gmail-sync-limits.md).
+
+If Gmail rejects an expired access token with 401, DankMail attempts one renewal before requesting consent again. A revoked refresh token still requires reconnecting the account.

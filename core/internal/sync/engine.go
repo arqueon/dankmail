@@ -35,13 +35,14 @@ const DefaultPollInterval = 60 * time.Second
 // Engine wires, per active account, a poll loop (provider.Sync →
 // Reconciler.Apply → cursor persistence) and an op-queue Executor.
 type Engine struct {
-	db         *ent.Client
-	bus        *bus.Bus
-	queue      *Queue
-	registry   Registry
-	reconciler *Reconciler
-	scheduler  *Scheduler
-	settings   *settings.Store
+	db           *ent.Client
+	bus          *bus.Bus
+	queue        *Queue
+	registry     Registry
+	reconciler   *Reconciler
+	scheduler    *Scheduler
+	settings     *settings.Store
+	accountLocks gosync.Map // uuid.UUID → cancellable per-account semaphore
 }
 
 func NewEngine(db *ent.Client, b *bus.Bus, q *Queue, reg Registry, sched *Scheduler, set *settings.Store) *Engine {
@@ -122,6 +123,32 @@ func (e *Engine) accountInterval(a *ent.Account) time.Duration {
 // SyncAccount performs one provider sync + reconcile pass. Also invoked
 // by the IPC "system.sync" method (dmail sync).
 func (e *Engine) SyncAccount(ctx context.Context, accountID uuid.UUID) error {
+	return e.syncAccount(ctx, accountID, false)
+}
+
+// FullSyncAccount resets the cursor under the same lock as polling, so a
+// finishing incremental sync cannot overwrite a manual full-sync request.
+func (e *Engine) FullSyncAccount(ctx context.Context, accountID uuid.UUID) error {
+	return e.syncAccount(ctx, accountID, true)
+}
+
+func (e *Engine) syncAccount(ctx context.Context, accountID uuid.UUID, full bool) error {
+	value, _ := e.accountLocks.LoadOrStore(accountID, make(chan struct{}, 1))
+	lock := value.(chan struct{})
+	select {
+	case lock <- struct{}{}:
+		defer func() { <-lock }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if full {
+		if _, err := e.db.Account.UpdateOneID(accountID).SetSyncCursor("").Save(ctx); err != nil {
+			return err
+		}
+	}
 	acct, err := e.db.Account.Get(ctx, accountID)
 	if err != nil {
 		return err

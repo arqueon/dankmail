@@ -5,8 +5,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"os/exec"
+	"sync"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -166,32 +169,83 @@ func LoadToken(accountID string) (*oauth2.Token, error) {
 // TokenSource returns an auto-refreshing source for the account that
 // persists refreshed tokens back to the keyring.
 func (b *Broker) TokenSource(ctx context.Context, accountID string) (oauth2.TokenSource, error) {
+	return b.tokenSource(ctx, accountID)
+}
+
+func (b *Broker) tokenSource(ctx context.Context, accountID string) (*persistingSource, error) {
 	tok, err := LoadToken(accountID)
 	if err != nil {
 		return nil, err
 	}
-	base := b.config("").TokenSource(ctx, tok)
-	return &persistingSource{accountID: accountID, base: base, last: tok.AccessToken}, nil
+	cfg := b.config("")
+	return &persistingSource{
+		ctx: ctx, cfg: cfg, base: cfg.TokenSource(ctx, tok), current: tok,
+		last: *tok, save: func(t *oauth2.Token) error { return SaveToken(accountID, t) },
+	}, nil
 }
 
 type persistingSource struct {
-	accountID string
-	base      oauth2.TokenSource
-	last      string
+	mu      sync.Mutex
+	ctx     context.Context
+	cfg     *oauth2.Config
+	base    oauth2.TokenSource
+	current *oauth2.Token
+	last    oauth2.Token
+	save    func(*oauth2.Token) error
 }
 
 func (s *persistingSource) Token() (*oauth2.Token, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.current.Valid() && s.current.RefreshToken == "" {
+		return nil, errdefs.Wrap(errdefs.KindAuth, errors.New("oauth: refresh token is missing"))
+	}
 	tok, err := s.base.Token()
 	if err != nil {
-		return nil, errdefs.Wrap(errdefs.KindAuth, err)
+		return nil, classifyTokenError(err)
 	}
-	if tok.AccessToken != s.last {
-		s.last = tok.AccessToken
-		if err := SaveToken(s.accountID, tok); err != nil {
-			return nil, err
+	s.current = tok
+	if tok.AccessToken != s.last.AccessToken || tok.RefreshToken != s.last.RefreshToken ||
+		tok.TokenType != s.last.TokenType || !tok.Expiry.Equal(s.last.Expiry) {
+		if err := s.save(tok); err != nil {
+			// Leave last untouched so a later request retries persistence.
+			return nil, errdefs.Wrap(errdefs.KindNetwork, fmt.Errorf("oauth: save refreshed token: %w", err))
 		}
+		s.last = *tok
 	}
 	return tok, nil
+}
+
+// invalidate discards only the rejected access token. Concurrent requests
+// that already refreshed it must not trigger another refresh.
+func (s *persistingSource) invalidate(rejected string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.current.AccessToken != rejected {
+		return
+	}
+	tok := &oauth2.Token{RefreshToken: s.current.RefreshToken}
+	s.current = tok
+	s.base = s.cfg.TokenSource(s.ctx, tok)
+}
+
+func classifyTokenError(err error) error {
+	var re *oauth2.RetrieveError
+	if errors.As(err, &re) {
+		switch re.ErrorCode {
+		case "invalid_grant", "invalid_client", "unauthorized_client", "access_denied", "interaction_required", "login_required", "consent_required":
+			return errdefs.Wrap(errdefs.KindAuth, err)
+		}
+		if re.Response != nil {
+			switch re.Response.StatusCode {
+			case http.StatusUnauthorized, http.StatusForbidden:
+				return errdefs.Wrap(errdefs.KindAuth, err)
+			case http.StatusTooManyRequests:
+				return errdefs.Wrap(errdefs.KindRateLimit, err)
+			}
+		}
+	}
+	return errdefs.Wrap(errdefs.KindNetwork, err)
 }
 
 func randomState() (string, error) {
