@@ -12,7 +12,7 @@ Item {
     property int reconnectMaxMs: 15000
     property int _reconnectAttempt: 0
 
-    signal connectionStateChanged
+    signal connectionStateChanged(bool ready)
 
     onConnectedChanged: socket.connected = connected
 
@@ -20,7 +20,7 @@ Item {
         id: socket
 
         onConnectionStateChanged: {
-            root.connectionStateChanged();
+            root.connectionStateChanged(socket.connected);
             if (connected) {
                 root._reconnectAttempt = 0;
                 return;

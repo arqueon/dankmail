@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import qs.Common
 import qs.Services
+import "../Common/ThreadSearch.js" as ThreadSearch
 
 // NOTE: responses may arrive out of order (the daemon dispatches each
 // request on its own goroutine so long-running calls like the OAuth
@@ -39,6 +40,8 @@ Singleton {
     property var threads: []
     property var currentThread: null
     property bool threadsLoading: false
+    property bool threadsHasMore: false
+    property var _threadSearch: null
     property bool dndEnabled: false
     // Triage filters (drive refreshThreads).
     property bool filterUnread: false
@@ -50,6 +53,12 @@ Singleton {
     // body); empty = normal inbox view. Full-history search continues in
     // the webmail via openWebSearch.
     property string searchQuery: ""
+
+    onSearchQueryChanged: invalidateThreadSearch()
+    onFilterUnreadChanged: invalidateThreadSearch()
+    onFilterStarredChanged: invalidateThreadSearch()
+    onFilterAccountChanged: invalidateThreadSearch()
+    onFilterLabelChanged: invalidateThreadSearch()
 
     readonly property int unreadTotal: {
         let n = 0;
@@ -176,8 +185,8 @@ Singleton {
         path: root.socketPath
         connected: false
 
-        onConnectionStateChanged: {
-            if (connected) {
+        onConnectionStateChanged: ready => {
+            if (ready) {
                 root.connected = true;
                 root.connecting = false;
                 root.connectionStateChanged();
@@ -186,6 +195,9 @@ Singleton {
             } else {
                 root.connected = false;
                 root.connecting = false;
+                root.pendingRequests = {};
+                if (root._threadSearch)
+                    root._threadSearch.reset();
                 root.connectionStateChanged();
                 probeRetry.restart();
             }
@@ -212,9 +224,9 @@ Singleton {
         path: root.socketPath
         connected: false
 
-        onConnectionStateChanged: {
-            root.subscribed = connected;
-            if (connected)
+        onConnectionStateChanged: ready => {
+            root.subscribed = ready;
+            if (ready)
                 subscribeSocket.send({
                     "id": root._nextId(),
                     "method": "subscribe"
@@ -371,13 +383,11 @@ Singleton {
         });
     }
 
-    function refreshThreads() {
-        threadsLoading = true;
+    function threadFilterParams() {
         const params = {
             // Starred is a mailbox-wide view. Keeping inbox=true here
             // accidentally reduced it to "starred AND in inbox".
-            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred,
-            "limit": 200
+            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred
         };
         if (searchQuery !== "")
             params.query = searchQuery;
@@ -389,14 +399,32 @@ Singleton {
             params.starred = true;
         if (filterAccount !== "")
             params.account = filterAccount;
-        sendRequest("threads.list", params, resp => {
-            threadsLoading = false;
-            if (resp.error) {
-                log.warn("threads.list:", resp.error);
-                return;
-            }
-            threads = resp.result || [];
-        });
+        return params;
+    }
+
+    function threadSearchController() {
+        if (!_threadSearch)
+            _threadSearch = ThreadSearch.create(
+                (params, callback) => root.sendRequest("threads.list", params, callback),
+                rows => { root.threads = rows; },
+                (loading, more) => {
+                    root.threadsLoading = loading;
+                    root.threadsHasMore = more;
+                },
+                error => root.log.warn("threads.list:", error));
+        return _threadSearch;
+    }
+
+    function invalidateThreadSearch() {
+        threadSearchController().setFilters(threadFilterParams());
+    }
+
+    function refreshThreads() {
+        threadSearchController().refresh(threadFilterParams());
+    }
+
+    function loadMoreThreads() {
+        threadSearchController().loadMore();
     }
 
     function loadThread(id, markRead) {

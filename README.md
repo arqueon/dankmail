@@ -44,6 +44,7 @@ Modern email clients are bloated, distract you with HTML tracking pixels, and su
 *   **30-Day Auto-Janitor:** Automatically prunes local SQLite cache while keeping starred and snoozed threads safe.
 
 ### 🛡️ Distraction-Free Triage Window
+*   **Indexed local search:** Find literal text in cached subjects, snippets, senders and bodies. Results load in pages of 200 with a **Load more** button; superseded requests cannot replace the current search. See [search behavior and validation](docs/search.md).
 *   **HTML to Markdown Distiller:** Reads clean, stylized markdown. Indents quote chains with color coding and renders text links safely.
 *   **Attachment Metadata Chips:** View file names and sizes instantly; opens webmail on click to keep heavy binary downloads off your machine.
 *   **Quick Reply & Compose:** Write lightning-fast replies in plain text with full thread nesting (`In-Reply-To`/`References`).

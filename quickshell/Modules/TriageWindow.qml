@@ -5,6 +5,7 @@ import qs.Common
 import qs.Modals
 import qs.Services
 import qs.Widgets
+import "../Common/ThreadSearch.js" as ThreadSearch
 
 // Main triage window: unified thread list (left) + plain-text preview
 // (right). Everything here is a view over the daemon: actions enqueue
@@ -606,18 +607,21 @@ FloatingWindow {
                 // button continues the query in the webmail.
                 DankTextField {
                     id: searchField
+                    objectName: "threadSearchField"
                     Layout.preferredWidth: 220
                     Layout.preferredHeight: 36
                     iconName: "search"
                     placeholderText: I18n.tr("Search mail…", "search")
-                    onTextChanged: searchDebounce.restart()
+                    onTextChanged: {
+                        DankMailService.searchQuery = text.trim();
+                        searchDebounce.restart();
+                    }
 
                     Timer {
                         id: searchDebounce
                         interval: 250
                         repeat: false
                         onTriggered: {
-                            DankMailService.searchQuery = searchField.text.trim();
                             DankMailService.refreshThreads();
                         }
                     }
@@ -697,17 +701,69 @@ FloatingWindow {
                 Layout.preferredWidth: 400
                 Layout.fillHeight: true
 
+                ListModel {
+                    id: threadModel
+                }
+
+                Connections {
+                    target: DankMailService
+                    function onThreadsChanged() {
+                        ThreadSearch.syncModel(threadModel, DankMailService.threads);
+                    }
+                }
+
+                Component.onCompleted: ThreadSearch.syncModel(threadModel, DankMailService.threads)
+
                 ListView {
                     id: threadList
+                    objectName: "threadList"
                     anchors.fill: parent
                     clip: true
-                    model: DankMailService.threads
+                    model: threadModel
+                    reuseItems: true
                     boundsBehavior: Flickable.StopAtBounds
                     spacing: 0
 
+                    footer: Column {
+                        width: threadList.width
+                        spacing: Theme.spacingS
+                        padding: Theme.spacingS
+
+                        StyledText {
+                            text: DankMailService.threadsLoading
+                                ? I18n.tr("Loading…", "search")
+                                : I18n.tr("Showing %1 threads", "search").arg(DankMailService.threads.length)
+                            color: Theme.surfaceTextMedium
+                            font.pixelSize: Theme.fontSizeSmall
+                        }
+
+                        StyledRect {
+                            visible: DankMailService.threadsHasMore
+                            width: moreLabel.implicitWidth + Theme.spacingXL
+                            height: 36
+                            radius: 18
+                            color: Theme.primaryContainer
+                            enabled: !DankMailService.threadsLoading
+
+                            StyledText {
+                                id: moreLabel
+                                anchors.centerIn: parent
+                                text: I18n.tr("Load more", "search")
+                                color: Theme.primary
+                            }
+                            StateLayer {
+                                stateColor: Theme.primary
+                                cornerRadius: 18
+                                onClicked: DankMailService.loadMoreThreads()
+                            }
+                        }
+                    }
+
                     delegate: Rectangle {
                         id: row
-                        required property var modelData
+                        required property string rowJson
+                        readonly property var modelData: JSON.parse(rowJson)
+                        ListView.onPooled: rowActions.snoozing = false
 
                         readonly property bool selected: modelData.id === window.selectedThreadId
                         readonly property bool isHidden: window.temporarilyHiddenIds.indexOf(modelData.id) !== -1
@@ -1040,7 +1096,7 @@ FloatingWindow {
                 // Empty state.
                 ColumnLayout {
                     anchors.centerIn: parent
-                    visible: DankMailService.threads.length === 0
+                    visible: DankMailService.threads.length === 0 && !DankMailService.threadsLoading
                     spacing: Theme.spacingM
 
                     DankIcon {

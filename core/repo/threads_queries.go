@@ -28,11 +28,11 @@ type ThreadFilter struct {
 	// view uses it so mixed threads (one spam message, thread alive in
 	// the inbox) don't show up as spam.
 	ExcludeInbox bool
-	// Query matches subject, snippet, sender, or message body
-	// (case-folded LIKE over the local cache — FTS5 is a ring-3
-	// upgrade). While searching, snoozed threads are included.
-	Query string
-	Limit int
+	// Query matches literal substrings in subject, snippet, sender, or
+	// message body using the local trigram index. Snoozed threads are included.
+	Query  string
+	Limit  int
+	Offset int
 }
 
 // ListThreads returns the unified triage list, newest first. Snoozed
@@ -41,18 +41,11 @@ type ThreadFilter struct {
 func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.ThreadSummary, error) {
 	q := r.client.Thread.Query().
 		WithAccount().
-		Order(ent.Desc(thread.FieldLastMessageAt))
+		Order(ent.Desc(thread.FieldLastMessageAt), ent.Desc(thread.FieldID))
 	if f.Query == "" {
 		q = q.Where(thread.SnoozedUntilIsNil())
 	} else {
-		q = q.Where(thread.Or(
-			thread.SubjectContainsFold(f.Query),
-			thread.SnippetContainsFold(f.Query),
-			thread.HasMessagesWith(message.Or(
-				message.FromContainsFold(f.Query),
-				message.BodyTextContainsFold(f.Query),
-			)),
-		))
+		q = q.Where(searchPredicate(f.Query))
 	}
 	if f.AccountID != nil {
 		q = q.Where(thread.HasAccountWith(account.IDEQ(*f.AccountID)))
@@ -77,6 +70,9 @@ func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.Thread
 	limit := f.Limit
 	if limit <= 0 || limit > 500 {
 		limit = 100
+	}
+	if f.Offset > 0 {
+		q = q.Offset(f.Offset)
 	}
 	rows, err := q.Limit(limit).All(ctx)
 	if err != nil {

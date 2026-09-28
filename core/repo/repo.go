@@ -39,6 +39,10 @@ func open(ctx context.Context, dsn string) (*ent.Client, error) {
 		_ = client.Close()
 		return nil, fmt.Errorf("migrate: %w", err)
 	}
+	if err := migrateSearch(ctx, db); err != nil {
+		_ = client.Close()
+		return nil, fmt.Errorf("migrate search: %w", err)
+	}
 	return client, nil
 }
 
