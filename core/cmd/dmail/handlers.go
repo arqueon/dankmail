@@ -54,6 +54,9 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if limit, ok := p["limit"].(float64); ok {
 			f.Limit = int(limit)
 		}
+		if offset, ok := p["offset"].(float64); ok && offset > 0 {
+			f.Offset = int(offset)
+		}
 		if s, ok := p["account"].(string); ok && s != "" {
 			id, err := uuid.Parse(s)
 			if err != nil {

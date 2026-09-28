@@ -33,7 +33,10 @@
     "No local results — search the full history or the web": "Nenhum resultado local — busque no histórico completo ou na web"
   },
   "search": {
-    "Search mail…": "Buscar e-mails…"
+    "Search mail…": "Buscar e-mails…",
+    "Loading…": "Carregando…",
+    "Showing %1 threads": "Mostrando %1 conversas",
+    "Load more": "Carregar mais"
   },
   "account wizard title": {
     "Add account": "Adicionar conta"
