@@ -23,6 +23,17 @@ Install **Dankmail Unread** from the DankMaterialShell plugin browser. The
 registry entry points to this `dms-plugin/` directory in the main Dankmail
 repository, so plugin and daemon development stay together.
 
+On Arch Linux, you can instead install the AUR package:
+
+```sh
+paru -S dms-shell-plugin-dankmail
+```
+
+This installs the companion in DMS's system plugin directory. An existing
+user-installed copy takes precedence; move that copy out of
+`~/.config/DankMaterialShell/plugins/` if you want to use the packaged version.
+Enable **Dankmail Unread** in DMS Settings → Plugins and add it to the bar.
+
 For a local checkout, link this directory as the plugin source:
 
 ```sh
