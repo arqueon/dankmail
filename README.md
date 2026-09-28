@@ -18,7 +18,7 @@
 | **dankmail** (app) | Standalone mail-triage desktop app: `dmail` daemon, CLI, and Quickshell UI. Works on any Wayland compositor. | Go, Quickshell |
 | **Dankmail Unread** (plugin) | Optional DankMaterialShell bar widget (unread capsules, triage popout) that talks to the same `dmail` daemon. | DMS + dankmail |
 
-The app is fully functional on its own; the plugin is an optional shell integration, **not** a separate mail client. Plugin source lives in [`dms-plugin/`](dms-plugin); install it with `make install-dms-plugin`.
+The app is fully functional on its own; the plugin is an optional shell integration, **not** a separate mail client. Plugin source lives in [`dms-plugin/`](dms-plugin). On Arch Linux, install `dms-shell-plugin-dankmail`; from source, run `make install-dms-plugin`. Starting with 0.3.6, the companion follows the app release version.
 
 ---
 
@@ -94,6 +94,22 @@ systemctl --user enable --now dmail
 paru -S dankmail-git
 systemctl --user enable --now dmail
 ```
+
+For the optional DankMaterialShell companion:
+
+```bash
+paru -S dms-shell-plugin-dankmail
+```
+
+Enable **Dankmail Unread** in DMS Settings → Plugins, then add it to the bar.
+The package installs a system plugin; it does not change your DMS settings.
+If you already installed the companion from the DMS catalog or from source,
+that user copy takes precedence. Keep using that copy, or move it out of
+`~/.config/DankMaterialShell/plugins/` to switch to the AUR-managed version.
+
+After upgrading DankMail, restart the daemon with `systemctl --user restart dmail`
+(or `dmail restart`) and close/reopen the triage window. The first 0.3.6 startup
+builds local search indexes; see [search behavior and migration](docs/search.md).
 
 ### From Source
 
