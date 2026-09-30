@@ -308,6 +308,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 	// results as cache backfill — old threads become previewable and
 	// triageable locally, with notifications suppressed.
 	srv.Register("threads.searchRemote", d.searchRemote)
+	srv.Register("threads.fetchArchived", d.fetchArchived)
 
 	// ui.openSearch continues a local search in the account's webmail
 	// (full history lives there; the local cache only spans retention).

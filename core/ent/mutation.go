@@ -5072,6 +5072,7 @@ type ThreadMutation struct {
 	subject            *string
 	snippet            *string
 	last_message_at    *time.Time
+	history_loaded_at  *time.Time
 	participants       *[]string
 	appendparticipants []string
 	unread             *bool
@@ -5334,6 +5335,55 @@ func (m *ThreadMutation) OldLastMessageAt(ctx context.Context) (v time.Time, err
 // ResetLastMessageAt resets all changes to the "last_message_at" field.
 func (m *ThreadMutation) ResetLastMessageAt() {
 	m.last_message_at = nil
+}
+
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (m *ThreadMutation) SetHistoryLoadedAt(t time.Time) {
+	m.history_loaded_at = &t
+}
+
+// HistoryLoadedAt returns the value of the "history_loaded_at" field in the mutation.
+func (m *ThreadMutation) HistoryLoadedAt() (r time.Time, exists bool) {
+	v := m.history_loaded_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldHistoryLoadedAt returns the old "history_loaded_at" field's value of the Thread entity.
+// If the Thread object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ThreadMutation) OldHistoryLoadedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldHistoryLoadedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldHistoryLoadedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldHistoryLoadedAt: %w", err)
+	}
+	return oldValue.HistoryLoadedAt, nil
+}
+
+// ClearHistoryLoadedAt clears the value of the "history_loaded_at" field.
+func (m *ThreadMutation) ClearHistoryLoadedAt() {
+	m.history_loaded_at = nil
+	m.clearedFields[thread.FieldHistoryLoadedAt] = struct{}{}
+}
+
+// HistoryLoadedAtCleared returns if the "history_loaded_at" field was cleared in this mutation.
+func (m *ThreadMutation) HistoryLoadedAtCleared() bool {
+	_, ok := m.clearedFields[thread.FieldHistoryLoadedAt]
+	return ok
+}
+
+// ResetHistoryLoadedAt resets all changes to the "history_loaded_at" field.
+func (m *ThreadMutation) ResetHistoryLoadedAt() {
+	m.history_loaded_at = nil
+	delete(m.clearedFields, thread.FieldHistoryLoadedAt)
 }
 
 // SetParticipants sets the "participants" field.
@@ -5814,7 +5864,7 @@ func (m *ThreadMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ThreadMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.provider_thread_id != nil {
 		fields = append(fields, thread.FieldProviderThreadID)
 	}
@@ -5826,6 +5876,9 @@ func (m *ThreadMutation) Fields() []string {
 	}
 	if m.last_message_at != nil {
 		fields = append(fields, thread.FieldLastMessageAt)
+	}
+	if m.history_loaded_at != nil {
+		fields = append(fields, thread.FieldHistoryLoadedAt)
 	}
 	if m.participants != nil {
 		fields = append(fields, thread.FieldParticipants)
@@ -5867,6 +5920,8 @@ func (m *ThreadMutation) Field(name string) (ent.Value, bool) {
 		return m.Snippet()
 	case thread.FieldLastMessageAt:
 		return m.LastMessageAt()
+	case thread.FieldHistoryLoadedAt:
+		return m.HistoryLoadedAt()
 	case thread.FieldParticipants:
 		return m.Participants()
 	case thread.FieldUnread:
@@ -5900,6 +5955,8 @@ func (m *ThreadMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldSnippet(ctx)
 	case thread.FieldLastMessageAt:
 		return m.OldLastMessageAt(ctx)
+	case thread.FieldHistoryLoadedAt:
+		return m.OldHistoryLoadedAt(ctx)
 	case thread.FieldParticipants:
 		return m.OldParticipants(ctx)
 	case thread.FieldUnread:
@@ -5952,6 +6009,13 @@ func (m *ThreadMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetLastMessageAt(v)
+		return nil
+	case thread.FieldHistoryLoadedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetHistoryLoadedAt(v)
 		return nil
 	case thread.FieldParticipants:
 		v, ok := value.([]string)
@@ -6054,6 +6118,9 @@ func (m *ThreadMutation) AddField(name string, value ent.Value) error {
 // mutation.
 func (m *ThreadMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(thread.FieldHistoryLoadedAt) {
+		fields = append(fields, thread.FieldHistoryLoadedAt)
+	}
 	if m.FieldCleared(thread.FieldSnoozedUntil) {
 		fields = append(fields, thread.FieldSnoozedUntil)
 	}
@@ -6071,6 +6138,9 @@ func (m *ThreadMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *ThreadMutation) ClearField(name string) error {
 	switch name {
+	case thread.FieldHistoryLoadedAt:
+		m.ClearHistoryLoadedAt()
+		return nil
 	case thread.FieldSnoozedUntil:
 		m.ClearSnoozedUntil()
 		return nil
@@ -6093,6 +6163,9 @@ func (m *ThreadMutation) ResetField(name string) error {
 		return nil
 	case thread.FieldLastMessageAt:
 		m.ResetLastMessageAt()
+		return nil
+	case thread.FieldHistoryLoadedAt:
+		m.ResetHistoryLoadedAt()
 		return nil
 	case thread.FieldParticipants:
 		m.ResetParticipants()

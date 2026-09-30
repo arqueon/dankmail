@@ -8,6 +8,7 @@ package gmail
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"net/mail"
@@ -252,7 +253,7 @@ func (p *Provider) SearchRemote(ctx context.Context, query string, limit int) (p
 	changes := provider.Changes{Backfill: true}
 	pageToken := ""
 	for len(changes.Upserted) < limit {
-		ids, next, err := p.api.SearchThreads(ctx, query, pageToken)
+		ids, next, err := p.api.SearchThreads(ctx, query, pageToken, min(100, limit-len(changes.Upserted)))
 		if err != nil {
 			return provider.Changes{}, classify(err)
 		}
@@ -635,4 +636,57 @@ func truncateAtRune(s string, capBytes int) string {
 		cut--
 	}
 	return s[:cut]
+}
+
+// archiveCursor preserves unfinished thread IDs when quota pacing interrupts a
+// page, so retrying never downloads the successful prefix again.
+type archiveCursor struct {
+	Page      string   `json:"page,omitempty"`
+	Remaining []string `json:"remaining,omitempty"`
+}
+
+func encodeArchiveCursor(c archiveCursor) string {
+	if c.Page == "" && len(c.Remaining) == 0 {
+		return ""
+	}
+	raw, _ := json.Marshal(c)
+	return base64.RawURLEncoding.EncodeToString(raw)
+}
+
+// ArchivedPage fetches a small Gmail page; local filtering still excludes
+// mixed inbox/spam/trash threads after Gmail returns full conversations.
+func (p *Provider) ArchivedPage(ctx context.Context, pageToken string) (provider.Changes, string, error) {
+	ctx = withRetryBudget(ctx)
+	cursor := archiveCursor{}
+	if pageToken != "" {
+		raw, err := base64.RawURLEncoding.DecodeString(pageToken)
+		if err != nil {
+			return provider.Changes{}, pageToken, fmt.Errorf("invalid archive cursor")
+		}
+		if err = json.Unmarshal(raw, &cursor); err != nil {
+			return provider.Changes{}, pageToken, fmt.Errorf("invalid archive cursor")
+		}
+	}
+	ids, next := cursor.Remaining, cursor.Page
+	if len(ids) == 0 {
+		var err error
+		ids, next, err = p.api.SearchThreads(ctx, "-in:inbox -in:spam -in:trash -is:draft", cursor.Page, 25)
+		if err != nil {
+			return provider.Changes{}, pageToken, classify(err)
+		}
+	}
+	changes := provider.Changes{Backfill: true}
+	for i, id := range ids {
+		t, err := p.api.GetThread(ctx, id)
+		if err != nil {
+			if isNotFound(err) {
+				continue
+			}
+			return changes, encodeArchiveCursor(archiveCursor{Page: next, Remaining: ids[i:]}), classify(err)
+		}
+		if d := p.threadDelta(t); d.MessageCount > 0 {
+			changes.Upserted = append(changes.Upserted, d)
+		}
+	}
+	return changes, encodeArchiveCursor(archiveCursor{Page: next}), nil
 }

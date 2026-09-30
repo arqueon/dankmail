@@ -28,6 +28,8 @@ type Thread struct {
 	Snippet string `json:"snippet,omitempty"`
 	// LastMessageAt holds the value of the "last_message_at" field.
 	LastMessageAt time.Time `json:"last_message_at,omitempty"`
+	// HistoryLoadedAt holds the value of the "history_loaded_at" field.
+	HistoryLoadedAt *time.Time `json:"history_loaded_at,omitempty"`
 	// Participants holds the value of the "participants" field.
 	Participants []string `json:"participants,omitempty"`
 	// Unread holds the value of the "unread" field.
@@ -95,7 +97,7 @@ func (*Thread) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullInt64)
 		case thread.FieldProviderThreadID, thread.FieldSubject, thread.FieldSnippet:
 			values[i] = new(sql.NullString)
-		case thread.FieldLastMessageAt, thread.FieldSnoozedUntil:
+		case thread.FieldLastMessageAt, thread.FieldHistoryLoadedAt, thread.FieldSnoozedUntil:
 			values[i] = new(sql.NullTime)
 		case thread.ForeignKeys[0]: // account_threads
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
@@ -143,6 +145,13 @@ func (_m *Thread) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field last_message_at", values[i])
 			} else if value.Valid {
 				_m.LastMessageAt = value.Time
+			}
+		case thread.FieldHistoryLoadedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field history_loaded_at", values[i])
+			} else if value.Valid {
+				_m.HistoryLoadedAt = new(time.Time)
+				*_m.HistoryLoadedAt = value.Time
 			}
 		case thread.FieldParticipants:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -261,6 +270,11 @@ func (_m *Thread) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("last_message_at=")
 	builder.WriteString(_m.LastMessageAt.Format(time.ANSIC))
+	builder.WriteString(", ")
+	if v := _m.HistoryLoadedAt; v != nil {
+		builder.WriteString("history_loaded_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("participants=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Participants))

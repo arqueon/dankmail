@@ -77,7 +77,7 @@ func (j *Janitor) SweepOnce(ctx context.Context) error {
 	}
 
 	// 2. Thread retention: drop conversations older than the window
-	// unless the user pinned them (starred) or snoozed them.
+	// unless pinned, snoozed or loaded as history within the window.
 	frozen := map[string]bool{}
 	rows, err := j.db.PendingOp.Query().
 		Where(pendingop.StateIn(pendingop.StatePending, pendingop.StateInflight)).
@@ -96,6 +96,7 @@ func (j *Janitor) SweepOnce(ctx context.Context) error {
 	old, err := j.db.Thread.Query().
 		Where(
 			thread.LastMessageAtLT(cutoff),
+			thread.Or(thread.HistoryLoadedAtIsNil(), thread.HistoryLoadedAtLT(cutoff)),
 			thread.StarredEQ(false),
 			thread.SnoozedUntilIsNil(),
 		).

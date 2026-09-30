@@ -20,6 +20,8 @@ const (
 	FieldSnippet = "snippet"
 	// FieldLastMessageAt holds the string denoting the last_message_at field in the database.
 	FieldLastMessageAt = "last_message_at"
+	// FieldHistoryLoadedAt holds the string denoting the history_loaded_at field in the database.
+	FieldHistoryLoadedAt = "history_loaded_at"
 	// FieldParticipants holds the string denoting the participants field in the database.
 	FieldParticipants = "participants"
 	// FieldUnread holds the string denoting the unread field in the database.
@@ -65,6 +67,7 @@ var Columns = []string{
 	FieldSubject,
 	FieldSnippet,
 	FieldLastMessageAt,
+	FieldHistoryLoadedAt,
 	FieldParticipants,
 	FieldUnread,
 	FieldStarred,
@@ -143,6 +146,11 @@ func BySnippet(opts ...sql.OrderTermOption) OrderOption {
 // ByLastMessageAt orders the results by the last_message_at field.
 func ByLastMessageAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLastMessageAt, opts...).ToFunc()
+}
+
+// ByHistoryLoadedAt orders the results by the history_loaded_at field.
+func ByHistoryLoadedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldHistoryLoadedAt, opts...).ToFunc()
 }
 
 // ByUnread orders the results by the unread field.

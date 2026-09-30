@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -49,6 +50,11 @@ func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider
 			if err != nil {
 				return err
 			}
+			if ch.Backfill {
+				if _, err := tx.Thread.Update().Where(thread.HasAccountWith(account.IDEQ(accountID)), thread.ProviderThreadIDEQ(delta.ThreadID)).SetHistoryLoadedAt(time.Now().UTC()).Save(ctx); err != nil {
+					return err
+				}
+			}
 			arrivals = append(arrivals, arr...)
 		}
 
@@ -67,13 +73,14 @@ func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider
 		}
 
 		if ch.FullResync {
-			// The payload is a complete snapshot: anything local that is
-			// not in it is gone remotely — except frozen threads (op in
-			// flight) and snoozed ones (locally archived on purpose).
+			// This snapshot covers monitored folders, not browsed history.
+			// Preserve backfilled threads, frozen operations and snoozes;
+			// explicit removals and retention still clean up history.
 			stale, err := tx.Thread.Query().
 				Where(
 					thread.HasAccountWith(account.IDEQ(accountID)),
 					thread.SnoozedUntilIsNil(),
+					thread.HistoryLoadedAtIsNil(),
 				).
 				All(ctx)
 			if err != nil {

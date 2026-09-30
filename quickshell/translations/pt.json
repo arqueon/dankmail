@@ -38,7 +38,12 @@
     "Search mail…": "Buscar e-mails…",
     "Loading…": "Carregando…",
     "Showing %1 threads": "Mostrando %1 conversas",
-    "Load more": "Carregar mais"
+    "Load more": "Carregar mais",
+    "Loading archived mail…": "Carregando e-mails arquivados…",
+    "Load older archived mail": "Carregar e-mails arquivados mais antigos",
+    "Retry archived history": "Tentar carregar arquivados novamente",
+    "This account only supports cached archived mail.": "Esta conta só permite consultar os e-mails arquivados no cache local.",
+    "Could not load archived history. Try again later.": "Não foi possível carregar os e-mails arquivados. Tente novamente mais tarde."
   },
   "account wizard title": {
     "Add account": "Adicionar conta"

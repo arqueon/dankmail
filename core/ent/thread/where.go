@@ -75,6 +75,11 @@ func LastMessageAt(v time.Time) predicate.Thread {
 	return predicate.Thread(sql.FieldEQ(FieldLastMessageAt, v))
 }
 
+// HistoryLoadedAt applies equality check predicate on the "history_loaded_at" field. It's identical to HistoryLoadedAtEQ.
+func HistoryLoadedAt(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldEQ(FieldHistoryLoadedAt, v))
+}
+
 // Unread applies equality check predicate on the "unread" field. It's identical to UnreadEQ.
 func Unread(v bool) predicate.Thread {
 	return predicate.Thread(sql.FieldEQ(FieldUnread, v))
@@ -338,6 +343,56 @@ func LastMessageAtLT(v time.Time) predicate.Thread {
 // LastMessageAtLTE applies the LTE predicate on the "last_message_at" field.
 func LastMessageAtLTE(v time.Time) predicate.Thread {
 	return predicate.Thread(sql.FieldLTE(FieldLastMessageAt, v))
+}
+
+// HistoryLoadedAtEQ applies the EQ predicate on the "history_loaded_at" field.
+func HistoryLoadedAtEQ(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldEQ(FieldHistoryLoadedAt, v))
+}
+
+// HistoryLoadedAtNEQ applies the NEQ predicate on the "history_loaded_at" field.
+func HistoryLoadedAtNEQ(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldNEQ(FieldHistoryLoadedAt, v))
+}
+
+// HistoryLoadedAtIn applies the In predicate on the "history_loaded_at" field.
+func HistoryLoadedAtIn(vs ...time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldIn(FieldHistoryLoadedAt, vs...))
+}
+
+// HistoryLoadedAtNotIn applies the NotIn predicate on the "history_loaded_at" field.
+func HistoryLoadedAtNotIn(vs ...time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldNotIn(FieldHistoryLoadedAt, vs...))
+}
+
+// HistoryLoadedAtGT applies the GT predicate on the "history_loaded_at" field.
+func HistoryLoadedAtGT(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldGT(FieldHistoryLoadedAt, v))
+}
+
+// HistoryLoadedAtGTE applies the GTE predicate on the "history_loaded_at" field.
+func HistoryLoadedAtGTE(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldGTE(FieldHistoryLoadedAt, v))
+}
+
+// HistoryLoadedAtLT applies the LT predicate on the "history_loaded_at" field.
+func HistoryLoadedAtLT(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldLT(FieldHistoryLoadedAt, v))
+}
+
+// HistoryLoadedAtLTE applies the LTE predicate on the "history_loaded_at" field.
+func HistoryLoadedAtLTE(v time.Time) predicate.Thread {
+	return predicate.Thread(sql.FieldLTE(FieldHistoryLoadedAt, v))
+}
+
+// HistoryLoadedAtIsNil applies the IsNil predicate on the "history_loaded_at" field.
+func HistoryLoadedAtIsNil() predicate.Thread {
+	return predicate.Thread(sql.FieldIsNull(FieldHistoryLoadedAt))
+}
+
+// HistoryLoadedAtNotNil applies the NotNil predicate on the "history_loaded_at" field.
+func HistoryLoadedAtNotNil() predicate.Thread {
+	return predicate.Thread(sql.FieldNotNull(FieldHistoryLoadedAt))
 }
 
 // UnreadEQ applies the EQ predicate on the "unread" field.

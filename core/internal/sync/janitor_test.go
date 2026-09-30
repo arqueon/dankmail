@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/arqueon/dankmail/core/ent/pendingop"
+	"github.com/arqueon/dankmail/core/internal/provider"
 	"github.com/arqueon/dankmail/core/internal/rules"
 )
 
@@ -87,5 +88,40 @@ func TestJanitorKeepsFrozenThreadsAndSweepsFinishedOps(t *testing.T) {
 	}
 	if _, err := r.db.PendingOp.Get(ctx, freshFailed.ID); err != nil {
 		t.Error("fresh failed op should be kept for visibility")
+	}
+}
+
+func TestBrowsedHistorySurvivesRetentionAndLabelResync(t *testing.T) {
+	r := newRig(t, rules.DefaultPolicies())
+	ctx := context.Background()
+	r.now = time.Now().UTC()
+	old := r.now.AddDate(0, 0, -45)
+	d := delta("browsed", nil)
+	d.LastMessage = old.Unix()
+	d.InInbox = false
+	d.Starred = false
+	rec := NewReconciler(r.db, r.bus)
+	if err := rec.Apply(ctx, r.acct.ID, provider.Changes{Backfill: true, Upserted: []provider.ThreadDelta{d}}); err != nil {
+		t.Fatal(err)
+	}
+	th := r.reloadThread(t, "browsed")
+	if th.HistoryLoadedAt == nil {
+		t.Fatal("missing backfill retention timestamp")
+	}
+	if err := rec.Apply(ctx, r.acct.ID, provider.Changes{FullResync: true}); err != nil {
+		t.Fatal(err)
+	}
+	j := NewJanitor(r.db, 30)
+	j.now = func() time.Time { return r.now }
+	if err := j.SweepOnce(ctx); err != nil {
+		t.Fatal(err)
+	}
+	th = r.reloadThread(t, "browsed")
+	r.db.Thread.UpdateOne(th).SetHistoryLoadedAt(r.now.AddDate(0, 0, -31)).SaveX(ctx)
+	if err := j.SweepOnce(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if n := r.db.Thread.Query().CountX(ctx); n != 0 {
+		t.Fatalf("expired cache retained %d threads", n)
 	}
 }

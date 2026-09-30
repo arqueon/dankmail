@@ -21,6 +21,8 @@ func (Thread) Fields() []ent.Field {
 		field.String("subject").Default(""),
 		field.String("snippet").Default(""),
 		field.Time("last_message_at"),
+		// Keep recently browsed history through the local retention window.
+		field.Time("history_loaded_at").Optional().Nillable(),
 		// Display forms of the participants, e.g. "Ada <ada@example.org>".
 		field.JSON("participants", []string{}).Default([]string{}),
 		field.Bool("unread").Default(false),
