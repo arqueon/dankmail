@@ -46,6 +46,7 @@ Singleton {
     // Triage filters (drive refreshThreads).
     property bool filterUnread: false
     property bool filterStarred: false
+    property bool filterArchived: false
     property string filterAccount: ""
     // Provider label view ("SPAM" for the spam-review tab; "" = inbox).
     property string filterLabel: ""
@@ -57,6 +58,7 @@ Singleton {
     onSearchQueryChanged: invalidateThreadSearch()
     onFilterUnreadChanged: invalidateThreadSearch()
     onFilterStarredChanged: invalidateThreadSearch()
+    onFilterArchivedChanged: invalidateThreadSearch()
     onFilterAccountChanged: invalidateThreadSearch()
     onFilterLabelChanged: invalidateThreadSearch()
 
@@ -387,7 +389,7 @@ Singleton {
         const params = {
             // Starred is a mailbox-wide view. Keeping inbox=true here
             // accidentally reduced it to "starred AND in inbox".
-            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred
+            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred && !filterArchived
         };
         if (searchQuery !== "")
             params.query = searchQuery;
@@ -397,6 +399,8 @@ Singleton {
             params.unread = true;
         if (filterStarred)
             params.starred = true;
+        if (filterArchived)
+            params.archived = true;
         if (filterAccount !== "")
             params.account = filterAccount;
         return params;

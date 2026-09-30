@@ -52,6 +52,7 @@ type Op struct {
 // ThreadState is the snapshot the optimistic layer needs to revert a
 // failed op.
 type ThreadState struct {
+	Labels       []string   `json:"labels"`
 	Unread       bool       `json:"unread"`
 	Starred      bool       `json:"starred"`
 	InInbox      bool       `json:"inInbox"`

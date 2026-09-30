@@ -47,11 +47,12 @@ type accountsOutput struct {
 }
 
 type threadsInput struct {
-	Unread  bool   `query:"unread" doc:"only unread threads"`
-	Starred bool   `query:"starred" doc:"only starred threads"`
-	Inbox   bool   `query:"inbox" doc:"only threads currently in the inbox"`
-	Account string `query:"account" doc:"restrict to one account UUID"`
-	Limit   int    `query:"limit" doc:"max rows (default 100)"`
+	Archived bool   `query:"archived" doc:"only archived threads, newest message first"`
+	Unread   bool   `query:"unread" doc:"only unread threads"`
+	Starred  bool   `query:"starred" doc:"only starred threads"`
+	Inbox    bool   `query:"inbox" doc:"only threads currently in the inbox"`
+	Account  string `query:"account" doc:"restrict to one account UUID"`
+	Limit    int    `query:"limit" doc:"max rows (default 100)"`
 }
 
 type threadsOutput struct {
@@ -81,10 +82,11 @@ func registerRoutes(api huma.API, deps Deps) {
 
 	huma.Get(api, "/threads", func(ctx context.Context, in *threadsInput) (*threadsOutput, error) {
 		f := repo.ThreadFilter{
-			UnreadOnly: in.Unread,
-			Starred:    in.Starred,
-			InboxOnly:  in.Inbox,
-			Limit:      in.Limit,
+			UnreadOnly:   in.Unread,
+			Starred:      in.Starred,
+			InboxOnly:    in.Inbox,
+			ArchivedOnly: in.Archived,
+			Limit:        in.Limit,
 		}
 		if in.Account != "" {
 			id, err := uuid.Parse(in.Account)

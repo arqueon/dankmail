@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"github.com/arqueon/dankmail/core/ent/pendingop"
@@ -56,6 +57,9 @@ func TestEnqueueTrashHookAddsMarkRead(t *testing.T) {
 		t.Errorf("op order = %s, %s; want mark_read then trash", ops[0].OpType, ops[1].OpType)
 	}
 	th := r.reloadThread(t, "t1")
+	if !slices.Contains(th.Labels, "TRASH") {
+		t.Fatal("optimistic trash must not appear as archived")
+	}
 	if th.Unread || th.InInbox {
 		t.Errorf("optimistic state = unread:%v inInbox:%v, want read + out of inbox", th.Unread, th.InInbox)
 	}

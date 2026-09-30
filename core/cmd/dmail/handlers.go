@@ -36,6 +36,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		f.UnreadOnly, _ = p["unread"].(bool)
 		f.Starred, _ = p["starred"].(bool)
 		f.InboxOnly, _ = p["inbox"].(bool)
+		f.ArchivedOnly, _ = p["archived"].(bool)
 		f.Label, _ = p["label"].(string)
 		f.Query, _ = p["query"].(string)
 		if f.Query != "" {

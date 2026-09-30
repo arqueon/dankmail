@@ -164,6 +164,7 @@ func opThreads(ctx context.Context, tx *ent.Tx, accountID uuid.UUID, threadIDs [
 
 func snapshotState(t *ent.Thread) ThreadState {
 	return ThreadState{
+		Labels:       append([]string{}, t.Labels...),
 		Unread:       t.Unread,
 		Starred:      t.Starred,
 		InInbox:      t.InInbox,
@@ -189,7 +190,13 @@ func applyLocal(ctx context.Context, tx *ent.Tx, op *Op, rows []*ent.Thread) err
 		case OpUnarchive:
 			u.SetInInbox(true)
 		case OpTrash:
-			u.SetInInbox(false)
+			labels := []string{"TRASH"}
+			for _, label := range t.Labels {
+				if label != "TRASH" && label != "INBOX" {
+					labels = append(labels, label)
+				}
+			}
+			u.SetInInbox(false).SetLabels(labels)
 		case OpUnspam:
 			labels := make([]string, 0, len(t.Labels))
 			for _, l := range t.Labels {
@@ -246,6 +253,10 @@ func revertLocal(ctx context.Context, tx *ent.Tx, op Op) error {
 			SetUnread(prev.Unread).
 			SetStarred(prev.Starred).
 			SetInInbox(prev.InInbox)
+		// Old queued operations have no label snapshot.
+		if prev.Labels != nil {
+			u.SetLabels(prev.Labels)
+		}
 		if prev.SnoozedUntil != nil {
 			u.SetSnoozedUntil(prev.SnoozedUntil.UTC())
 		} else {
