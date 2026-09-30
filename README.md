@@ -145,3 +145,7 @@ Compose and quick-forward recipient fields share the same autocomplete index: Go
 
 Distributed under the **GPL-3.0-or-later** license. See [LICENSE](LICENSE) for details.  
 UI components utilize modified parts of the MIT-licensed infrastructure from `dankcalendar` (Avenge Media LLC), preserved in `quickshell/NOTICE`.
+
+### Archived mail
+
+Choose **Archived** in the quick filters to browse cached conversations outside the inbox, newest message first. Spam, trash, drafts and snoozed conversations are excluded. Account filtering and local search also work in this view; this is not an archive-action history or a complete server-side archive.

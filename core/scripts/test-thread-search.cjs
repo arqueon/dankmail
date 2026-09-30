@@ -114,3 +114,18 @@ test('unchanged rows retain delegates; changed, moved and removed rows reconcile
     api.syncModel(model, [row(3)]);
     assert.deepEqual(rows.map(x => x.rowId), [3]);
 });
+
+test('Archived sends an exclusive mailbox filter and keeps search/account scope', () => {
+    const service = fs.readFileSync(path.join(__dirname, '../../quickshell/Services/DankMailService.qml'), 'utf8');
+    const filterFunction = service.slice(service.indexOf('function threadFilterParams()'), service.indexOf('function threadSearchController()'));
+    const params = overrides => clone(vm.runInNewContext(filterFunction + '\nthreadFilterParams()', {
+        searchQuery: '', filterLabel: '', filterUnread: false, filterStarred: false,
+        filterArchived: false, filterAccount: '', ...overrides
+    }));
+    assert.deepEqual(params({filterArchived:true}), {inbox:false, archived:true});
+    assert.deepEqual(params({filterArchived:true, searchQuery:'invoice', filterAccount:'one'}),
+        {inbox:false, query:'invoice', archived:true, account:'one'});
+    assert.deepEqual(params({}), {inbox:true});
+    assert.deepEqual(params({filterLabel:'SPAM'}), {inbox:false, label:'SPAM'});
+    assert.deepEqual(params({filterStarred:true}), {inbox:false, starred:true});
+});

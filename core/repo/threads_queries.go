@@ -21,6 +21,9 @@ type ThreadFilter struct {
 	UnreadOnly bool
 	Starred    bool
 	InboxOnly  bool
+	// ArchivedOnly selects cached mail outside the inbox, excluding spam,
+	// trash, drafts and snoozed threads.
+	ArchivedOnly bool
 	// Label keeps only threads carrying this provider label (e.g.
 	// "SPAM" for the spam-review view).
 	Label string
@@ -46,6 +49,15 @@ func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.Thread
 		q = q.Where(thread.SnoozedUntilIsNil())
 	} else {
 		q = q.Where(searchPredicate(f.Query))
+	}
+	if f.ArchivedOnly {
+		q = q.Where(thread.InInboxEQ(false), thread.SnoozedUntilIsNil(), func(s *sql.Selector) {
+			s.Where(sql.Not(sql.Or(
+				sqljson.ValueContains(thread.FieldLabels, "SPAM"),
+				sqljson.ValueContains(thread.FieldLabels, "TRASH"),
+				sqljson.ValueContains(thread.FieldLabels, "DRAFT"),
+			)))
+		})
 	}
 	if f.AccountID != nil {
 		q = q.Where(thread.HasAccountWith(account.IDEQ(*f.AccountID)))

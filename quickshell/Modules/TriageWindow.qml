@@ -376,198 +376,6 @@ FloatingWindow {
                     Layout.preferredWidth: Theme.spacingS
                 }
 
-                // Quick filters: all / unread / starred.
-                Row {
-                    spacing: Theme.spacingXS
-
-                    Repeater {
-                        model: [
-                            {
-                                "key": "all",
-                                "label": I18n.tr("All", "filter")
-                            },
-                            {
-                                "key": "unread",
-                                "label": I18n.tr("Unread", "filter")
-                            },
-                            {
-                                "key": "starred",
-                                "label": I18n.tr("Starred", "filter")
-                            },
-                            {
-                                "key": "spam",
-                                "label": I18n.tr("Spam", "filter")
-                            }
-                        ]
-
-                        delegate: StyledRect {
-                            required property var modelData
-                            readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && DankMailService.filterLabel === "")
-
-                            width: filterLabel.implicitWidth + Theme.spacingL
-                            height: 30
-                            radius: 15
-                            color: active ? Theme.primaryContainer : "transparent"
-
-                            StyledText {
-                                id: filterLabel
-                                anchors.centerIn: parent
-                                text: parent.modelData.label
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: parent.active ? Theme.primary : Theme.surfaceTextMedium
-                            }
-
-                            StateLayer {
-                                stateColor: Theme.primary
-                                onClicked: {
-                                    DankMailService.filterUnread = parent.modelData.key === "unread";
-                                    DankMailService.filterStarred = parent.modelData.key === "starred";
-                                    DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : "";
-                                    window.checkedIds = [];
-                                    DankMailService.refreshThreads();
-                                }
-                            }
-                        }
-                    }
-
-                    // Spam review: one click marks everything listed as
-                    // read, so the folder can be left "reviewed". Only shown when nothing is selected.
-                    DankActionButton {
-                        visible: DankMailService.filterLabel === "SPAM" && DankMailService.threads.some(t => t.unread) && window.checkedIds.length === 0
-                        iconName: "done_all"
-                        iconColor: Theme.primary
-                        onClicked: {
-                            const ids = DankMailService.threads.filter(t => t.unread).map(t => t.id);
-                            if (ids.length)
-                                DankMailService.markRead(ids);
-                        }
-                    }
-
-                    // GENERAL BULK ACTIONS TOOLBAR
-                    RowLayout {
-                        visible: window.checkedIds.length > 0
-                        spacing: Theme.spacingS
-
-                        StyledText {
-                            text: I18n.tr("%1 selected", "bulk action").arg(window.checkedIds.length)
-                            font.pixelSize: Theme.fontSizeSmall
-                            font.weight: Font.DemiBold
-                            color: Theme.primary
-                        }
-
-                        DankActionButton {
-                            buttonSize: 28
-                            iconName: "close"
-                            iconColor: Theme.primary
-                            onClicked: window.checkedIds = []
-                        }
-
-                        // Divider
-                        Rectangle {
-                            width: 1
-                            height: 16
-                            color: Theme.outline
-                        }
-
-                        // SPAM-specific bulk actions
-                        Row {
-                            spacing: Theme.spacingXS
-                            visible: DankMailService.filterLabel === "SPAM"
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "drafts"
-                                onClicked: {
-                                    DankMailService.markRead(window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "move_to_inbox"
-                                iconColor: Theme.primary
-                                onClicked: {
-                                    window.queueUndoableAction("unspam", window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "delete_forever"
-                                iconColor: Theme.error
-                                onClicked: {
-                                    window.queueUndoableAction("trash", window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-                        }
-
-                        // General bulk actions for Inbox, Unread, Starred, All
-                        Row {
-                            spacing: Theme.spacingXS
-                            visible: DankMailService.filterLabel !== "SPAM"
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "archive"
-                                onClicked: {
-                                    window.queueUndoableAction("archive", window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "delete"
-                                iconColor: Theme.error
-                                onClicked: {
-                                    window.queueUndoableAction("trash", window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "drafts"
-                                onClicked: {
-                                    DankMailService.markRead(window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "mark_email_unread"
-                                onClicked: {
-                                    DankMailService.markUnread(window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "star"
-                                iconColor: Theme.warning
-                                onClicked: {
-                                    DankMailService.star(window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-
-                            DankActionButton {
-                                buttonSize: 28
-                                iconName: "star_outline"
-                                onClicked: {
-                                    DankMailService.unstar(window.checkedIds);
-                                    window.checkedIds = [];
-                                }
-                            }
-                        }
-                    }
-                }
-
                 // Account filter dots.
                 Row {
                     spacing: Theme.spacingXS
@@ -689,6 +497,206 @@ FloatingWindow {
             Layout.preferredHeight: 1
             color: Theme.outlineMedium
         }
+
+        // Quick mailbox filters.
+        Flow {
+            Layout.fillWidth: true
+            Layout.margins: Theme.spacingS
+            spacing: Theme.spacingXS
+
+            Repeater {
+                model: [
+                    {
+                        "key": "all",
+                        "label": I18n.tr("All", "filter")
+                    },
+                    {
+                        "key": "unread",
+                        "label": I18n.tr("Unread", "filter")
+                    },
+                    {
+                        "key": "starred",
+                        "label": I18n.tr("Starred", "filter")
+                    },
+                    {
+                        "key": "archived",
+                        "label": I18n.tr("Archived", "filter")
+                    },
+                    {
+                        "key": "spam",
+                        "label": I18n.tr("Spam", "filter")
+                    }
+                ]
+
+                delegate: StyledRect {
+                    required property var modelData
+                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterArchived && DankMailService.filterLabel === "")
+
+                    width: filterLabel.implicitWidth + Theme.spacingL
+                    height: 30
+                    radius: 15
+                    color: active ? Theme.primaryContainer : "transparent"
+
+                    StyledText {
+                        id: filterLabel
+                        anchors.centerIn: parent
+                        text: parent.modelData.label
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: parent.active ? Theme.primary : Theme.surfaceTextMedium
+                    }
+
+                    StateLayer {
+                        stateColor: Theme.primary
+                        onClicked: {
+                            DankMailService.filterUnread = parent.modelData.key === "unread";
+                            DankMailService.filterStarred = parent.modelData.key === "starred";
+                            DankMailService.filterArchived = parent.modelData.key === "archived";
+                            DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : "";
+                            window.checkedIds = [];
+                            DankMailService.refreshThreads();
+                        }
+                    }
+                }
+            }
+
+            // Spam review: one click marks everything listed as
+            // read, so the folder can be left "reviewed". Only shown when nothing is selected.
+            DankActionButton {
+                visible: DankMailService.filterLabel === "SPAM" && DankMailService.threads.some(t => t.unread) && window.checkedIds.length === 0
+                iconName: "done_all"
+                iconColor: Theme.primary
+                onClicked: {
+                    const ids = DankMailService.threads.filter(t => t.unread).map(t => t.id);
+                    if (ids.length)
+                        DankMailService.markRead(ids);
+                }
+            }
+
+            // GENERAL BULK ACTIONS TOOLBAR
+            RowLayout {
+                visible: window.checkedIds.length > 0
+                spacing: Theme.spacingS
+
+                StyledText {
+                    text: I18n.tr("%1 selected", "bulk action").arg(window.checkedIds.length)
+                    font.pixelSize: Theme.fontSizeSmall
+                    font.weight: Font.DemiBold
+                    color: Theme.primary
+                }
+
+                DankActionButton {
+                    buttonSize: 28
+                    iconName: "close"
+                    iconColor: Theme.primary
+                    onClicked: window.checkedIds = []
+                }
+
+                // Divider
+                Rectangle {
+                    width: 1
+                    height: 16
+                    color: Theme.outline
+                }
+
+                // SPAM-specific bulk actions
+                Row {
+                    spacing: Theme.spacingXS
+                    visible: DankMailService.filterLabel === "SPAM"
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "drafts"
+                        onClicked: {
+                            DankMailService.markRead(window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "move_to_inbox"
+                        iconColor: Theme.primary
+                        onClicked: {
+                            window.queueUndoableAction("unspam", window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "delete_forever"
+                        iconColor: Theme.error
+                        onClicked: {
+                            window.queueUndoableAction("trash", window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+                }
+
+                // General bulk actions for Inbox, Unread, Starred, All
+                Row {
+                    spacing: Theme.spacingXS
+                    visible: DankMailService.filterLabel !== "SPAM"
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "archive"
+                        onClicked: {
+                            window.queueUndoableAction("archive", window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "delete"
+                        iconColor: Theme.error
+                        onClicked: {
+                            window.queueUndoableAction("trash", window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "drafts"
+                        onClicked: {
+                            DankMailService.markRead(window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "mark_email_unread"
+                        onClicked: {
+                            DankMailService.markUnread(window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "star"
+                        iconColor: Theme.warning
+                        onClicked: {
+                            DankMailService.star(window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
+                    DankActionButton {
+                        buttonSize: 28
+                        iconName: "star_outline"
+                        onClicked: {
+                            DankMailService.unstar(window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+                }
+            }
+        }
+
 
         // ---- content: list + preview ------------------------------------
         RowLayout {
@@ -1115,6 +1123,8 @@ FloatingWindow {
                                 return I18n.tr("No accounts yet", "empty state");
                             if (DankMailService.searchQuery !== "")
                                 return I18n.tr("No local results — search the full history or the web", "empty state");
+                            if (DankMailService.filterArchived)
+                                return I18n.tr("No archived mail", "empty state");
                             return I18n.tr("Inbox zero", "empty state");
                         }
                         color: Theme.surfaceTextMedium

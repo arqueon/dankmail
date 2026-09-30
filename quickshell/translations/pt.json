@@ -14,6 +14,7 @@
     "All": "Todas",
     "Unread": "Não lidas",
     "Starred": "Com estrela",
+    "Archived": "Arquivados",
     "Spam": "Spam"
   },
   "bulk action": {
@@ -26,6 +27,7 @@
     "(no subject)": "(sem assunto)"
   },
   "empty state": {
+    "No archived mail": "Nenhum e-mail arquivado",
     "Inbox zero": "Caixa de entrada zerada",
     "Daemon offline": "Daemon desconectado",
     "No accounts yet": "Nenhuma conta ainda",

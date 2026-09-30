@@ -108,7 +108,11 @@ func TestExecutorPermanentErrorFailsImmediately(t *testing.T) {
 	if !trashOp {
 		t.Fatal("trash op missing")
 	}
-	// The revert restores the pre-trash snapshot (back to inbox).
+	// The revert restores the pre-trash snapshot, including labels.
+	if th := r.reloadThread(t, "t1"); len(th.Labels) != 0 {
+		t.Fatalf("failed trash retained labels: %v", th.Labels)
+	}
+	// Back to inbox.
 	if th := r.reloadThread(t, "t1"); !th.InInbox {
 		t.Error("permanent failure must revert the optimistic trash")
 	}
