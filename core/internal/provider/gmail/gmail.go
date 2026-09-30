@@ -636,3 +636,27 @@ func truncateAtRune(s string, capBytes int) string {
 	}
 	return s[:cut]
 }
+
+// ArchivedPage fetches one bounded Gmail page; local filtering still excludes
+// mixed inbox/spam/trash threads after Gmail returns full conversations.
+func (p *Provider) ArchivedPage(ctx context.Context, pageToken string) (provider.Changes, string, error) {
+	ctx = withRetryBudget(ctx)
+	ids, next, err := p.api.SearchThreads(ctx, "-in:inbox -in:spam -in:trash -is:draft", pageToken)
+	if err != nil {
+		return provider.Changes{}, "", classify(err)
+	}
+	changes := provider.Changes{Backfill: true}
+	for _, id := range ids {
+		t, err := p.api.GetThread(ctx, id)
+		if err != nil {
+			if isNotFound(err) {
+				continue
+			}
+			return provider.Changes{}, "", classify(err)
+		}
+		if d := p.threadDelta(t); d.MessageCount > 0 {
+			changes.Upserted = append(changes.Upserted, d)
+		}
+	}
+	return changes, next, nil
+}

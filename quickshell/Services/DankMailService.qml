@@ -7,6 +7,7 @@ import Quickshell.Io
 import qs.Common
 import qs.Services
 import "../Common/ThreadSearch.js" as ThreadSearch
+import "../Common/ArchiveHistory.js" as ArchiveHistory
 
 // NOTE: responses may arrive out of order (the daemon dispatches each
 // request on its own goroutine so long-running calls like the OAuth
@@ -58,8 +59,8 @@ Singleton {
     onSearchQueryChanged: invalidateThreadSearch()
     onFilterUnreadChanged: invalidateThreadSearch()
     onFilterStarredChanged: invalidateThreadSearch()
-    onFilterArchivedChanged: invalidateThreadSearch()
-    onFilterAccountChanged: invalidateThreadSearch()
+    onFilterArchivedChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
+    onFilterAccountChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
     onFilterLabelChanged: invalidateThreadSearch()
 
     readonly property int unreadTotal: {
@@ -198,6 +199,7 @@ Singleton {
                 root.connected = false;
                 root.connecting = false;
                 root.pendingRequests = {};
+                if (root._archiveHistory) root._archiveHistory.reset("", false);
                 if (root._threadSearch)
                     root._threadSearch.reset();
                 root.connectionStateChanged();
@@ -349,6 +351,7 @@ Singleton {
     // ---- reads ---------------------------------------------------------
 
     function refreshAll() {
+        resetArchiveHistory();
         refreshAccounts();
         refreshThreads();
         refreshDnd();
@@ -425,6 +428,34 @@ Singleton {
 
     function refreshThreads() {
         threadSearchController().refresh(threadFilterParams());
+    }
+
+    property var _archiveHistory: null
+    property bool archiveLoading: false
+    property bool archiveHasMore: false
+    property string archiveWarning: ""
+    property bool archiveUnsupported: false
+
+    function archiveHistoryController() {
+        if (!_archiveHistory)
+            _archiveHistory = ArchiveHistory.create(
+                (params, callback) => root.sendRequest("threads.fetchArchived", params, callback),
+                (loading, more, warning, unsupported) => {
+                    root.archiveLoading = loading;
+                    root.archiveHasMore = more;
+                    root.archiveWarning = warning;
+                    root.archiveUnsupported = unsupported;
+                    if (warning) root.log.warn("threads.fetchArchived:", warning);
+                }, () => root.refreshThreads());
+        return _archiveHistory;
+    }
+
+    function resetArchiveHistory() {
+        archiveHistoryController().reset(filterAccount, connected && filterArchived);
+    }
+
+    function loadArchiveHistory() {
+        archiveHistoryController().load();
     }
 
     function loadMoreThreads() {

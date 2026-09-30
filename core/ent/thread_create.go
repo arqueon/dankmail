@@ -65,6 +65,20 @@ func (_c *ThreadCreate) SetLastMessageAt(v time.Time) *ThreadCreate {
 	return _c
 }
 
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (_c *ThreadCreate) SetHistoryLoadedAt(v time.Time) *ThreadCreate {
+	_c.mutation.SetHistoryLoadedAt(v)
+	return _c
+}
+
+// SetNillableHistoryLoadedAt sets the "history_loaded_at" field if the given value is not nil.
+func (_c *ThreadCreate) SetNillableHistoryLoadedAt(v *time.Time) *ThreadCreate {
+	if v != nil {
+		_c.SetHistoryLoadedAt(*v)
+	}
+	return _c
+}
+
 // SetParticipants sets the "participants" field.
 func (_c *ThreadCreate) SetParticipants(v []string) *ThreadCreate {
 	_c.mutation.SetParticipants(v)
@@ -341,6 +355,10 @@ func (_c *ThreadCreate) createSpec() (*Thread, *sqlgraph.CreateSpec) {
 		_spec.SetField(thread.FieldLastMessageAt, field.TypeTime, value)
 		_node.LastMessageAt = value
 	}
+	if value, ok := _c.mutation.HistoryLoadedAt(); ok {
+		_spec.SetField(thread.FieldHistoryLoadedAt, field.TypeTime, value)
+		_node.HistoryLoadedAt = &value
+	}
 	if value, ok := _c.mutation.Participants(); ok {
 		_spec.SetField(thread.FieldParticipants, field.TypeJSON, value)
 		_node.Participants = value
@@ -503,6 +521,24 @@ func (u *ThreadUpsert) SetLastMessageAt(v time.Time) *ThreadUpsert {
 // UpdateLastMessageAt sets the "last_message_at" field to the value that was provided on create.
 func (u *ThreadUpsert) UpdateLastMessageAt() *ThreadUpsert {
 	u.SetExcluded(thread.FieldLastMessageAt)
+	return u
+}
+
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (u *ThreadUpsert) SetHistoryLoadedAt(v time.Time) *ThreadUpsert {
+	u.Set(thread.FieldHistoryLoadedAt, v)
+	return u
+}
+
+// UpdateHistoryLoadedAt sets the "history_loaded_at" field to the value that was provided on create.
+func (u *ThreadUpsert) UpdateHistoryLoadedAt() *ThreadUpsert {
+	u.SetExcluded(thread.FieldHistoryLoadedAt)
+	return u
+}
+
+// ClearHistoryLoadedAt clears the value of the "history_loaded_at" field.
+func (u *ThreadUpsert) ClearHistoryLoadedAt() *ThreadUpsert {
+	u.SetNull(thread.FieldHistoryLoadedAt)
 	return u
 }
 
@@ -707,6 +743,27 @@ func (u *ThreadUpsertOne) SetLastMessageAt(v time.Time) *ThreadUpsertOne {
 func (u *ThreadUpsertOne) UpdateLastMessageAt() *ThreadUpsertOne {
 	return u.Update(func(s *ThreadUpsert) {
 		s.UpdateLastMessageAt()
+	})
+}
+
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (u *ThreadUpsertOne) SetHistoryLoadedAt(v time.Time) *ThreadUpsertOne {
+	return u.Update(func(s *ThreadUpsert) {
+		s.SetHistoryLoadedAt(v)
+	})
+}
+
+// UpdateHistoryLoadedAt sets the "history_loaded_at" field to the value that was provided on create.
+func (u *ThreadUpsertOne) UpdateHistoryLoadedAt() *ThreadUpsertOne {
+	return u.Update(func(s *ThreadUpsert) {
+		s.UpdateHistoryLoadedAt()
+	})
+}
+
+// ClearHistoryLoadedAt clears the value of the "history_loaded_at" field.
+func (u *ThreadUpsertOne) ClearHistoryLoadedAt() *ThreadUpsertOne {
+	return u.Update(func(s *ThreadUpsert) {
+		s.ClearHistoryLoadedAt()
 	})
 }
 
@@ -1093,6 +1150,27 @@ func (u *ThreadUpsertBulk) SetLastMessageAt(v time.Time) *ThreadUpsertBulk {
 func (u *ThreadUpsertBulk) UpdateLastMessageAt() *ThreadUpsertBulk {
 	return u.Update(func(s *ThreadUpsert) {
 		s.UpdateLastMessageAt()
+	})
+}
+
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (u *ThreadUpsertBulk) SetHistoryLoadedAt(v time.Time) *ThreadUpsertBulk {
+	return u.Update(func(s *ThreadUpsert) {
+		s.SetHistoryLoadedAt(v)
+	})
+}
+
+// UpdateHistoryLoadedAt sets the "history_loaded_at" field to the value that was provided on create.
+func (u *ThreadUpsertBulk) UpdateHistoryLoadedAt() *ThreadUpsertBulk {
+	return u.Update(func(s *ThreadUpsert) {
+		s.UpdateHistoryLoadedAt()
+	})
+}
+
+// ClearHistoryLoadedAt clears the value of the "history_loaded_at" field.
+func (u *ThreadUpsertBulk) ClearHistoryLoadedAt() *ThreadUpsertBulk {
+	return u.Update(func(s *ThreadUpsert) {
+		s.ClearHistoryLoadedAt()
 	})
 }
 

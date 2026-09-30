@@ -738,7 +738,7 @@ FloatingWindow {
                         padding: Theme.spacingS
 
                         StyledText {
-                            text: DankMailService.threadsLoading
+                            text: (DankMailService.threadsLoading || DankMailService.archiveLoading)
                                 ? I18n.tr("Loading…", "search")
                                 : I18n.tr("Showing %1 threads", "search").arg(DankMailService.threads.length)
                             color: Theme.surfaceTextMedium
@@ -765,6 +765,40 @@ FloatingWindow {
                                 onClicked: DankMailService.loadMoreThreads()
                             }
                         }
+                        StyledText {
+                            width: parent.width - 2 * Theme.spacingS
+                            wrapMode: Text.Wrap
+                            visible: DankMailService.filterArchived && (DankMailService.archiveWarning !== "" || DankMailService.archiveUnsupported)
+                            text: DankMailService.archiveUnsupported
+                                ? I18n.tr("This account only supports cached archived mail.", "search")
+                                : I18n.tr("Could not load archived history. Try again later.", "search")
+                            color: Theme.surfaceTextMedium
+                        }
+
+                        StyledRect {
+                            visible: DankMailService.filterArchived && DankMailService.archiveHasMore
+                            width: archiveMoreLabel.implicitWidth + Theme.spacingXL
+                            height: 36
+                            radius: 18
+                            color: Theme.primaryContainer
+                            enabled: !DankMailService.archiveLoading
+                            StyledText {
+                                id: archiveMoreLabel
+                                anchors.centerIn: parent
+                                text: DankMailService.archiveLoading
+                                    ? I18n.tr("Loading archived mail…", "search")
+                                    : DankMailService.archiveWarning !== ""
+                                        ? I18n.tr("Retry archived history", "search")
+                                        : I18n.tr("Load older archived mail", "search")
+                                color: Theme.primary
+                            }
+                            StateLayer {
+                                stateColor: Theme.primary
+                                cornerRadius: 18
+                                onClicked: DankMailService.loadArchiveHistory()
+                            }
+                        }
+
                     }
 
                     delegate: Rectangle {
@@ -1104,7 +1138,7 @@ FloatingWindow {
                 // Empty state.
                 ColumnLayout {
                     anchors.centerIn: parent
-                    visible: DankMailService.threads.length === 0 && !DankMailService.threadsLoading
+                    visible: DankMailService.threads.length === 0 && !DankMailService.threadsLoading && !DankMailService.archiveLoading
                     spacing: Theme.spacingM
 
                     DankIcon {

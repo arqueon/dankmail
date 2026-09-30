@@ -214,6 +214,7 @@ var (
 		{Name: "subject", Type: field.TypeString, Default: ""},
 		{Name: "snippet", Type: field.TypeString, Default: ""},
 		{Name: "last_message_at", Type: field.TypeTime},
+		{Name: "history_loaded_at", Type: field.TypeTime, Nullable: true},
 		{Name: "participants", Type: field.TypeJSON},
 		{Name: "unread", Type: field.TypeBool, Default: false},
 		{Name: "starred", Type: field.TypeBool, Default: false},
@@ -232,7 +233,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "threads_accounts_threads",
-				Columns:    []*schema.Column{ThreadsColumns[13]},
+				Columns:    []*schema.Column{ThreadsColumns[14]},
 				RefColumns: []*schema.Column{AccountsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -241,7 +242,7 @@ var (
 			{
 				Name:    "thread_provider_thread_id_account_threads",
 				Unique:  true,
-				Columns: []*schema.Column{ThreadsColumns[1], ThreadsColumns[13]},
+				Columns: []*schema.Column{ThreadsColumns[1], ThreadsColumns[14]},
 			},
 			{
 				Name:    "thread_last_message_at",
@@ -251,7 +252,7 @@ var (
 			{
 				Name:    "thread_snoozed_until",
 				Unique:  false,
-				Columns: []*schema.Column{ThreadsColumns[10]},
+				Columns: []*schema.Column{ThreadsColumns[11]},
 			},
 		},
 	}

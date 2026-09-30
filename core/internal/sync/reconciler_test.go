@@ -274,3 +274,21 @@ func TestReconcilerSentMessagesNeverArrive(t *testing.T) {
 		t.Errorf("messages = %d, want 2", n)
 	}
 }
+
+func TestArchivedBackfillNeverNotifies(t *testing.T) {
+	r := newRig(t, rules.DefaultPolicies())
+	_, events := r.bus.Subscribe(32)
+	d := delta("archived-old", func(d *provider.ThreadDelta) {
+		d.InInbox = false
+		d.Unread = true
+		d.Messages = []provider.MessageDelta{{MessageID: "old-message", From: "fixture@example.org", Date: 1000}}
+	})
+	if err := NewReconciler(r.db, r.bus).Apply(context.Background(), r.acct.ID, provider.Changes{Backfill: true, Upserted: []provider.ThreadDelta{d}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range collect(events, 8, 100*time.Millisecond) {
+		if event.Topic == "message.arrived" {
+			t.Fatal("historical message triggered arrival")
+		}
+	}
+}

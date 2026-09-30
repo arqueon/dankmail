@@ -161,31 +161,31 @@ func init() {
 	// thread.DefaultSnippet holds the default value on creation for the snippet field.
 	thread.DefaultSnippet = threadDescSnippet.Default.(string)
 	// threadDescParticipants is the schema descriptor for participants field.
-	threadDescParticipants := threadFields[4].Descriptor()
+	threadDescParticipants := threadFields[5].Descriptor()
 	// thread.DefaultParticipants holds the default value on creation for the participants field.
 	thread.DefaultParticipants = threadDescParticipants.Default.([]string)
 	// threadDescUnread is the schema descriptor for unread field.
-	threadDescUnread := threadFields[5].Descriptor()
+	threadDescUnread := threadFields[6].Descriptor()
 	// thread.DefaultUnread holds the default value on creation for the unread field.
 	thread.DefaultUnread = threadDescUnread.Default.(bool)
 	// threadDescStarred is the schema descriptor for starred field.
-	threadDescStarred := threadFields[6].Descriptor()
+	threadDescStarred := threadFields[7].Descriptor()
 	// thread.DefaultStarred holds the default value on creation for the starred field.
 	thread.DefaultStarred = threadDescStarred.Default.(bool)
 	// threadDescInInbox is the schema descriptor for in_inbox field.
-	threadDescInInbox := threadFields[7].Descriptor()
+	threadDescInInbox := threadFields[8].Descriptor()
 	// thread.DefaultInInbox holds the default value on creation for the in_inbox field.
 	thread.DefaultInInbox = threadDescInInbox.Default.(bool)
 	// threadDescLabels is the schema descriptor for labels field.
-	threadDescLabels := threadFields[8].Descriptor()
+	threadDescLabels := threadFields[9].Descriptor()
 	// thread.DefaultLabels holds the default value on creation for the labels field.
 	thread.DefaultLabels = threadDescLabels.Default.([]string)
 	// threadDescMessageCount is the schema descriptor for message_count field.
-	threadDescMessageCount := threadFields[10].Descriptor()
+	threadDescMessageCount := threadFields[11].Descriptor()
 	// thread.DefaultMessageCount holds the default value on creation for the message_count field.
 	thread.DefaultMessageCount = threadDescMessageCount.Default.(int)
 	// threadDescHasAttachments is the schema descriptor for has_attachments field.
-	threadDescHasAttachments := threadFields[11].Descriptor()
+	threadDescHasAttachments := threadFields[12].Descriptor()
 	// thread.DefaultHasAttachments holds the default value on creation for the has_attachments field.
 	thread.DefaultHasAttachments = threadDescHasAttachments.Default.(bool)
 }

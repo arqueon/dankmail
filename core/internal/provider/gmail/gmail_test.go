@@ -1034,3 +1034,24 @@ func TestMessageDeltaMarksSent(t *testing.T) {
 		t.Error("m2 IsSent = false, want true (SENT label)")
 	}
 }
+
+func TestArchivedPageUsesTokensAndIncludesUnstarredHistory(t *testing.T) {
+	f := &fakeAPI{threads: fixtureThreads(), searchPages: []listPage{
+		{ids: []string{"t3"}, next: "1"}, {ids: []string{"t2"}},
+	}}
+	p := newTestProvider(f, Options{})
+	first, next, err := p.ArchivedPage(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !first.Backfill || first.FullResync || len(first.Upserted) != 1 || first.Upserted[0].Starred || next != "1" {
+		t.Fatalf("first page=%+v next=%q", first, next)
+	}
+	if f.lastQuery != "-in:inbox -in:spam -in:trash -is:draft" {
+		t.Fatal(f.lastQuery)
+	}
+	second, next, err := p.ArchivedPage(context.Background(), next)
+	if err != nil || len(second.Upserted) != 1 || second.Upserted[0].ThreadID != "t2" || next != "" {
+		t.Fatalf("second page=%+v next=%q err=%v", second, next, err)
+	}
+}

@@ -148,4 +148,4 @@ UI components utilize modified parts of the MIT-licensed infrastructure from `da
 
 ### Archived mail
 
-Choose **Archived** in the quick filters to browse cached conversations outside the inbox, newest message first. Spam, trash, drafts and snoozed conversations are excluded. Account filtering and local search also work in this view; this is not an archive-action history or a complete server-side archive.
+Choose **Archived** to load archived history from Gmail, including unstarred mail that has never been cached. **Load older archived mail** retrieves the next provider page; **Load more** displays more already-cached results. Conversations are sorted by newest message, with spam, trash, drafts and snoozed mail excluded. Account filtering and local search remain available. Browsed history stays cached for the retention period after loading, without new-mail notifications. Providers without archive-history support show cached results with an explicit notice.

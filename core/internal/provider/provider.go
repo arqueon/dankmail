@@ -114,13 +114,13 @@ type MessageDelta struct {
 	RFC822MessageID string // Message-ID header, for deep links and reply threading
 	// IsSent marks the user's own copy of an outgoing message: stored
 	// like any other message but never treated as an arrival.
-	IsSent bool
-	From   string
-	To              []string
-	Cc              []string
-	Date            int64 // unix seconds
-	Snippet         string
-	BodyText        string // plain text, already truncated by the provider to the configured cap
+	IsSent   bool
+	From     string
+	To       []string
+	Cc       []string
+	Date     int64 // unix seconds
+	Snippet  string
+	BodyText string // plain text, already truncated by the provider to the configured cap
 	// Attachments carries metadata only — never content.
 	Attachments []AttachmentMeta
 	// ReplyHeaders holds the minimal headers needed to build a threaded
@@ -163,6 +163,12 @@ type ComposeDraft struct {
 // the reconciler suppresses notifications for old mail.
 type RemoteSearcher interface {
 	SearchRemote(ctx context.Context, query string, limit int) (Changes, error)
+}
+
+// ArchivedPager reads one provider page of archived history. Tokens are opaque;
+// returned changes are backfill and must never produce new-mail notifications.
+type ArchivedPager interface {
+	ArchivedPage(ctx context.Context, pageToken string) (Changes, string, error)
 }
 
 // Provider is implemented once per account type. Implementations must be

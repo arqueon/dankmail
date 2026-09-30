@@ -89,6 +89,26 @@ func (_u *ThreadUpdate) SetNillableLastMessageAt(v *time.Time) *ThreadUpdate {
 	return _u
 }
 
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (_u *ThreadUpdate) SetHistoryLoadedAt(v time.Time) *ThreadUpdate {
+	_u.mutation.SetHistoryLoadedAt(v)
+	return _u
+}
+
+// SetNillableHistoryLoadedAt sets the "history_loaded_at" field if the given value is not nil.
+func (_u *ThreadUpdate) SetNillableHistoryLoadedAt(v *time.Time) *ThreadUpdate {
+	if v != nil {
+		_u.SetHistoryLoadedAt(*v)
+	}
+	return _u
+}
+
+// ClearHistoryLoadedAt clears the value of the "history_loaded_at" field.
+func (_u *ThreadUpdate) ClearHistoryLoadedAt() *ThreadUpdate {
+	_u.mutation.ClearHistoryLoadedAt()
+	return _u
+}
+
 // SetParticipants sets the "participants" field.
 func (_u *ThreadUpdate) SetParticipants(v []string) *ThreadUpdate {
 	_u.mutation.SetParticipants(v)
@@ -333,6 +353,12 @@ func (_u *ThreadUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.LastMessageAt(); ok {
 		_spec.SetField(thread.FieldLastMessageAt, field.TypeTime, value)
 	}
+	if value, ok := _u.mutation.HistoryLoadedAt(); ok {
+		_spec.SetField(thread.FieldHistoryLoadedAt, field.TypeTime, value)
+	}
+	if _u.mutation.HistoryLoadedAtCleared() {
+		_spec.ClearField(thread.FieldHistoryLoadedAt, field.TypeTime)
+	}
 	if value, ok := _u.mutation.Participants(); ok {
 		_spec.SetField(thread.FieldParticipants, field.TypeJSON, value)
 	}
@@ -522,6 +548,26 @@ func (_u *ThreadUpdateOne) SetNillableLastMessageAt(v *time.Time) *ThreadUpdateO
 	if v != nil {
 		_u.SetLastMessageAt(*v)
 	}
+	return _u
+}
+
+// SetHistoryLoadedAt sets the "history_loaded_at" field.
+func (_u *ThreadUpdateOne) SetHistoryLoadedAt(v time.Time) *ThreadUpdateOne {
+	_u.mutation.SetHistoryLoadedAt(v)
+	return _u
+}
+
+// SetNillableHistoryLoadedAt sets the "history_loaded_at" field if the given value is not nil.
+func (_u *ThreadUpdateOne) SetNillableHistoryLoadedAt(v *time.Time) *ThreadUpdateOne {
+	if v != nil {
+		_u.SetHistoryLoadedAt(*v)
+	}
+	return _u
+}
+
+// ClearHistoryLoadedAt clears the value of the "history_loaded_at" field.
+func (_u *ThreadUpdateOne) ClearHistoryLoadedAt() *ThreadUpdateOne {
+	_u.mutation.ClearHistoryLoadedAt()
 	return _u
 }
 
@@ -798,6 +844,12 @@ func (_u *ThreadUpdateOne) sqlSave(ctx context.Context) (_node *Thread, err erro
 	}
 	if value, ok := _u.mutation.LastMessageAt(); ok {
 		_spec.SetField(thread.FieldLastMessageAt, field.TypeTime, value)
+	}
+	if value, ok := _u.mutation.HistoryLoadedAt(); ok {
+		_spec.SetField(thread.FieldHistoryLoadedAt, field.TypeTime, value)
+	}
+	if _u.mutation.HistoryLoadedAtCleared() {
+		_spec.ClearField(thread.FieldHistoryLoadedAt, field.TypeTime)
 	}
 	if value, ok := _u.mutation.Participants(); ok {
 		_spec.SetField(thread.FieldParticipants, field.TypeJSON, value)
