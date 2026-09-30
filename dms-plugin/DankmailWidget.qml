@@ -12,6 +12,7 @@ import qs.Widgets
 // If the daemon is down, the icon dims and a click starts the service.
 PluginComponent {
     id: root
+    readonly property int barLabelSize: Theme.barTextSize(barThickness, barConfig ? barConfig.fontScale : undefined, barConfig ? barConfig.maximizeWidgetText : undefined)
 
     property bool hideWhenZero: pluginData.hideWhenZero ?? false
     property bool showDndDot: pluginData.showDndDot ?? true
@@ -312,15 +313,15 @@ PluginComponent {
                         color: {
                             if (!root.daemonConnected)
                                 return Theme.surfaceVariantText;
-                            return Theme.primary;
+                            return root.unread > 0 ? Theme.primary : Theme.widgetIconColor;
                         }
                     }
 
                     Rectangle {
                         visible: root.showDndDot && root.dnd && root.daemonConnected
-                        width: 7
-                        height: 7
-                        radius: 3.5
+                        width: Theme.spacingS
+                        height: Theme.spacingS
+                        radius: Theme.cornerRadius
                         color: Theme.warning
                         anchors.right: parent.right
                         anchors.top: parent.top
@@ -332,7 +333,7 @@ PluginComponent {
                     text: root.unreadLabel
                     reserveText: "99+"
                     width: reservedWidth
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: root.barLabelSize
                     font.weight: Font.Bold
                     color: Theme.primary
                     horizontalAlignment: Text.AlignHCenter
@@ -487,7 +488,7 @@ PluginComponent {
                         readonly property bool active: root.mailboxView === modelData.key
                         width: viewLabel.implicitWidth + Theme.spacingL
                         height: Theme.iconSize + Theme.spacingXS
-                        radius: height / 2
+                        radius: Theme.cornerRadius
                         color: active ? Theme.primaryContainer : "transparent"
 
                         StyledText {
@@ -552,7 +553,7 @@ PluginComponent {
 
                             width: threadColumn.width
                             height: Theme.iconSizeLarge + Theme.spacingL * 2
-                            radius: Theme.cornerRadiusSmall
+                            radius: Theme.cornerRadius / 2
                             color: rowHover.hovered ? Theme.surfaceContainerHigh : "transparent"
 
                             HoverHandler {
@@ -571,7 +572,7 @@ PluginComponent {
                                 Rectangle {
                                     width: Theme.spacingS
                                     height: Theme.spacingS
-                                    radius: width / 2
+                                    radius: Theme.cornerRadius
                                     color: mailRow.modelData.unread ? Theme.primary : "transparent"
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
@@ -731,7 +732,7 @@ PluginComponent {
 
             Column {
                 id: vCol
-                spacing: 1
+                spacing: Theme.spacingXXS
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 DankIcon {
@@ -740,7 +741,7 @@ PluginComponent {
                     color: {
                         if (!root.daemonConnected)
                             return Theme.surfaceVariantText;
-                        return Theme.primary;
+                        return root.unread > 0 ? Theme.primary : Theme.widgetIconColor;
                     }
                     anchors.horizontalCenter: parent.horizontalCenter
                 }
@@ -750,7 +751,7 @@ PluginComponent {
                     text: root.unreadLabel
                     reserveText: "99+"
                     width: reservedWidth
-                    font.pixelSize: Theme.fontSizeSmall
+                    font.pixelSize: root.barLabelSize
                     font.weight: Font.Bold
                     color: Theme.primary
                     horizontalAlignment: Text.AlignHCenter
