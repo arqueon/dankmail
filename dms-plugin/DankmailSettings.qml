@@ -9,7 +9,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Dankmail Unread"
+        text: I18n.trFor("dankmailUnread", "Dankmail Unread")
         font.pixelSize: Theme.fontSizeLarge
         font.weight: Font.Medium
         color: Theme.surfaceText
@@ -17,7 +17,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: "Live unread badge and triage popout for dankmail. Left click opens the popout, middle click toggles the app, and right click syncs."
+        text: I18n.trFor("dankmailUnread", "Live unread badge and triage popout for Dankmail. Left click opens the popout, middle click toggles the app, and right click syncs.")
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
@@ -25,15 +25,15 @@ PluginSettings {
 
     ToggleSetting {
         settingKey: "hideWhenZero"
-        label: "Hide when inbox is clear"
-        description: "Collapse the pill while there is no unread mail"
+        label: I18n.trFor("dankmailUnread", "Hide when inbox is clear")
+        description: I18n.trFor("dankmailUnread", "Collapse the pill while there is no unread mail")
         defaultValue: false
     }
 
     ToggleSetting {
         settingKey: "showDndDot"
-        label: "Do-not-disturb indicator"
-        description: "Show a small dot while dankmail's DND mode is active"
+        label: I18n.trFor("dankmailUnread", "Do-not-disturb indicator")
+        description: I18n.trFor("dankmailUnread", "Show a small dot while Dankmail's DND mode is active")
         defaultValue: true
     }
 }

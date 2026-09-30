@@ -363,14 +363,14 @@ PluginComponent {
                     spacing: 0
 
                     StyledText {
-                        text: "Dank Mail"
-                        font.pixelSize: Theme.fontSizeLarge + 2
+                        text: I18n.trFor("dankmailUnread", "Dank Mail")
+                        font.pixelSize: Theme.fontSizeLarge
                         font.weight: Font.Bold
                         color: titleHover.hovered ? Theme.primary : Theme.surfaceText
                     }
 
                     StyledText {
-                        text: root.daemonConnected ? ((root.accounts.length > 1 ? root.accounts.length + " cuentas · " : "") + (root.unread > 0 ? root.unread + " sin leer" : "Bandeja en cero")) : "daemon apagado"
+                        text: root.daemonConnected ? ((root.accounts.length > 1 ? I18n.trFor("dankmailUnread", "%1 accounts · ").arg(root.accounts.length) : "") + (root.unread > 0 ? I18n.trFor("dankmailUnread", "%1 unread").arg(root.unread) : I18n.trFor("dankmailUnread", "Inbox clear"))) : I18n.trFor("dankmailUnread", "Daemon stopped")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                     }
@@ -452,7 +452,7 @@ PluginComponent {
 
                         StyledText {
                             width: parent.width - accountUnread.implicitWidth - Theme.iconSizeSmall - Theme.spacingS * 2
-                            text: parent.modelData.displayName || parent.modelData.email || "Cuenta"
+                            text: parent.modelData.displayName || parent.modelData.email || I18n.trFor("dankmailUnread", "Account")
                             font.pixelSize: Theme.fontSizeSmall
                             color: Theme.surfaceVariantText
                             elide: Text.ElideRight
@@ -461,7 +461,7 @@ PluginComponent {
 
                         StyledText {
                             id: accountUnread
-                            text: (parent.modelData.unread || 0) + " sin leer"
+                            text: I18n.trFor("dankmailUnread", "%1 unread").arg(parent.modelData.unread || 0)
                             font.pixelSize: Theme.fontSizeSmall
                             font.weight: Font.Medium
                             color: parent.modelData.unread > 0 ? Theme.primary : Theme.surfaceVariantText
@@ -478,16 +478,16 @@ PluginComponent {
 
                 Repeater {
                     model: [
-                        { "key": "inbox", "label": "Recibidos" },
-                        { "key": "starred", "label": "Destacados" }
+                        { "key": "inbox", "label": I18n.trFor("dankmailUnread", "Inbox") },
+                        { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") }
                     ]
 
                     delegate: Rectangle {
                         required property var modelData
                         readonly property bool active: root.mailboxView === modelData.key
                         width: viewLabel.implicitWidth + Theme.spacingL
-                        height: 28
-                        radius: 14
+                        height: Theme.iconSize + Theme.spacingXS
+                        radius: height / 2
                         color: active ? Theme.primaryContainer : "transparent"
 
                         StyledText {
@@ -529,7 +529,7 @@ PluginComponent {
                     StyledText {
                         visible: !root.daemonConnected
                         width: parent.width
-                        text: "El daemon de dankmail no está corriendo. Usa el botón ↗ para iniciarlo."
+                        text: I18n.trFor("dankmailUnread", "Dankmail is stopped. Click the title above to start it.")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         wrapMode: Text.WordWrap
@@ -538,7 +538,7 @@ PluginComponent {
                     StyledText {
                         visible: root.daemonConnected && root.threads.length === 0
                         width: parent.width
-                        text: root.mailboxView === "starred" ? "Sin correos destacados." : "Sin correos en la bandeja."
+                        text: root.mailboxView === "starred" ? I18n.trFor("dankmailUnread", "No starred mail.") : I18n.trFor("dankmailUnread", "No mail in the inbox.")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                     }
@@ -551,7 +551,7 @@ PluginComponent {
                             required property var modelData
 
                             width: threadColumn.width
-                            height: 56
+                            height: Theme.iconSizeLarge + Theme.spacingL * 2
                             radius: Theme.cornerRadiusSmall
                             color: rowHover.hovered ? Theme.surfaceContainerHigh : "transparent"
 
@@ -569,15 +569,15 @@ PluginComponent {
                                 spacing: Theme.spacingS
 
                                 Rectangle {
-                                    width: 8
-                                    height: 8
-                                    radius: 4
+                                    width: Theme.spacingS
+                                    height: Theme.spacingS
+                                    radius: width / 2
                                     color: mailRow.modelData.unread ? Theme.primary : "transparent"
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
                                 Column {
-                                    width: parent.width - 8 - Theme.spacingS * 2 - timeLabel.implicitWidth - (starMark.visible ? starMark.width + Theme.spacingS : 0)
+                                    width: parent.width - Theme.spacingS * 3 - timeLabel.implicitWidth - (starMark.visible ? starMark.width + Theme.spacingS : 0)
                                     spacing: 1
 
                                     StyledText {
@@ -592,7 +592,7 @@ PluginComponent {
 
                                     StyledText {
                                         width: parent.width
-                                        text: mailRow.modelData.subject || "(sin asunto)"
+                                        text: mailRow.modelData.subject || I18n.trFor("dankmailUnread", "(no subject)")
                                         font.pixelSize: Theme.fontSizeSmall
                                         color: mailRow.modelData.unread ? Theme.surfaceText : Theme.surfaceVariantText
                                         elide: Text.ElideRight

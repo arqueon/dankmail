@@ -2,7 +2,7 @@
   "id": "dankmailUnread",
   "name": "Dankmail Unread",
   "description": "The DankMaterialShell companion shipped with Dankmail, powered by its dmail daemon.",
-  "version": "0.3.6",
+  "version": "0.3.7",
   "author": "arqueon",
   "type": "widget",
   "capabilities": [
@@ -14,6 +14,7 @@
   "dependencies": [
     "dmail"
   ],
+  "requires_dms": ">=1.6.0",
   "permissions": [
     "process",
     "settings_read",
