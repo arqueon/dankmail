@@ -55,17 +55,24 @@ func (d *daemon) fetchArchived(ctx context.Context, p map[string]any) (any, erro
 		}
 		supported++
 		changes, cursor, err := pager.ArchivedPage(ctx, token)
-		if err == nil {
+		if len(changes.Upserted) > 0 {
 			changes.Backfill = true
 			changes.FullResync = false
-			err = rec.Apply(ctx, id, changes)
+			if applyErr := rec.Apply(ctx, id, changes); applyErr != nil {
+				next[a.ID] = token
+				warnings = append(warnings, applyErr.Error())
+				continue
+			}
+			ingested += len(changes.Upserted)
 		}
 		if err != nil {
-			next[a.ID] = token
+			if cursor == "" {
+				cursor = token
+			}
+			next[a.ID] = cursor
 			warnings = append(warnings, err.Error())
 			continue
 		}
-		ingested += len(changes.Upserted)
 		if cursor != "" {
 			next[a.ID] = cursor
 		}

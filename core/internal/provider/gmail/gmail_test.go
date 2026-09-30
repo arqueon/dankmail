@@ -62,8 +62,9 @@ type fakeAPI struct {
 	sent    []sentCall
 	sendErr error
 
-	searchPages []listPage
-	lastQuery   string
+	searchPages  []listPage
+	lastQuery    string
+	lastPageSize int
 }
 
 func (f *fakeAPI) record(name string) { f.calls = append(f.calls, name) }
@@ -153,9 +154,10 @@ func (f *fakeAPI) SendMessage(_ context.Context, threadID string, raw []byte) er
 	return nil
 }
 
-func (f *fakeAPI) SearchThreads(_ context.Context, query string, pageToken string) ([]string, string, error) {
+func (f *fakeAPI) SearchThreads(_ context.Context, query string, pageToken string, pageSize int) ([]string, string, error) {
 	f.record("SearchThreads")
 	f.lastQuery = query
+	f.lastPageSize = pageSize
 	pages := f.searchPages
 	idx := 0
 	if pageToken != "" {
@@ -1044,7 +1046,7 @@ func TestArchivedPageUsesTokensAndIncludesUnstarredHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !first.Backfill || first.FullResync || len(first.Upserted) != 1 || first.Upserted[0].Starred || next != "1" {
+	if !first.Backfill || first.FullResync || len(first.Upserted) != 1 || first.Upserted[0].Starred || next == "" || f.lastPageSize != 25 {
 		t.Fatalf("first page=%+v next=%q", first, next)
 	}
 	if f.lastQuery != "-in:inbox -in:spam -in:trash -is:draft" {
@@ -1053,5 +1055,24 @@ func TestArchivedPageUsesTokensAndIncludesUnstarredHistory(t *testing.T) {
 	second, next, err := p.ArchivedPage(context.Background(), next)
 	if err != nil || len(second.Upserted) != 1 || second.Upserted[0].ThreadID != "t2" || next != "" {
 		t.Fatalf("second page=%+v next=%q err=%v", second, next, err)
+	}
+}
+
+func TestArchivedPageResumesAfterPartialFailure(t *testing.T) {
+	f := &fakeAPI{threads: fixtureThreads(), threadErr: map[string]error{"t2": errors.New("temporary quota")}, searchPages: []listPage{{ids: []string{"t3", "t2"}, next: "1"}, {ids: []string{"t1"}}}}
+	p := newTestProvider(f, Options{})
+	first, next, err := p.ArchivedPage(context.Background(), "")
+	if err == nil || len(first.Upserted) != 1 || next == "" {
+		t.Fatalf("partial=%+v next=%q err=%v", first, next, err)
+	}
+	delete(f.threadErr, "t2")
+	f.calls = nil
+	rest, next, err := p.ArchivedPage(context.Background(), next)
+	if err != nil || len(rest.Upserted) != 1 || rest.Upserted[0].ThreadID != "t2" || len(f.calls) != 1 || f.calls[0] != "GetThread" {
+		t.Fatalf("rest=%+v calls=%v err=%v", rest, f.calls, err)
+	}
+	last, next, err := p.ArchivedPage(context.Background(), next)
+	if err != nil || len(last.Upserted) != 1 || last.Upserted[0].ThreadID != "t1" || next != "" {
+		t.Fatalf("last=%+v next=%q err=%v", last, next, err)
 	}
 }

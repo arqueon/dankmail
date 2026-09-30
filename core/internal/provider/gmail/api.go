@@ -45,5 +45,5 @@ type gmailAPI interface {
 
 	// SearchThreads returns one page of thread IDs matching a Gmail
 	// search query (users.threads.list with q; full-history, server-side).
-	SearchThreads(ctx context.Context, query string, pageToken string) (ids []string, nextPageToken string, err error)
+	SearchThreads(ctx context.Context, query string, pageToken string, pageSize int) (ids []string, nextPageToken string, err error)
 }
