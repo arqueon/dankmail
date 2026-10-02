@@ -32,6 +32,8 @@ type Message struct {
 	Cc []string `json:"cc,omitempty"`
 	// Date holds the value of the "date" field.
 	Date time.Time `json:"date,omitempty"`
+	// IsSent holds the value of the "is_sent" field.
+	IsSent bool `json:"is_sent,omitempty"`
 	// Snippet holds the value of the "snippet" field.
 	Snippet string `json:"snippet,omitempty"`
 	// BodyText holds the value of the "body_text" field.
@@ -74,6 +76,8 @@ func (*Message) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case message.FieldTo, message.FieldCc, message.FieldReplyHeaders, message.FieldAttachments:
 			values[i] = new([]byte)
+		case message.FieldIsSent:
+			values[i] = new(sql.NullBool)
 		case message.FieldID:
 			values[i] = new(sql.NullInt64)
 		case message.FieldProviderMessageID, message.FieldRfc822MessageID, message.FieldFrom, message.FieldSnippet, message.FieldBodyText:
@@ -142,6 +146,12 @@ func (_m *Message) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field date", values[i])
 			} else if value.Valid {
 				_m.Date = value.Time
+			}
+		case message.FieldIsSent:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field is_sent", values[i])
+			} else if value.Valid {
+				_m.IsSent = value.Bool
 			}
 		case message.FieldSnippet:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -236,6 +246,9 @@ func (_m *Message) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("date=")
 	builder.WriteString(_m.Date.Format(time.ANSIC))
+	builder.WriteString(", ")
+	builder.WriteString("is_sent=")
+	builder.WriteString(fmt.Sprintf("%v", _m.IsSent))
 	builder.WriteString(", ")
 	builder.WriteString("snippet=")
 	builder.WriteString(_m.Snippet)

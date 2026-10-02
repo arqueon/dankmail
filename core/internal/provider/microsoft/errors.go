@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 	"unicode/utf8"
 
 	"github.com/arqueon/dankmail/core/errdefs"
@@ -14,7 +15,10 @@ type graphError struct {
 	Status int
 	Code   string // Graph error.code, e.g. "SyncStateNotFound"
 	Msg    string
+	Until  time.Time
 }
+
+func (e *graphError) RetryAfter() time.Duration { return max(0, time.Until(e.Until)) }
 
 func (e *graphError) Error() string {
 	return fmt.Sprintf("graph: %d %s: %s", e.Status, e.Code, e.Msg)

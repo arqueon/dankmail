@@ -76,6 +76,20 @@ func (_c *MessageCreate) SetDate(v time.Time) *MessageCreate {
 	return _c
 }
 
+// SetIsSent sets the "is_sent" field.
+func (_c *MessageCreate) SetIsSent(v bool) *MessageCreate {
+	_c.mutation.SetIsSent(v)
+	return _c
+}
+
+// SetNillableIsSent sets the "is_sent" field if the given value is not nil.
+func (_c *MessageCreate) SetNillableIsSent(v *bool) *MessageCreate {
+	if v != nil {
+		_c.SetIsSent(*v)
+	}
+	return _c
+}
+
 // SetSnippet sets the "snippet" field.
 func (_c *MessageCreate) SetSnippet(v string) *MessageCreate {
 	_c.mutation.SetSnippet(v)
@@ -178,6 +192,10 @@ func (_c *MessageCreate) defaults() {
 		v := message.DefaultCc
 		_c.mutation.SetCc(v)
 	}
+	if _, ok := _c.mutation.IsSent(); !ok {
+		v := message.DefaultIsSent
+		_c.mutation.SetIsSent(v)
+	}
 	if _, ok := _c.mutation.Snippet(); !ok {
 		v := message.DefaultSnippet
 		_c.mutation.SetSnippet(v)
@@ -211,6 +229,9 @@ func (_c *MessageCreate) check() error {
 	}
 	if _, ok := _c.mutation.Date(); !ok {
 		return &ValidationError{Name: "date", err: errors.New(`ent: missing required field "Message.date"`)}
+	}
+	if _, ok := _c.mutation.IsSent(); !ok {
+		return &ValidationError{Name: "is_sent", err: errors.New(`ent: missing required field "Message.is_sent"`)}
 	}
 	if _, ok := _c.mutation.Snippet(); !ok {
 		return &ValidationError{Name: "snippet", err: errors.New(`ent: missing required field "Message.snippet"`)}
@@ -274,6 +295,10 @@ func (_c *MessageCreate) createSpec() (*Message, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Date(); ok {
 		_spec.SetField(message.FieldDate, field.TypeTime, value)
 		_node.Date = value
+	}
+	if value, ok := _c.mutation.IsSent(); ok {
+		_spec.SetField(message.FieldIsSent, field.TypeBool, value)
+		_node.IsSent = value
 	}
 	if value, ok := _c.mutation.Snippet(); ok {
 		_spec.SetField(message.FieldSnippet, field.TypeString, value)
@@ -429,6 +454,18 @@ func (u *MessageUpsert) SetDate(v time.Time) *MessageUpsert {
 // UpdateDate sets the "date" field to the value that was provided on create.
 func (u *MessageUpsert) UpdateDate() *MessageUpsert {
 	u.SetExcluded(message.FieldDate)
+	return u
+}
+
+// SetIsSent sets the "is_sent" field.
+func (u *MessageUpsert) SetIsSent(v bool) *MessageUpsert {
+	u.Set(message.FieldIsSent, v)
+	return u
+}
+
+// UpdateIsSent sets the "is_sent" field to the value that was provided on create.
+func (u *MessageUpsert) UpdateIsSent() *MessageUpsert {
+	u.SetExcluded(message.FieldIsSent)
 	return u
 }
 
@@ -607,6 +644,20 @@ func (u *MessageUpsertOne) SetDate(v time.Time) *MessageUpsertOne {
 func (u *MessageUpsertOne) UpdateDate() *MessageUpsertOne {
 	return u.Update(func(s *MessageUpsert) {
 		s.UpdateDate()
+	})
+}
+
+// SetIsSent sets the "is_sent" field.
+func (u *MessageUpsertOne) SetIsSent(v bool) *MessageUpsertOne {
+	return u.Update(func(s *MessageUpsert) {
+		s.SetIsSent(v)
+	})
+}
+
+// UpdateIsSent sets the "is_sent" field to the value that was provided on create.
+func (u *MessageUpsertOne) UpdateIsSent() *MessageUpsertOne {
+	return u.Update(func(s *MessageUpsert) {
+		s.UpdateIsSent()
 	})
 }
 
@@ -958,6 +1009,20 @@ func (u *MessageUpsertBulk) SetDate(v time.Time) *MessageUpsertBulk {
 func (u *MessageUpsertBulk) UpdateDate() *MessageUpsertBulk {
 	return u.Update(func(s *MessageUpsert) {
 		s.UpdateDate()
+	})
+}
+
+// SetIsSent sets the "is_sent" field.
+func (u *MessageUpsertBulk) SetIsSent(v bool) *MessageUpsertBulk {
+	return u.Update(func(s *MessageUpsert) {
+		s.SetIsSent(v)
+	})
+}
+
+// UpdateIsSent sets the "is_sent" field to the value that was provided on create.
+func (u *MessageUpsertBulk) UpdateIsSent() *MessageUpsertBulk {
+	return u.Update(func(s *MessageUpsert) {
+		s.UpdateIsSent()
 	})
 }
 

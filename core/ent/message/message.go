@@ -24,6 +24,8 @@ const (
 	FieldCc = "cc"
 	// FieldDate holds the string denoting the date field in the database.
 	FieldDate = "date"
+	// FieldIsSent holds the string denoting the is_sent field in the database.
+	FieldIsSent = "is_sent"
 	// FieldSnippet holds the string denoting the snippet field in the database.
 	FieldSnippet = "snippet"
 	// FieldBodyText holds the string denoting the body_text field in the database.
@@ -54,6 +56,7 @@ var Columns = []string{
 	FieldTo,
 	FieldCc,
 	FieldDate,
+	FieldIsSent,
 	FieldSnippet,
 	FieldBodyText,
 	FieldReplyHeaders,
@@ -90,6 +93,8 @@ var (
 	DefaultTo []string
 	// DefaultCc holds the default value on creation for the "cc" field.
 	DefaultCc []string
+	// DefaultIsSent holds the default value on creation for the "is_sent" field.
+	DefaultIsSent bool
 	// DefaultSnippet holds the default value on creation for the "snippet" field.
 	DefaultSnippet string
 	// DefaultBodyText holds the default value on creation for the "body_text" field.
@@ -124,6 +129,11 @@ func ByFrom(opts ...sql.OrderTermOption) OrderOption {
 // ByDate orders the results by the date field.
 func ByDate(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDate, opts...).ToFunc()
+}
+
+// ByIsSent orders the results by the is_sent field.
+func ByIsSent(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIsSent, opts...).ToFunc()
 }
 
 // BySnippet orders the results by the snippet field.

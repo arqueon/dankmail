@@ -129,3 +129,10 @@ test('Archived sends an exclusive mailbox filter and keeps search/account scope'
     assert.deepEqual(params({filterLabel:'SPAM'}), {inbox:false, label:'SPAM'});
     assert.deepEqual(params({filterStarred:true}), {inbox:false, starred:true});
 });
+
+test('Sent keeps its outgoing filter, pagination and account scope during search', () => {
+ const service = fs.readFileSync(path.join(__dirname, '../../quickshell/Services/DankMailService.qml'), 'utf8');
+ const fn=service.slice(service.indexOf('function threadFilterParams()'),service.indexOf('function threadSearchController()'));
+ const params=clone(vm.runInNewContext(fn+'\nthreadFilterParams()', {searchQuery:'receipt',filterLabel:'SENT',filterUnread:false,filterStarred:false,filterArchived:false,filterAccount:'hotmail'}));
+ assert.deepEqual(params,{inbox:false,query:'receipt',sent:true,account:'hotmail'});
+});

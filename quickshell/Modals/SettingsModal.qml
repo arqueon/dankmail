@@ -427,10 +427,11 @@ FloatingWindow {
                         required property var modelData
                         property bool reauthPending: false
                         Layout.fillWidth: true
-                        implicitHeight: 56
+                        implicitHeight: accountContent.implicitHeight + Theme.spacingM * 2
                         color: Theme.surfaceContainer
 
                         RowLayout {
+                            id: accountContent
                             anchors.fill: parent
                             anchors.margins: Theme.spacingM
                             spacing: Theme.spacingM
@@ -447,15 +448,36 @@ FloatingWindow {
                                 spacing: 0
 
                                 StyledText {
+                                    Layout.fillWidth: true
                                     text: acctRow.modelData.email
+                                    elide: Text.ElideMiddle
                                     font.pixelSize: Theme.fontSizeSmall
                                     font.weight: Font.DemiBold
                                 }
 
                                 StyledText {
-                                    text: acctRow.modelData.type + " · " + acctRow.modelData.status + (acctRow.modelData.unread > 0 ? " · " + acctRow.modelData.unread + " " + I18n.tr("unread", "tray tooltip") : "")
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                    text: (acctRow.modelData.type === "gmail" ? "Google" : acctRow.modelData.type === "microsoft" ? "Microsoft" : "IMAP") + " · " + (acctRow.modelData.needsReauth ? I18n.tr("Sign in required", "account status") : acctRow.modelData.lastError ? I18n.tr("Sync paused", "account status") : I18n.tr("Connected", "account status")) + (acctRow.modelData.unread > 0 ? " · " + acctRow.modelData.unread + " " + I18n.tr("unread", "tray tooltip") : "")
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: acctRow.modelData.status === "active" ? Theme.surfaceTextMedium : Theme.warning
+                                }
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    visible: !!acctRow.modelData.lastSyncAt
+                                    text: I18n.tr("Last completed sync: %1", "account status").arg(acctRow.modelData.lastSyncAt ? Qt.formatDateTime(new Date(acctRow.modelData.lastSyncAt), "d MMM HH:mm") : "")
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceTextMedium
+                                    wrapMode: Text.WordWrap
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    visible: !!acctRow.modelData.lastError
+                                    text: acctRow.modelData.syncNotice || acctRow.modelData.authError || acctRow.modelData.lastError || ""
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.warning
+                                    wrapMode: Text.WrapAnywhere
                                 }
                             }
 

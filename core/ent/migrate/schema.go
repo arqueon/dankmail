@@ -75,6 +75,7 @@ var (
 		{Name: "to", Type: field.TypeJSON},
 		{Name: "cc", Type: field.TypeJSON},
 		{Name: "date", Type: field.TypeTime},
+		{Name: "is_sent", Type: field.TypeBool, Default: false},
 		{Name: "snippet", Type: field.TypeString, Default: ""},
 		{Name: "body_text", Type: field.TypeString, Size: 2147483647, Default: ""},
 		{Name: "reply_headers", Type: field.TypeJSON},
@@ -89,7 +90,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "messages_threads_messages",
-				Columns:    []*schema.Column{MessagesColumns[11]},
+				Columns:    []*schema.Column{MessagesColumns[12]},
 				RefColumns: []*schema.Column{ThreadsColumns[0]},
 				OnDelete:   schema.Cascade,
 			},
@@ -98,7 +99,7 @@ var (
 			{
 				Name:    "message_provider_message_id_thread_messages",
 				Unique:  true,
-				Columns: []*schema.Column{MessagesColumns[1], MessagesColumns[11]},
+				Columns: []*schema.Column{MessagesColumns[1], MessagesColumns[12]},
 			},
 			{
 				Name:    "message_date",

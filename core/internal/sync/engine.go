@@ -119,14 +119,20 @@ func (e *Engine) SyncAll(ctx context.Context, full bool) error {
 		return err
 	}
 	var failures []error
+	var mu gosync.Mutex
+	var wg gosync.WaitGroup
 	for _, a := range accounts {
-		if ctx.Err() != nil {
-			return errors.Join(append(failures, ctx.Err())...)
-		}
-		if err := e.syncAccount(ctx, a.ID, full); err != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", a.Email, err))
-		}
+		wg.Add(1)
+		go func(a *ent.Account) {
+			defer wg.Done()
+			if err := e.syncAccount(ctx, a.ID, full); err != nil {
+				mu.Lock()
+				failures = append(failures, fmt.Errorf("%s: %w", a.Email, err))
+				mu.Unlock()
+			}
+		}(a)
 	}
+	wg.Wait()
 	return errors.Join(failures...)
 }
 
@@ -186,28 +192,36 @@ func (e *Engine) syncAccount(ctx context.Context, accountID uuid.UUID, full bool
 		return errNoProvider
 	}
 
-	changes, cursor, err := prov.Sync(ctx, acct.SyncCursor)
-	if err != nil {
-		upd := e.db.Account.UpdateOneID(accountID).SetLastError(err.Error())
-		if errdefs.KindOf(err) == errdefs.KindAuth {
-			upd.SetStatus(account.StatusAuthError)
-			upd.SetNeedsReauth(true)
-			upd.SetAuthError(err.Error())
-			e.bus.Publish("account.auth", map[string]any{"accountId": accountID.String()})
+	for {
+		changes, cursor, syncErr := prov.Sync(ctx, acct.SyncCursor)
+		if changes.Incomplete && cursor == "" {
+			return errors.New("provider returned a checkpoint without a cursor")
 		}
-		_, _ = upd.Save(ctx)
-		return err
+		if syncErr == nil || changes.Incomplete {
+			if err := e.reconciler.ApplySync(ctx, accountID, changes, cursor); err != nil {
+				return err
+			}
+		}
+		if syncErr != nil {
+			upd := e.db.Account.UpdateOneID(accountID).SetLastError(syncErr.Error())
+			if errdefs.KindOf(syncErr) == errdefs.KindAuth {
+				upd.SetStatus(account.StatusAuthError).SetNeedsReauth(true).SetAuthError(syncErr.Error())
+				e.bus.Publish("account.auth", map[string]any{"accountId": accountID.String()})
+			}
+			if err := upd.Exec(ctx); err != nil {
+				return errors.Join(syncErr, err)
+			}
+			return syncErr
+		}
+		if !changes.Incomplete {
+			return nil
+		}
+		if cursor == acct.SyncCursor {
+			return errors.New("provider checkpoint did not advance")
+		}
+		acct.SyncCursor = cursor
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
-
-	if err := e.reconciler.Apply(ctx, accountID, changes); err != nil {
-		return err
-	}
-	_, err = e.db.Account.UpdateOneID(accountID).
-		SetSyncCursor(cursor).
-		SetLastSyncAt(time.Now().UTC()).
-		SetLastError("").
-		SetNeedsReauth(false).
-		SetAuthError("").
-		Save(ctx)
-	return err
 }

@@ -2,10 +2,8 @@ package microsoft
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/url"
-	"sort"
 	"strings"
 	gosync "sync"
 
@@ -31,9 +29,8 @@ type Provider struct {
 	api       graphAPI
 	bodyCap   int
 
-	folderOnce gosync.Once
-	folderIDs  map[string]string
-	folderErr  error
+	folderMu  gosync.Mutex
+	folderIDs map[string]string
 }
 
 // New builds a Provider for accountID/email over the given API seam.
@@ -62,115 +59,17 @@ var monitoredFolders = []string{folderInbox, folderJunk}
 type cursorState map[string]string
 
 func (p *Provider) folders(ctx context.Context) (map[string]string, error) {
-	p.folderOnce.Do(func() {
-		p.folderIDs, p.folderErr = p.api.FolderIDs(ctx)
-	})
-	return p.folderIDs, p.folderErr
-}
-
-// Sync runs a message delta per monitored folder, groups the affected
-// conversations, and rebuilds each one whole (ListConversation) so the
-// resulting ThreadDelta has the same complete-thread shape Gmail
-// produces — the reconciler needs no provider-specific logic.
-func (p *Provider) Sync(ctx context.Context, cursor string) (provider.Changes, string, error) {
-	state := cursorState{}
-	full := cursor == ""
-	if !full {
-		if err := json.Unmarshal([]byte(cursor), &state); err != nil {
-			// Unreadable cursor (e.g. account migrated): full resync.
-			full = true
-			state = cursorState{}
-		}
+	p.folderMu.Lock()
+	defer p.folderMu.Unlock()
+	if p.folderIDs != nil {
+		return p.folderIDs, nil
 	}
-
-	changes := provider.Changes{FullResync: full}
-	affected := map[string]bool{}
-	removed := []string{} // message IDs from @removed entries
-
-	for _, folder := range monitoredFolders {
-		link := ""
-		if !full {
-			link = state[folder]
-		}
-		for {
-			page, err := p.api.DeltaMessages(ctx, folder, link)
-			if err != nil {
-				if isGone(err) {
-					// Delta token expired (410 SyncStateNotFound):
-					// restart from scratch, like Gmail's history 404.
-					return p.Sync(ctx, "")
-				}
-				return provider.Changes{}, "", classify(err)
-			}
-			for _, m := range page.Messages {
-				if m.Removed {
-					removed = append(removed, m.ID)
-					continue
-				}
-				if m.ConversationID != "" {
-					affected[m.ConversationID] = true
-				}
-			}
-			if page.DeltaLink != "" {
-				state[folder] = page.DeltaLink
-				break
-			}
-			if page.NextLink == "" {
-				break
-			}
-			link = page.NextLink
-		}
-	}
-
-	// @removed entries carry only the message ID. If the message still
-	// exists (it merely left the folder), rebuild its conversation; if
-	// it is truly gone, a later full resync reconciles the remainder.
-	for _, id := range removed {
-		m, err := p.api.GetMessage(ctx, id)
-		if err != nil {
-			if isNotFound(err) {
-				continue
-			}
-			return provider.Changes{}, "", classify(err)
-		}
-		if m.ConversationID != "" {
-			affected[m.ConversationID] = true
-		}
-	}
-
-	convIDs := make([]string, 0, len(affected))
-	for id := range affected {
-		convIDs = append(convIDs, id)
-	}
-	sort.Strings(convIDs)
-
-	for _, convID := range convIDs {
-		msgs, err := p.api.ListConversation(ctx, convID)
-		if err != nil {
-			if isNotFound(err) {
-				changes.RemovedThreadIDs = append(changes.RemovedThreadIDs, convID)
-				continue
-			}
-			return provider.Changes{}, "", classify(err)
-		}
-		if len(msgs) == 0 {
-			changes.RemovedThreadIDs = append(changes.RemovedThreadIDs, convID)
-			continue
-		}
-		delta, err := p.threadDelta(ctx, convID, msgs)
-		if err != nil {
-			return provider.Changes{}, "", err
-		}
-		if delta.MessageCount > 0 {
-			changes.Upserted = append(changes.Upserted, delta)
-		}
-	}
-
-	raw, err := json.Marshal(state)
+	ids, err := p.api.FolderIDs(ctx)
 	if err != nil {
-		return provider.Changes{}, "", errdefs.Wrap(errdefs.KindPermanent, err)
+		return nil, err
 	}
-	return changes, string(raw), nil
+	p.folderIDs = ids
+	return ids, nil
 }
 
 // threadDelta folds a conversation's messages into the provider-neutral

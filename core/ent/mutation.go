@@ -2111,6 +2111,7 @@ type MessageMutation struct {
 	cc                  *[]string
 	appendcc            []string
 	date                *time.Time
+	is_sent             *bool
 	snippet             *string
 	body_text           *string
 	reply_headers       *map[string]string
@@ -2468,6 +2469,42 @@ func (m *MessageMutation) ResetDate() {
 	m.date = nil
 }
 
+// SetIsSent sets the "is_sent" field.
+func (m *MessageMutation) SetIsSent(b bool) {
+	m.is_sent = &b
+}
+
+// IsSent returns the value of the "is_sent" field in the mutation.
+func (m *MessageMutation) IsSent() (r bool, exists bool) {
+	v := m.is_sent
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIsSent returns the old "is_sent" field's value of the Message entity.
+// If the Message object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MessageMutation) OldIsSent(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIsSent is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIsSent requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIsSent: %w", err)
+	}
+	return oldValue.IsSent, nil
+}
+
+// ResetIsSent resets all changes to the "is_sent" field.
+func (m *MessageMutation) ResetIsSent() {
+	m.is_sent = nil
+}
+
 // SetSnippet sets the "snippet" field.
 func (m *MessageMutation) SetSnippet(s string) {
 	m.snippet = &s
@@ -2714,7 +2751,7 @@ func (m *MessageMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MessageMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 11)
 	if m.provider_message_id != nil {
 		fields = append(fields, message.FieldProviderMessageID)
 	}
@@ -2732,6 +2769,9 @@ func (m *MessageMutation) Fields() []string {
 	}
 	if m.date != nil {
 		fields = append(fields, message.FieldDate)
+	}
+	if m.is_sent != nil {
+		fields = append(fields, message.FieldIsSent)
 	}
 	if m.snippet != nil {
 		fields = append(fields, message.FieldSnippet)
@@ -2765,6 +2805,8 @@ func (m *MessageMutation) Field(name string) (ent.Value, bool) {
 		return m.Cc()
 	case message.FieldDate:
 		return m.Date()
+	case message.FieldIsSent:
+		return m.IsSent()
 	case message.FieldSnippet:
 		return m.Snippet()
 	case message.FieldBodyText:
@@ -2794,6 +2836,8 @@ func (m *MessageMutation) OldField(ctx context.Context, name string) (ent.Value,
 		return m.OldCc(ctx)
 	case message.FieldDate:
 		return m.OldDate(ctx)
+	case message.FieldIsSent:
+		return m.OldIsSent(ctx)
 	case message.FieldSnippet:
 		return m.OldSnippet(ctx)
 	case message.FieldBodyText:
@@ -2852,6 +2896,13 @@ func (m *MessageMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetDate(v)
+		return nil
+	case message.FieldIsSent:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIsSent(v)
 		return nil
 	case message.FieldSnippet:
 		v, ok := value.(string)
@@ -2956,6 +3007,9 @@ func (m *MessageMutation) ResetField(name string) error {
 		return nil
 	case message.FieldDate:
 		m.ResetDate()
+		return nil
+	case message.FieldIsSent:
+		m.ResetIsSent()
 		return nil
 	case message.FieldSnippet:
 		m.ResetSnippet()

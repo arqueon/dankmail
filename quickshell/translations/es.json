@@ -15,7 +15,8 @@
     "Unread": "No leídos",
     "Starred": "Destacados",
     "Archived": "Archivados",
-    "Spam": "Spam"
+    "Spam": "Spam",
+    "Sent": "Enviados"
   },
   "bulk action": {
     "%1 selected": "%1 seleccionados"
@@ -32,7 +33,8 @@
     "Daemon offline": "Daemon desconectado",
     "No accounts yet": "Aún no hay cuentas",
     "Add a Gmail account": "Añadir cuenta de Gmail",
-    "No local results — search the full history or the web": "Sin resultados locales — busca en el historial completo o en la web"
+    "No local results — search the full history or the web": "Sin resultados locales — busca en el historial completo o en la web",
+    "No sent mail": "No hay correos enviados"
   },
   "search": {
     "Search mail…": "Buscar correo…",
@@ -43,7 +45,12 @@
     "Load older archived mail": "Cargar archivados anteriores",
     "Retry archived history": "Reintentar carga de archivados",
     "This account only supports cached archived mail.": "Esta cuenta solo permite consultar los archivados guardados localmente.",
-    "Could not load archived history. Try again later.": "No se pudieron cargar los archivados. Inténtalo más tarde."
+    "Could not load archived history. Try again later.": "No se pudieron cargar los archivados. Inténtalo más tarde.",
+    "This account only supports cached sent mail.": "Esta cuenta solo permite consultar enviados en caché.",
+    "Could not load sent mail. Try again later.": "No se pudieron cargar los enviados. Intenta más tarde.",
+    "Loading sent mail…": "Cargando enviados…",
+    "Retry sent mail": "Reintentar enviados",
+    "Load older sent mail": "Cargar enviados anteriores"
   },
   "account wizard title": {
     "Add account": "Añadir cuenta"
@@ -179,5 +186,20 @@
     "%1 threads marked as Spam.": "%1 hilos marcados como Spam.",
     "1 thread snoozed.": "1 hilo pospuesto.",
     "%1 threads snoozed.": "%1 hilos pospuestos."
+  },
+  "message body": {
+    "Link": "Enlace"
+  },
+  "thread action": {
+    "Not spam": "No es spam"
+  },
+  "account status": {
+    "Sign in required": "Inicia sesión",
+    "Sync paused": "Sincronización en pausa",
+    "Connected": "Conectada",
+    "Last completed sync: %1": "Última sincronización completa: %1"
+  },
+  "operation error": {
+    "Could not apply the action: %1": "No se pudo aplicar la acción: %1"
   }
 }

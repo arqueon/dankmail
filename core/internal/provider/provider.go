@@ -64,10 +64,17 @@ const (
 // since the given cursor. IDs are provider-native thread/message IDs; the
 // sync engine maps them to local rows.
 type Changes struct {
+	// Incomplete marks a durable checkpoint, not a completed sync. The
+	// returned cursor and these deltas must be committed atomically, even
+	// when Sync also returns a transient error. Never prune a partial snapshot.
+	Incomplete bool
+	// SnapshotThreadIDs includes threads committed by earlier checkpoints
+	// of a full resync. Only the final batch may prune the complete snapshot.
+	SnapshotThreadIDs []string
 	// FullResync signals the cursor was invalid/expired (Gmail history 404,
-	// IMAP UIDVALIDITY change) and this payload is a complete snapshot:
-	// the local cache for the account must be reconciled against it, and
-	// threads absent from it treated as gone.
+	// IMAP UIDVALIDITY change) and this is part of a full snapshot. Only
+	// its final batch may remove absent threads; SnapshotThreadIDs carries
+	// the membership established by earlier batches.
 	FullResync bool
 	// Backfill marks deltas that ingest OLD mail on purpose (remote
 	// search results): upsert normally but never notify, never prune.
@@ -191,7 +198,8 @@ type Provider interface {
 	// Sync returns remote changes since cursor and the new cursor to
 	// persist. An empty cursor requests an initial full sync (Changes with
 	// FullResync=true). Providers without CapHistorySync ignore the cursor
-	// and always return a full snapshot.
+	// and always return a full snapshot. Incomplete results carry durable
+	// partial progress even when accompanied by an error.
 	Sync(ctx context.Context, cursor string) (Changes, string, error)
 
 	// ModifyFlags adds and removes flags on the given threads.
@@ -230,4 +238,9 @@ type Provider interface {
 	// the URL targets the specific thread/message; without it providers
 	// may still return a mailbox-level URL (ok=true) or nothing (ok=false).
 	WebLink(threadID, messageID string) (url string, ok bool)
+}
+
+// SentPager reads recent sent conversations on demand, newest first, in small pages.
+type SentPager interface {
+	SentPage(ctx context.Context, pageToken string) (Changes, string, error)
 }

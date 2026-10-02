@@ -44,6 +44,7 @@ type AttachmentView struct {
 }
 
 type MessageView struct {
+	IsSent            bool      `json:"isSent"`
 	ID                int       `json:"id"`
 	ProviderMessageID string    `json:"providerMessageId"`
 	From              string    `json:"from"`

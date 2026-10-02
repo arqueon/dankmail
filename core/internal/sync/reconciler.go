@@ -34,6 +34,16 @@ func NewReconciler(db *ent.Client, b *bus.Bus) *Reconciler {
 // threads.changed once, and message.arrived for every genuinely new
 // message that should be considered for notification.
 func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider.Changes) error {
+	return r.apply(ctx, accountID, ch, nil)
+}
+
+// ApplySync commits the downloaded data and continuation in one transaction.
+// A crash can replay at most the uncommitted batch; it cannot skip its mail.
+func (r *Reconciler) ApplySync(ctx context.Context, accountID uuid.UUID, ch provider.Changes, cursor string) error {
+	return r.apply(ctx, accountID, ch, &cursor)
+}
+
+func (r *Reconciler) apply(ctx context.Context, accountID uuid.UUID, ch provider.Changes, cursor *string) error {
 	frozen, err := r.frozenThreadIDs(ctx, accountID)
 	if err != nil {
 		return err
@@ -42,6 +52,9 @@ func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider
 	var arrivals []map[string]any
 	err = withTx(ctx, r.db, func(tx *ent.Tx) error {
 		seen := make(map[string]bool, len(ch.Upserted))
+		for _, id := range ch.SnapshotThreadIDs {
+			seen[id] = true
+		}
 		for _, delta := range ch.Upserted {
 			seen[delta.ThreadID] = true
 			// FullResync and Backfill (remote search results) re-ingest
@@ -72,7 +85,7 @@ func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider
 			}
 		}
 
-		if ch.FullResync {
+		if ch.FullResync && !ch.Incomplete {
 			// This snapshot covers monitored folders, not browsed history.
 			// Preserve backfilled threads, frozen operations and snoozes;
 			// explicit removals and retention still clean up history.
@@ -94,6 +107,13 @@ func (r *Reconciler) Apply(ctx context.Context, accountID uuid.UUID, ch provider
 					return err
 				}
 			}
+		}
+		if cursor != nil {
+			update := tx.Account.UpdateOneID(accountID).SetSyncCursor(*cursor).SetLastError("")
+			if !ch.Incomplete {
+				update.SetLastSyncAt(time.Now().UTC()).SetNeedsReauth(false).SetAuthError("")
+			}
+			return update.Exec(ctx)
 		}
 		return nil
 	})
@@ -212,6 +232,13 @@ func upsertThread(ctx context.Context, tx *ent.Tx, accountID uuid.UUID, d provid
 			return nil, err
 		}
 		if existing != nil {
+			// Populate the sent flag for caches created before the Sent view.
+			// Mailbox/folder changes can also change this provider fact.
+			if existing.IsSent != m.IsSent {
+				if err := tx.Message.UpdateOne(existing).SetIsSent(m.IsSent).Exec(ctx); err != nil {
+					return nil, err
+				}
+			}
 			// Backfill attachment metadata for messages ingested before
 			// the feature existed (full resyncs re-deliver them).
 			if len(m.Attachments) > 0 && len(existing.Attachments) == 0 {
@@ -238,6 +265,7 @@ func upsertThread(ctx context.Context, tx *ent.Tx, accountID uuid.UUID, d provid
 			SetDate(timeFromUnix(m.Date)).
 			SetSnippet(m.Snippet).
 			SetBodyText(m.BodyText).
+			SetIsSent(m.IsSent).
 			SetReplyHeaders(replyHeaders(m)).
 			SetAttachments(m.Attachments).
 			Save(ctx); err != nil {

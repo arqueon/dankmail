@@ -82,16 +82,20 @@ func init() {
 	messageDescCc := messageFields[4].Descriptor()
 	// message.DefaultCc holds the default value on creation for the cc field.
 	message.DefaultCc = messageDescCc.Default.([]string)
+	// messageDescIsSent is the schema descriptor for is_sent field.
+	messageDescIsSent := messageFields[6].Descriptor()
+	// message.DefaultIsSent holds the default value on creation for the is_sent field.
+	message.DefaultIsSent = messageDescIsSent.Default.(bool)
 	// messageDescSnippet is the schema descriptor for snippet field.
-	messageDescSnippet := messageFields[6].Descriptor()
+	messageDescSnippet := messageFields[7].Descriptor()
 	// message.DefaultSnippet holds the default value on creation for the snippet field.
 	message.DefaultSnippet = messageDescSnippet.Default.(string)
 	// messageDescBodyText is the schema descriptor for body_text field.
-	messageDescBodyText := messageFields[7].Descriptor()
+	messageDescBodyText := messageFields[8].Descriptor()
 	// message.DefaultBodyText holds the default value on creation for the body_text field.
 	message.DefaultBodyText = messageDescBodyText.Default.(string)
 	// messageDescReplyHeaders is the schema descriptor for reply_headers field.
-	messageDescReplyHeaders := messageFields[8].Descriptor()
+	messageDescReplyHeaders := messageFields[9].Descriptor()
 	// message.DefaultReplyHeaders holds the default value on creation for the reply_headers field.
 	message.DefaultReplyHeaders = messageDescReplyHeaders.Default.(map[string]string)
 	notifyruleFields := schema.NotifyRule{}.Fields()

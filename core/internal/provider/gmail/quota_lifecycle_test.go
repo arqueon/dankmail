@@ -113,8 +113,8 @@ func TestSyncRetryBudgetSpansHistoryPages(t *testing.T) {
 	if !errors.As(err, &deferred) || attempts[""] != 2 || attempts["two"] != 2 || attempts["three"] != 1 {
 		t.Fatalf("budget reset per page: attempts=%v err=%v", attempts, err)
 	}
-	if cursor != "" || len(changes.Upserted) != 0 || changes.FullResync {
-		t.Fatal("incomplete sync must not advance cursor or reconcile a partial snapshot")
+	if cursor == "" || !changes.Incomplete || len(changes.Upserted) != 0 || changes.FullResync {
+		t.Fatal("interrupted history must preserve a continuation without claiming completion")
 	}
 	var retryWait time.Duration
 	for _, d := range *sleeps {
@@ -128,7 +128,7 @@ func TestSyncRetryBudgetSpansHistoryPages(t *testing.T) {
 	// A later operation gets a fresh budget; it does not inherit the previous
 	// operation's spent budget simply because the Provider is cached.
 	q.sleep(context.Background(), deferred.RetryAfter())
-	if _, _, err := p.Sync(context.Background(), cursorV2Prefix+"10"); err != nil {
+	if _, _, err := p.Sync(context.Background(), cursor); err != nil {
 		t.Fatalf("new operation inherited exhausted budget: %v", err)
 	}
 }

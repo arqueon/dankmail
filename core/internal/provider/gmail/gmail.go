@@ -13,8 +13,6 @@ import (
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"net/mail"
 	"net/url"
-	"sort"
-	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -103,123 +101,6 @@ func (p *Provider) Capabilities() provider.Capability {
 		provider.CapHistorySync |
 		provider.CapUnspam |
 		provider.CapSpam
-}
-
-// Sync returns remote changes since cursor and the new cursor. An empty
-// or unparseable cursor, and an expired one (history 404), trigger the
-// full-resync path.
-func (p *Provider) Sync(ctx context.Context, cursor string) (provider.Changes, string, error) {
-	ctx = withRetryBudget(ctx)
-	// v2 added STARRED to the always-monitored labels. Treat old numeric
-	// cursors as stale once so existing accounts import archived stars.
-	if cursor == "" || !strings.HasPrefix(cursor, cursorV2Prefix) {
-		return p.fullSync(ctx)
-	}
-	start, err := strconv.ParseUint(strings.TrimPrefix(cursor, cursorV2Prefix), 10, 64)
-	if err != nil {
-		// A corrupt cursor is equivalent to an expired one.
-		return p.fullSync(ctx)
-	}
-	return p.incrementalSync(ctx, start)
-}
-
-// fullSync captures the profile historyId FIRST (so changes racing the
-// listing are replayed by the next incremental sync), then lists every
-// monitored label and fetches each thread once.
-func (p *Provider) fullSync(ctx context.Context) (provider.Changes, string, error) {
-	_, historyID, err := p.api.GetProfile(ctx)
-	if err != nil {
-		return provider.Changes{}, "", classify(err)
-	}
-
-	changes := provider.Changes{FullResync: true}
-	seen := map[string]bool{}
-	for _, label := range p.labels {
-		pageToken := ""
-		for {
-			ids, next, err := p.api.ListThreads(ctx, []string{label}, pageToken)
-			if err != nil {
-				return provider.Changes{}, "", classify(err)
-			}
-			for _, id := range ids {
-				if seen[id] {
-					continue
-				}
-				seen[id] = true
-				t, err := p.api.GetThread(ctx, id)
-				if err != nil {
-					if isNotFound(err) {
-						continue // raced away between list and get
-					}
-					return provider.Changes{}, "", classify(err)
-				}
-				if d := p.threadDelta(t); d.MessageCount > 0 {
-					changes.Upserted = append(changes.Upserted, d)
-				}
-			}
-			if next == "" {
-				break
-			}
-			pageToken = next
-		}
-	}
-	return changes, cursorV2Prefix + strconv.FormatUint(historyID, 10), nil
-}
-
-// incrementalSync replays history since start. Affected threads are
-// re-fetched whole; a 404 on the fetch means the thread is gone and only
-// then does it land in RemovedThreadIDs — archived or trashed threads
-// come back as upserts with InInbox=false so local snooze/retention
-// logic can decide what to do.
-func (p *Provider) incrementalSync(ctx context.Context, start uint64) (provider.Changes, string, error) {
-	maxHistory := start
-	affected := map[string]bool{}
-	pageToken := ""
-	for {
-		resp, err := p.api.ListHistory(ctx, start, pageToken)
-		if err != nil {
-			if isNotFound(err) {
-				// Cursor expired: Gmail only keeps recent history.
-				return p.fullSync(ctx)
-			}
-			return provider.Changes{}, "", classify(err)
-		}
-		if resp.HistoryId > maxHistory {
-			maxHistory = resp.HistoryId
-		}
-		for _, h := range resp.History {
-			if h.Id > maxHistory {
-				maxHistory = h.Id
-			}
-			collectThreadIDs(affected, h)
-		}
-		if resp.NextPageToken == "" {
-			break
-		}
-		pageToken = resp.NextPageToken
-	}
-
-	ids := make([]string, 0, len(affected))
-	for id := range affected {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-
-	var changes provider.Changes
-	for _, id := range ids {
-		t, err := p.api.GetThread(ctx, id)
-		if err != nil {
-			if isNotFound(err) {
-				changes.RemovedThreadIDs = append(changes.RemovedThreadIDs, id)
-				continue
-			}
-			return provider.Changes{}, "", classify(err)
-		}
-		if d := p.threadDelta(t); d.MessageCount > 0 {
-			changes.Upserted = append(changes.Upserted, d)
-		}
-	}
-	return changes, cursorV2Prefix + strconv.FormatUint(maxHistory, 10), nil
 }
 
 func collectThreadIDs(dst map[string]bool, h *gmailv1.History) {
@@ -641,6 +522,8 @@ func truncateAtRune(s string, capBytes int) string {
 // archiveCursor preserves unfinished thread IDs when quota pacing interrupts a
 // page, so retrying never downloads the successful prefix again.
 type archiveCursor struct {
+	Account   string   `json:"account,omitempty"`
+	Query     string   `json:"query,omitempty"`
 	Page      string   `json:"page,omitempty"`
 	Remaining []string `json:"remaining,omitempty"`
 }
@@ -656,6 +539,14 @@ func encodeArchiveCursor(c archiveCursor) string {
 // ArchivedPage fetches a small Gmail page; local filtering still excludes
 // mixed inbox/spam/trash threads after Gmail returns full conversations.
 func (p *Provider) ArchivedPage(ctx context.Context, pageToken string) (provider.Changes, string, error) {
+	return p.historyPage(ctx, "-in:inbox -in:spam -in:trash -is:draft", pageToken)
+}
+
+func (p *Provider) SentPage(ctx context.Context, pageToken string) (provider.Changes, string, error) {
+	return p.historyPage(ctx, "in:sent -in:trash -is:draft", pageToken)
+}
+
+func (p *Provider) historyPage(ctx context.Context, query, pageToken string) (provider.Changes, string, error) {
 	ctx = withRetryBudget(ctx)
 	cursor := archiveCursor{}
 	if pageToken != "" {
@@ -667,10 +558,13 @@ func (p *Provider) ArchivedPage(ctx context.Context, pageToken string) (provider
 			return provider.Changes{}, pageToken, fmt.Errorf("invalid archive cursor")
 		}
 	}
+	if (cursor.Account != "" && cursor.Account != p.accountID) || (cursor.Query != "" && cursor.Query != query) {
+		return provider.Changes{}, pageToken, fmt.Errorf("history cursor belongs to another mailbox")
+	}
 	ids, next := cursor.Remaining, cursor.Page
 	if len(ids) == 0 {
 		var err error
-		ids, next, err = p.api.SearchThreads(ctx, "-in:inbox -in:spam -in:trash -is:draft", cursor.Page, 25)
+		ids, next, err = p.api.SearchThreads(ctx, query, cursor.Page, 25)
 		if err != nil {
 			return provider.Changes{}, pageToken, classify(err)
 		}
@@ -682,11 +576,11 @@ func (p *Provider) ArchivedPage(ctx context.Context, pageToken string) (provider
 			if isNotFound(err) {
 				continue
 			}
-			return changes, encodeArchiveCursor(archiveCursor{Page: next, Remaining: ids[i:]}), classify(err)
+			return changes, encodeArchiveCursor(archiveCursor{Account: p.accountID, Query: query, Page: next, Remaining: ids[i:]}), classify(err)
 		}
 		if d := p.threadDelta(t); d.MessageCount > 0 {
 			changes.Upserted = append(changes.Upserted, d)
 		}
 	}
-	return changes, encodeArchiveCursor(archiveCursor{Page: next}), nil
+	return changes, encodeArchiveCursor(archiveCursor{Account: p.accountID, Query: query, Page: next}), nil
 }

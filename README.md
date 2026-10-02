@@ -149,3 +149,17 @@ UI components utilize modified parts of the MIT-licensed infrastructure from `da
 ### Archived mail
 
 Choose **Archived** to load archived history from Gmail, including unstarred mail that has never been cached. **Load older archived mail** retrieves the next provider page; **Load more** displays more already-cached results. Conversations are sorted by newest message, with spam, trash, drafts and snoozed mail excluded. Account filtering and local search remain available. Browsed history stays cached for the retention period after loading, without new-mail notifications. Providers without archive-history support show cached results with an explicit notice.
+
+## Mailbox updates and reading
+
+Synchronization checkpoints downloaded batches, so a quota pause or restart can
+resume without discarding all earlier progress. A slow account does not block a
+manual sync of the others. Account settings show the last completed sync and errors.
+
+**Sent** loads recent outgoing conversations from Gmail or Microsoft in pages of
+25, with an explicit control for older mail. **Not spam** is available for the
+open conversation and bulk selections, including selections across accounts.
+
+The reader formats distilled text into paragraphs, lists, quotes, tables and code
+blocks. Links allow HTTP(S) and mailto only; remote images and original message
+HTML are not loaded. Button styling follows DankCalendar and DMS theme colors.

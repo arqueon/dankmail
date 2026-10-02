@@ -9,7 +9,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
@@ -30,7 +32,9 @@ const convSelect = "id,conversationId,internetMessageId,subject,bodyPreview,from
 // Client is the real graphAPI over HTTP; hc must inject OAuth (an
 // oauth2.NewClient built from the persisting token source).
 type Client struct {
-	hc *http.Client
+	hc       *http.Client
+	mu       sync.Mutex
+	cooldown *graphError
 }
 
 func NewClient(hc *http.Client) *Client { return &Client{hc: hc} }
@@ -126,6 +130,16 @@ func (w *wireMessage) toGraphMessage() *graphMessage {
 // --- request plumbing -------------------------------------------------
 
 func (c *Client) do(ctx context.Context, method, u string, body any, out any) error {
+	parsed, err := url.Parse(u)
+	if err != nil || parsed.Scheme != "https" || parsed.Host != "graph.microsoft.com" || parsed.User != nil {
+		return fmt.Errorf("invalid Microsoft Graph continuation URL")
+	}
+	c.mu.Lock()
+	blocked := c.cooldown
+	c.mu.Unlock()
+	if blocked != nil && blocked.RetryAfter() > 0 {
+		return blocked
+	}
 	var rdr io.Reader
 	if body != nil {
 		raw, err := json.Marshal(body)
@@ -141,6 +155,7 @@ func (c *Client) do(ctx context.Context, method, u string, body any, out any) er
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
+	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="text"`)
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		return err
@@ -155,7 +170,22 @@ func (c *Client) do(ctx context.Context, method, u string, body any, out any) er
 		}
 		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
 		_ = json.Unmarshal(raw, &doc)
-		return &graphError{Status: resp.StatusCode, Code: doc.Error.Code, Msg: doc.Error.Message}
+		failure := &graphError{Status: resp.StatusCode, Code: doc.Error.Code, Msg: doc.Error.Message}
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
+			delay := time.Minute
+			if seconds, err := strconv.ParseInt(resp.Header.Get("Retry-After"), 10, 32); err == nil && seconds > 0 {
+				delay = time.Duration(seconds) * time.Second
+			} else if until, err := http.ParseTime(resp.Header.Get("Retry-After")); err == nil {
+				delay = max(time.Second, time.Until(until))
+			}
+			failure.Until = time.Now().Add(delay)
+			c.mu.Lock()
+			if c.cooldown == nil || failure.Until.After(c.cooldown.Until) {
+				c.cooldown = failure
+			}
+			c.mu.Unlock()
+		}
+		return failure
 	}
 	if out == nil {
 		return nil

@@ -6,6 +6,7 @@ import qs.Modals
 import qs.Services
 import qs.Widgets
 import "../Common/ThreadSearch.js" as ThreadSearch
+import "../Common/BodyFormatter.js" as BodyFormatter
 
 // Main triage window: unified thread list (left) + plain-text preview
 // (right). Everything here is a view over the daemon: actions enqueue
@@ -31,6 +32,22 @@ FloatingWindow {
     color: Theme.surface
 
     property int selectedThreadId: -1
+    property string operationError: ""
+
+    Connections {
+        target: DankMailService
+        function onOpFailed(opType, error) {
+            window.operationError = I18n.tr("Could not apply the action: %1", "operation error").arg(error);
+        }
+    }
+
+    function previewMessage() {
+        const t = DankMailService.currentThread;
+        if (!t || !t.messages)
+            return null;
+        const messages = DankMailService.filterLabel === "SENT" ? t.messages.filter(m => m.isSent) : t.messages;
+        return messages.length ? messages[messages.length - 1] : null;
+    }
 
     function selectThread(t) {
         selectedThreadId = t.id;
@@ -196,88 +213,12 @@ FloatingWindow {
         return Qt.formatDate(d, "dd/MM/yy");
     }
 
-    function escapeHtml(s) {
-        return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }
-
-    function makeAnchor(url, label) {
-        return `<a href="${url.replace(/&amp;/g, "&")}"><font color="${Theme.primary}">${label}</font></a>`;
-    }
-
-    // linkify wraps bare http(s)/mailto URLs in already-escaped text,
-    // shortening very long ones for display (href keeps the full URL).
-    function linkify(escaped) {
-        return escaped.replace(/(https?:\/\/[^\s&]*(?:&amp;[^\s&]*)*|mailto:[^\s<]+)/g, url => {
-            const label = url.length > 64 ? url.substring(0, 60) + "…" : url;
-            return makeAnchor(url, label);
-        });
-    }
-
-    // renderInline turns the light markdown that the HTML→text distiller
-    // emits into presentation markup: [text](url) becomes a clickable
-    // label (URL hidden), image-buttons collapse to their alt text,
-    // **bold** becomes bold, and leftover bare URLs get linkified.
-    // Anchors are stashed behind \x01N\x01 placeholders so later passes
-    // never touch URLs already inside an href.
-    function renderInline(escaped) {
-        let s = escaped.replace(/\\([\\`*_{}\[\]()#+\-.!~])/g, "$1"); // markdown escapes
-        const stash = [];
-        const put = html => {
-            stash.push(html);
-            return "\x01" + (stash.length - 1) + "\x01";
-        };
-        const boldify = t => t.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
-
-        // [![alt](img)](url) — image buttons (Guardar/Twitter/…): keep a
-        // small labeled link, drop the image.
-        s = s.replace(/\[!\[([^\]]*)\]\(([^()\s]+)\)\]\(([^()\s]+)\)/g, (m, alt, img, url) => put(makeAnchor(url, (alt !== "" ? alt : "enlace") + " ↗")));
-        // ![alt](img) — plain images: alt text only.
-        s = s.replace(/!\[([^\]]*)\]\(([^()\s]+)\)/g, (m, alt) => alt);
-        // [text](url) — regular links: clickable label, URL hidden.
-        s = s.replace(/\[([^\]]+)\]\(([^()\s]+)\)/g, (m, txt, url) => put(makeAnchor(url, boldify(txt))));
-
-        s = boldify(s);
-        s = linkify(s);
-        return s.replace(/\x01(\d+)\x01/g, (m, i) => stash[i]);
-    }
-
-    // formatBody turns the plain-text body into our own presentation
-    // markup (this is NOT rendering the email's HTML — the source stays
-    // plain text): quote levels ('>', '>>', …) become indented, colored
-    // blocks with the markers stripped, and URLs become clickable.
     function formatBody(text) {
-        const quoteColors = [String(Theme.surfaceText), String(Theme.primary), String(Theme.success), String(Theme.warning), String(Theme.secondary)];
-        const lines = text.split("\n");
-        let html = "";
-        let depth = 0;
-        for (let i = 0; i < lines.length; i++) {
-            const m = lines[i].match(/^\s*((?:>\s?)+)/);
-            const d = m ? (m[1].match(/>/g) || []).length : 0;
-            const content = m ? lines[i].substring(m[0].length) : lines[i];
-            while (depth < d) {
-                html += "<blockquote>";
-                depth++;
-            }
-            while (depth > d) {
-                html += "</blockquote>";
-                depth--;
-            }
-            const color = quoteColors[Math.min(d, quoteColors.length - 1)];
-            let body = renderInline(escapeHtml(content));
-            // Markdown headings from the distiller → bold lines.
-            const h = body.match(/^\s*#{1,6}\s+(.*)$/);
-            if (h)
-                body = "<b>" + h[1] + "</b>";
-            // One paragraph per source line (not <br>) so each line is its
-            // own text block: triple-click then selects the line instead of
-            // the whole body.
-            html += `<p style="margin:0"><font color="${color}">${body === "" ? "&nbsp;" : body}</font></p>`;
-        }
-        while (depth > 0) {
-            html += "</blockquote>";
-            depth--;
-        }
-        return html;
+        return BodyFormatter.format(text, {
+            linkColor: String(Theme.primary),
+            quoteColor: String(Theme.surfaceTextMedium),
+            linkLabel: I18n.tr("Link", "message body")
+        });
     }
 
     // Entry points for the shell's pending-intent dispatch (ui.showThread
@@ -498,6 +439,26 @@ FloatingWindow {
             color: Theme.outlineMedium
         }
 
+        StyledRect {
+            Layout.fillWidth: true
+            implicitHeight: operationErrorRow.implicitHeight + Theme.spacingM * 2
+            visible: window.operationError !== ""
+            color: Theme.withAlpha(Theme.error, 0.12)
+            RowLayout {
+                id: operationErrorRow
+                anchors.fill: parent
+                anchors.margins: Theme.spacingM
+                StyledText {
+                    Layout.fillWidth: true
+                    text: window.operationError
+                    textFormat: Text.PlainText
+                    wrapMode: Text.Wrap
+                    color: Theme.error
+                }
+                DankActionButton { iconName: "close"; onClicked: window.operationError = "" }
+            }
+        }
+
         // Quick mailbox filters.
         Flow {
             Layout.fillWidth: true
@@ -523,6 +484,10 @@ FloatingWindow {
                         "label": I18n.tr("Archived", "filter")
                     },
                     {
+                        "key": "sent",
+                        "label": I18n.tr("Sent", "filter")
+                    },
+                    {
                         "key": "spam",
                         "label": I18n.tr("Spam", "filter")
                     }
@@ -530,7 +495,7 @@ FloatingWindow {
 
                 delegate: StyledRect {
                     required property var modelData
-                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterArchived && DankMailService.filterLabel === "")
+                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "sent" && DankMailService.filterLabel === "SENT") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterArchived && DankMailService.filterLabel === "")
 
                     width: filterLabel.implicitWidth + Theme.spacingL
                     height: 30
@@ -551,7 +516,7 @@ FloatingWindow {
                             DankMailService.filterUnread = parent.modelData.key === "unread";
                             DankMailService.filterStarred = parent.modelData.key === "starred";
                             DankMailService.filterArchived = parent.modelData.key === "archived";
-                            DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : "";
+                            DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : parent.modelData.key === "sent" ? "SENT" : "";
                             window.checkedIds = [];
                             DankMailService.refreshThreads();
                         }
@@ -612,10 +577,11 @@ FloatingWindow {
                         }
                     }
 
-                    DankActionButton {
-                        buttonSize: 28
+                    DankButton {
+                        buttonHeight: 32
+                        horizontalPadding: Theme.spacingM
+                        text: I18n.tr("Not spam", "thread action")
                         iconName: "move_to_inbox"
-                        iconColor: Theme.primary
                         onClicked: {
                             window.queueUndoableAction("unspam", window.checkedIds);
                             window.checkedIds = [];
@@ -768,15 +734,17 @@ FloatingWindow {
                         StyledText {
                             width: parent.width - 2 * Theme.spacingS
                             wrapMode: Text.Wrap
-                            visible: DankMailService.filterArchived && (DankMailService.archiveWarning !== "" || DankMailService.archiveUnsupported)
-                            text: DankMailService.archiveUnsupported
+                            visible: (DankMailService.filterArchived || DankMailService.filterLabel === "SENT") && (DankMailService.archiveWarning !== "" || DankMailService.archiveUnsupported)
+                            text: DankMailService.filterLabel === "SENT"
+                                ? (DankMailService.archiveUnsupported ? I18n.tr("This account only supports cached sent mail.", "search") : I18n.tr("Could not load sent mail. Try again later.", "search"))
+                                : DankMailService.archiveUnsupported
                                 ? I18n.tr("This account only supports cached archived mail.", "search")
                                 : I18n.tr("Could not load archived history. Try again later.", "search")
                             color: Theme.surfaceTextMedium
                         }
 
                         StyledRect {
-                            visible: DankMailService.filterArchived && DankMailService.archiveHasMore
+                            visible: (DankMailService.filterArchived || DankMailService.filterLabel === "SENT") && DankMailService.archiveHasMore
                             width: archiveMoreLabel.implicitWidth + Theme.spacingXL
                             height: 36
                             radius: 18
@@ -785,7 +753,9 @@ FloatingWindow {
                             StyledText {
                                 id: archiveMoreLabel
                                 anchors.centerIn: parent
-                                text: DankMailService.archiveLoading
+                                text: DankMailService.filterLabel === "SENT"
+                                    ? (DankMailService.archiveLoading ? I18n.tr("Loading sent mail…", "search") : DankMailService.archiveWarning !== "" ? I18n.tr("Retry sent mail", "search") : I18n.tr("Load older sent mail", "search"))
+                                    : DankMailService.archiveLoading
                                     ? I18n.tr("Loading archived mail…", "search")
                                     : DankMailService.archiveWarning !== ""
                                         ? I18n.tr("Retry archived history", "search")
@@ -1157,6 +1127,8 @@ FloatingWindow {
                                 return I18n.tr("No accounts yet", "empty state");
                             if (DankMailService.searchQuery !== "")
                                 return I18n.tr("No local results — search the full history or the web", "empty state");
+                            if (DankMailService.filterLabel === "SENT")
+                                return I18n.tr("No sent mail", "empty state");
                             if (DankMailService.filterArchived)
                                 return I18n.tr("No archived mail", "empty state");
                             return I18n.tr("Inbox zero", "empty state");
@@ -1227,12 +1199,7 @@ FloatingWindow {
                             Layout.fillWidth: true
                             spacing: Theme.spacingS
 
-                            readonly property var lastMsg: {
-                                const t = DankMailService.currentThread;
-                                if (!t || !t.messages || t.messages.length === 0)
-                                    return null;
-                                return t.messages[t.messages.length - 1];
-                            }
+                            readonly property var lastMsg: window.previewMessage()
                             readonly property var fromAddr: lastMsg ? DankMailService.parseAddress(lastMsg.from) : null
                             id: fromLine
 
@@ -1289,7 +1256,7 @@ FloatingWindow {
                                 return "";
                             }
                             readonly property bool bccLikely: {
-                                if (ownEmail === "" || !fromLine.lastMsg)
+                                if (ownEmail === "" || !fromLine.lastMsg || fromLine.lastMsg.isSent)
                                     return false;
                                 const all = toList.concat(ccList);
                                 for (let i = 0; i < all.length; i++) {
@@ -1388,9 +1355,23 @@ FloatingWindow {
                         }
                     }
 
-                    // Action bar — archive leads, Gmail-style.
-                    RowLayout {
+                    // Wrap actions at narrow widths, including the labeled rescue action.
+                    Flow {
+                        Layout.fillWidth: true
                         spacing: Theme.spacingXS
+
+                        DankButton {
+                            buttonHeight: 32
+                            horizontalPadding: Theme.spacingM
+                            text: I18n.tr("Not spam", "thread action")
+                            iconName: "move_to_inbox"
+                            visible: !!DankMailService.currentThread && (DankMailService.currentThread.labels || []).indexOf("SPAM") !== -1
+                            onClicked: {
+                                const t = DankMailService.currentThread;
+                                if (t)
+                                    window.queueUndoableAction("unspam", [t.id]);
+                            }
+                        }
 
                         DankActionButton {
                             iconName: "archive"
@@ -1471,10 +1452,6 @@ FloatingWindow {
                                 if (forwardArea.visible)
                                     forwardToInput.forceActiveFocus();
                             }
-                        }
-
-                        Item {
-                            Layout.fillWidth: true
                         }
 
                         DankActionButton {
@@ -1657,12 +1634,14 @@ FloatingWindow {
                     DankFlickable {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        contentHeight: bodyText.implicitHeight
+                        contentHeight: bodyText.implicitHeight + Theme.spacingL * 2
                         clip: true
 
                         TextEdit {
                             id: bodyText
-                            width: parent.width
+                            width: Math.min(parent.width - Theme.spacingL * 2, 760)
+                            x: (parent.width - width) / 2
+                            y: Theme.spacingL
                             readOnly: true
                             selectByMouse: true
                             wrapMode: TextEdit.Wrap
@@ -1672,13 +1651,11 @@ FloatingWindow {
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeMedium
                             text: {
-                                const t = DankMailService.currentThread;
-                                if (!t || !t.messages || t.messages.length === 0)
-                                    return "";
-                                return window.formatBody(t.messages[t.messages.length - 1].bodyText || "");
+                                const message = window.previewMessage();
+                                return message ? window.formatBody(message.bodyText || "") : "";
                             }
                             onLinkActivated: link => {
-                                if (link.startsWith("http://") || link.startsWith("https://") || link.startsWith("mailto:"))
+                                if (BodyFormatter.safeUrl(link))
                                     Qt.openUrlExternally(link);
                             }
 

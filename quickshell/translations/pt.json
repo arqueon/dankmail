@@ -15,7 +15,8 @@
     "Unread": "Não lidas",
     "Starred": "Com estrela",
     "Archived": "Arquivados",
-    "Spam": "Spam"
+    "Spam": "Spam",
+    "Sent": "Enviados"
   },
   "bulk action": {
     "%1 selected": "%1 selecionadas"
@@ -32,7 +33,8 @@
     "Daemon offline": "Daemon desconectado",
     "No accounts yet": "Nenhuma conta ainda",
     "Add a Gmail account": "Adicionar uma conta do Gmail",
-    "No local results — search the full history or the web": "Nenhum resultado local — busque no histórico completo ou na web"
+    "No local results — search the full history or the web": "Nenhum resultado local — busque no histórico completo ou na web",
+    "No sent mail": "Nenhum e-mail enviado"
   },
   "search": {
     "Search mail…": "Buscar e-mails…",
@@ -43,7 +45,12 @@
     "Load older archived mail": "Carregar e-mails arquivados mais antigos",
     "Retry archived history": "Tentar carregar arquivados novamente",
     "This account only supports cached archived mail.": "Esta conta só permite consultar os e-mails arquivados no cache local.",
-    "Could not load archived history. Try again later.": "Não foi possível carregar os e-mails arquivados. Tente novamente mais tarde."
+    "Could not load archived history. Try again later.": "Não foi possível carregar os e-mails arquivados. Tente novamente mais tarde.",
+    "This account only supports cached sent mail.": "Esta conta só permite consultar enviados em cache.",
+    "Could not load sent mail. Try again later.": "Não foi possível carregar os enviados. Tente mais tarde.",
+    "Loading sent mail…": "Carregando enviados…",
+    "Retry sent mail": "Tentar enviados novamente",
+    "Load older sent mail": "Carregar enviados anteriores"
   },
   "account wizard title": {
     "Add account": "Adicionar conta"
@@ -179,5 +186,20 @@
     "%1 threads marked as Spam.": "%1 conversas marcadas como Spam.",
     "1 thread snoozed.": "1 conversa adiada.",
     "%1 threads snoozed.": "%1 conversas adiadas."
+  },
+  "message body": {
+    "Link": "Link"
+  },
+  "thread action": {
+    "Not spam": "Não é spam"
+  },
+  "account status": {
+    "Sign in required": "Login necessário",
+    "Sync paused": "Sincronização pausada",
+    "Connected": "Conectada",
+    "Last completed sync: %1": "Última sincronização completa: %1"
+  },
+  "operation error": {
+    "Could not apply the action: %1": "Não foi possível aplicar a ação: %1"
   }
 }

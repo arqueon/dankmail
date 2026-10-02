@@ -112,6 +112,20 @@ func (_u *MessageUpdate) SetNillableDate(v *time.Time) *MessageUpdate {
 	return _u
 }
 
+// SetIsSent sets the "is_sent" field.
+func (_u *MessageUpdate) SetIsSent(v bool) *MessageUpdate {
+	_u.mutation.SetIsSent(v)
+	return _u
+}
+
+// SetNillableIsSent sets the "is_sent" field if the given value is not nil.
+func (_u *MessageUpdate) SetNillableIsSent(v *bool) *MessageUpdate {
+	if v != nil {
+		_u.SetIsSent(*v)
+	}
+	return _u
+}
+
 // SetSnippet sets the "snippet" field.
 func (_u *MessageUpdate) SetSnippet(v string) *MessageUpdate {
 	_u.mutation.SetSnippet(v)
@@ -267,6 +281,9 @@ func (_u *MessageUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Date(); ok {
 		_spec.SetField(message.FieldDate, field.TypeTime, value)
 	}
+	if value, ok := _u.mutation.IsSent(); ok {
+		_spec.SetField(message.FieldIsSent, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.Snippet(); ok {
 		_spec.SetField(message.FieldSnippet, field.TypeString, value)
 	}
@@ -414,6 +431,20 @@ func (_u *MessageUpdateOne) SetDate(v time.Time) *MessageUpdateOne {
 func (_u *MessageUpdateOne) SetNillableDate(v *time.Time) *MessageUpdateOne {
 	if v != nil {
 		_u.SetDate(*v)
+	}
+	return _u
+}
+
+// SetIsSent sets the "is_sent" field.
+func (_u *MessageUpdateOne) SetIsSent(v bool) *MessageUpdateOne {
+	_u.mutation.SetIsSent(v)
+	return _u
+}
+
+// SetNillableIsSent sets the "is_sent" field if the given value is not nil.
+func (_u *MessageUpdateOne) SetNillableIsSent(v *bool) *MessageUpdateOne {
+	if v != nil {
+		_u.SetIsSent(*v)
 	}
 	return _u
 }
@@ -602,6 +633,9 @@ func (_u *MessageUpdateOne) sqlSave(ctx context.Context) (_node *Message, err er
 	}
 	if value, ok := _u.mutation.Date(); ok {
 		_spec.SetField(message.FieldDate, field.TypeTime, value)
+	}
+	if value, ok := _u.mutation.IsSent(); ok {
+		_spec.SetField(message.FieldIsSent, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.Snippet(); ok {
 		_spec.SetField(message.FieldSnippet, field.TypeString, value)

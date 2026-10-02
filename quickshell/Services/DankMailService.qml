@@ -61,7 +61,7 @@ Singleton {
     onFilterStarredChanged: invalidateThreadSearch()
     onFilterArchivedChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
     onFilterAccountChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
-    onFilterLabelChanged: invalidateThreadSearch()
+    onFilterLabelChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
 
     readonly property int unreadTotal: {
         let n = 0;
@@ -396,7 +396,9 @@ Singleton {
         };
         if (searchQuery !== "")
             params.query = searchQuery;
-        if (filterLabel !== "" && searchQuery === "")
+        if (filterLabel === "SENT")
+            params.sent = true;
+        else if (filterLabel !== "" && searchQuery === "")
             params.label = filterLabel;
         if (filterUnread)
             params.unread = true;
@@ -439,7 +441,7 @@ Singleton {
     function archiveHistoryController() {
         if (!_archiveHistory)
             _archiveHistory = ArchiveHistory.create(
-                (params, callback) => root.sendRequest("threads.fetchArchived", params, callback),
+                (params, callback) => root.sendRequest(root.filterLabel === "SENT" ? "threads.fetchSent" : "threads.fetchArchived", params, callback),
                 (loading, more, warning, unsupported) => {
                     root.archiveLoading = loading;
                     root.archiveHasMore = more;
@@ -451,7 +453,7 @@ Singleton {
     }
 
     function resetArchiveHistory() {
-        archiveHistoryController().reset(filterAccount, connected && filterArchived);
+        archiveHistoryController().reset(filterAccount, connected && (filterArchived || filterLabel === "SENT"));
     }
 
     function loadArchiveHistory() {
@@ -490,7 +492,7 @@ Singleton {
             "ids": ids
         }, resp => {
             if (resp.error)
-                log.warn(method + ":", resp.error);
+                opFailed(method, resp.error);
             refreshDebounce.restart();
         });
     }
@@ -651,6 +653,8 @@ Singleton {
         sendRequest("system.sync", {}, resp => {
             if (resp.error)
                 log.warn("system.sync:", resp.error);
+            resetArchiveHistory();
+            refreshAccounts();
         });
     }
 

@@ -1,147 +1,76 @@
-# Provider `microsoft` — Outlook.com / Microsoft 365 vía Graph API
+# Microsoft provider: Outlook.com / Microsoft 365
 
-Diseño del provider nativo de Microsoft (Anillo 2.5 del roadmap). Espejo
-del provider Gmail: mismo contrato `provider.Provider`, mismo patrón de
-seam para tests, mismo wizard servido por IPC. Este documento fija las
-decisiones; el código las implementa tal cual.
+Status (2026-10-02): implemented. Personal and organizational accounts use
+Microsoft Graph through the shared OAuth broker, IPC account wizard and provider
+registry. The desktop client uses authorization code + PKCE and the `common`
+tenant. It does not require a client secret.
 
-Estado: **fundaciones en main** (broker OAuth parametrizado por
-endpoints con PKCE, `GraphScopes`, enum `microsoft` en Account.type);
-el provider en sí está por implementarse.
+## Application registration
 
-## 1. Autenticación
+Create an application in Microsoft Entra **App registrations**:
 
-- **App registration de Azure** creada por el usuario (mismo modelo
-  bring-your-own-client que Gmail): public client (Mobile & desktop),
-  redirect `http://localhost/callback` (loopback; Microsoft ignores the ephemeral port), "Allow public client flows"
-  activado, supported account types = *Personal Microsoft accounts and
-  work/school accounts* (tenant `common`).
-- **Sin client secret**: el broker ya hace PKCE S256 en todos los flujos;
-  `oauth.NewBrokerFor(oauth.MicrosoftEndpoints, clientID, "", bindAddr)`.
-- **Scopes** (`oauth.GraphScopes`): `Mail.ReadWrite` + `Mail.Send` +
-  `User.Read` + `offline_access`. Regla de minimalidad de Gmail
-  (spec §3.2) aplicada a Graph: jamás `Mail.ReadWrite.Shared` ni scopes
-  de directorio.
-- El email de la cuenta se lee del perfil autorizado
-  (`GET /me` → `mail` o `userPrincipalName`), como `FetchGmailEmail`.
-- Token + client ID al llavero con las claves existentes
-  (`KeyOAuthToken`/`KeyOAuthClient`; ClientCreds.ClientSecret queda "").
+- Name: `DankMail Desktop` (or another recognizable name).
+- Supported accounts: organizational directories **and personal Microsoft accounts**.
+- Platform: **Mobile and desktop applications**.
+- Redirect URI: `http://localhost/callback`. The runtime chooses a loopback port.
+- Enable public client flows. Do not create a client secret.
+- Delegated Graph permissions: `Mail.ReadWrite`, `Mail.Send`, `User.Read`;
+  the OAuth request also includes `offline_access` for refresh tokens.
+- Paste the **Application (client) ID** into DankMail's Microsoft account wizard.
+  Complete sign-in and consent in the system browser.
 
-## 2. Seam `graphAPI` (tests sin HTTP)
+The registration must live in a directory where the signed-in user can register
+applications. A personal mailbox can authorize the application, but that alone
+does not guarantee access to an Entra directory for creating the registration.
+If the portal requests verification or directory access, complete that prerequisite
+before claiming that registration or mailbox connection succeeded.
 
-Interfaz mínima sobre el cliente REST de Graph — todo lo que el provider
-toca y nada más (patrón `gmailAPI` de anillo1 §2):
+References: [desktop registration](https://learn.microsoft.com/en-us/entra/identity-platform/quickstart-register-app),
+[redirect URI rules](https://learn.microsoft.com/en-us/entra/identity-platform/reply-url).
 
-```go
-type graphAPI interface {
-    GetProfile(ctx) (email string, err error)                    // GET /me
-    DeltaMessages(ctx, folder, deltaLink string) (deltaPage, error) // GET /me/mailFolders/{folder}/messages/delta
-    GetMessage(ctx, id string) (*graphMessage, error)            // GET /me/messages/{id} (cuerpo + headers)
-    ListConversation(ctx, convID string) ([]*graphMessage, error) // GET /me/messages?$filter=conversationId eq '…'
-    PatchMessage(ctx, id string, body map[string]any) error      // PATCH /me/messages/{id} (isRead, flag)
-    MoveMessage(ctx, id, destFolder string) (newID string, err error) // POST /me/messages/{id}/move
-    SendMail(ctx, mime []byte) error                             // POST /me/sendMail (MIME base64)
-    FolderIDs(ctx) (map[string]string, error)                    // GET /me/mailFolders (well-known names→ids)
-}
-```
+## Storage and synchronization
 
-Sin SDK oficial: cliente HTTP fino sobre `oauth2.NewClient` (el SDK de
-Graph para Go es enorme y genera fricción de versiones; los endpoints
-usados son seis). Implementación real en `graph_client.go`, fake en
-`graph_fake.go` (tests).
+Tokens and the client ID use DankMail's existing keyring broker; no secrets belong
+in this document or the repository. A conversation ID identifies a thread within
+its account. Operations never mix provider IDs from separate accounts.
 
-## 3. Modelo de hilos: message-centric → thread-centric
+Inbox and Junk folder delta streams drive background synchronization. Completed
+cursors retain the per-folder delta-link JSON format. Interrupted rounds use a
+versioned checkpoint containing only account identity, folder/page continuation
+and outstanding conversation IDs. Each downloaded batch and its cursor are saved
+in the same SQLite transaction. Only the final batch prunes a full snapshot.
+Expired delta links restart a full round. Folder lookup failures are retried rather
+than permanently cached.
 
-**El problema central** (Gmail no lo tiene): Graph es de mensajes; el
-hilo de dankmail es `provider_thread_id` + delta agregado.
+Graph requests use immutable message IDs and honor `Retry-After` for 429/503
+responses. While the cooldown is active, the same client defers subsequent calls.
+Continuation URLs must remain on `https://graph.microsoft.com`. Writes are not
+silently replayed by the HTTP client.
 
-- `provider_thread_id` = `conversationId` de Graph (estable por buzón).
-- El **delta de mensajes** llega por `/messages/delta` sobre las
-  carpetas monitoreadas (`inbox` + `junkemail`; ver §5). Cada página
-  trae mensajes creados/cambiados/borrados.
-- Para cada `conversationId` afectado en el lote, el provider llama
-  `ListConversation` y construye el `ThreadDelta` completo (subject,
-  participantes, unread = algún mensaje `!isRead`, starred = algún
-  `flag.flagStatus == "flagged"`, InInbox = algún mensaje con
-  `parentFolderId == inbox`, labels = carpetas well-known presentes
-  {SPAM si junkemail, TRASH si deleteditems}) — mismo shape que
-  `threadDelta()` de gmail.go, así el reconciler no cambia NADA.
-- Mensajes: cuerpo `body.content` (text) o distiller HTML→texto ya
-  existente si `contentType == "html"`; adjuntos =
-  `hasAttachments` + `GET /messages/{id}/attachments?$select=name,contentType,size`
-  (metadata only, spec §1).
+References: [throttling](https://learn.microsoft.com/en-us/graph/throttling),
+[immutable IDs](https://learn.microsoft.com/en-us/graph/outlook-immutable-id).
 
-## 4. Sync
+## Sent and triage
 
-- **Cursor** = JSON `{ "inbox": "<deltaLink>", "junkemail": "<deltaLink>" }`
-  serializado en `account.sync_cursor` (un deltaLink por carpeta
-  monitoreada) ⇒ `CapHistorySync`.
-- **Full sync**: delta inicial sin deltaLink (Graph pagina todo el
-  folder y entrega el deltaLink final). Mismo guard de replay que
-  Gmail.
-- **Incremental**: delta con deltaLink; si Graph responde
-  `SyncStateNotFound` (410) → full resync, como el cursor expirado de
-  Gmail.
-- `dmail sync --full` ya limpia el cursor (funciona sin cambios).
+The Sent view requests the newest 25 Sent Items message references, ordered by
+`sentDateTime desc`, and fetches their conversations. Older pages are explicit;
+failed pages preserve unfinished conversation IDs. Backfill does not generate
+new-mail notifications or alter the background delta cursor. Cached Sent threads
+are sorted by their most recent outgoing message, and the reader shows that
+message, including its matching sender, recipients and date.
 
-## 5. Triage (mapeo de ops)
+Read/unread and star/unstar patch the messages. Archive, trash, spam and not-spam
+move messages between well-known folders. Not-spam moves Junk messages to Inbox.
+Reply and compose use the shared MIME builder and Graph sendMail endpoint. These
+operations are queued locally with optimistic state and failure recovery.
 
-| Op dankmail | Graph | Nota |
-|---|---|---|
-| read/unread | `PATCH isRead` por mensaje | El executor coalesce por hilo; el provider expande a los mensajes del hilo (como batchModify de Gmail). |
-| star/unstar | `PATCH flag.flagStatus = flagged/notFlagged` | |
-| archive | `POST /move` a `archive` | Well-known folder. |
-| unarchive | `POST /move` a `inbox` | |
-| trash | `POST /move` a `deleteditems` | |
-| snooze | local (igual que Gmail) | `CapServerSnooze` sigue reservado. |
-| reply/send | `POST /sendMail` con MIME de `mailmime` | Threading por In-Reply-To/References ya resuelto en mailmime. |
+## Current limits
 
-⇒ `CapModifyFlags | CapArchive | CapTrash | CapSendReply | CapCompose |
-CapHistorySync | CapDeepLink`.
+Archive browsing and full-mailbox remote text search remain Gmail-only. Microsoft
+Sent supports remote pagination. Truly deleted message IDs from delta responses
+cannot always be mapped back to a cached conversation; a later full resync cleans
+stale monitored threads. Attachment contents and original HTML remain in webmail;
+DankMail stores text and attachment metadata, and never loads remote message images.
 
-- **Spam**: la carpeta `junkemail` se monitorea siempre (paridad con la
-  vista Spam de Gmail); sus hilos llevan label `SPAM`, `InInbox=false`.
-- **Deep links**: `webLink` del mensaje más reciente ⇒ mejor que Gmail
-  (no hay que construir la URL).
-- **Contactos**: fuera del MVP (People API de Graph = scope extra);
-  el autocomplete cae a correspondientes locales.
-
-## 6. Wizard y wiring
-
-- `accounts.microsoft.setupGuide/start/complete` — mismos tres IPC que
-  Gmail; `complete` comparte el `flowRegistry`. El texto de los pasos de
-  Azure se adapta del de dankcalendar (incluida la trampa del
-  directorio/suscripción en cuentas personales).
-- `accounts.reauth` ya existente: gana un switch por tipo de cuenta para
-  elegir `MicrosoftEndpoints` (hoy asume Gmail).
-- `registry.go`: `case account.TypeMicrosoft:` → broker Microsoft +
-  `microsoft.New(...)` con el token source persistente.
-- QML: tercer proveedor en el chooser del wizard ("Outlook / Microsoft
-  365"), formulario solo pide Client ID (no hay secret ni JSON).
-- CLI: `dmail account add-microsoft [--client-id …]`.
-
-## 7. Orden de implementación (testeable primero, como anillo1)
-
-1. `graph_client.go` + `graph_fake.go` (seam + fake con fixtures).
-2. `microsoft.go`: threadDelta/conversation grouping + fullSync — tests
-   con fake.
-3. Incremental delta + expiración de cursor — tests.
-4. Ops de triage + Send — tests.
-5. Wiring: registry, wizard IPC, CLI, QML, reauth por tipo.
-6. Docs: README (sección Accounts), microsoft-setup.md.
-
-## 8. Qué necesita el usuario (una vez)
-
-1. <https://portal.azure.com> → **App registrations** → *New
-   registration*: nombre libre (p. ej. "dankmail"), supported account
-   types = **Personal Microsoft accounts and work/school accounts**.
-2. **Authentication** → *Add a platform* → **Mobile and desktop
-   applications** → redirect URI `http://localhost/callback` → y activar **Allow
-   public client flows = Yes**.
-3. **API permissions** → Microsoft Graph → **Delegated permissions**:
-   `Mail.ReadWrite`, `Mail.Send`, `User.Read` y `offline_access`.
-4. Copiar el **Application (client) ID** — es lo único que pide el
-   wizard (no se crea ningún secret).
-
-Cuentas personales (hotmail.com/outlook.com/live.com) funcionan con
-tenant `common` sin suscripción de Azure de pago.
+Live account setup must be verified separately from fixture tests; passing unit
+or transport tests does not prove that a user's Microsoft account is connected.

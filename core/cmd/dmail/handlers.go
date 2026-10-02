@@ -37,6 +37,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		f.Starred, _ = p["starred"].(bool)
 		f.InboxOnly, _ = p["inbox"].(bool)
 		f.ArchivedOnly, _ = p["archived"].(bool)
+		f.SentOnly, _ = p["sent"].(bool)
 		f.Label, _ = p["label"].(string)
 		f.Query, _ = p["query"].(string)
 		if f.Query != "" {
@@ -107,31 +108,14 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		accountID, ptids, err := d.resolveThreads(ctx, p)
-		if err != nil {
-			return nil, err
-		}
-		return "ok", d.queue.Enqueue(ctx, dsync.Op{
-			AccountID: accountID, Type: dsync.OpSnooze, ThreadIDs: ptids,
-			Payload: dsync.OpPayload{Snooze: &dsync.SnoozePayload{Until: until, MarkUnread: true}},
-		})
+		return "ok", d.enqueueThreadOp(ctx, p, dsync.OpSnooze, dsync.OpPayload{Snooze: &dsync.SnoozePayload{Until: until, MarkUnread: true}})
 	})
 
 	// ops.snoozePreset snoozes using the configured preset (settings
 	// snoozePreset/snoozeMinutes) — the time math stays server-side so
 	// bar widgets don't reimplement it.
 	srv.Register("ops.snoozePreset", func(ctx context.Context, p map[string]any) (any, error) {
-		accountID, ptids, err := d.resolveThreads(ctx, p)
-		if err != nil {
-			return nil, err
-		}
-		return "ok", d.queue.Enqueue(ctx, dsync.Op{
-			AccountID: accountID, Type: dsync.OpSnooze, ThreadIDs: ptids,
-			Payload: dsync.OpPayload{Snooze: &dsync.SnoozePayload{
-				Until:      d.settings.Get().SnoozeUntil(time.Now()),
-				MarkUnread: true,
-			}},
-		})
+		return "ok", d.enqueueThreadOp(ctx, p, dsync.OpSnooze, dsync.OpPayload{Snooze: &dsync.SnoozePayload{Until: d.settings.Get().SnoozeUntil(time.Now()), MarkUnread: true}})
 	})
 
 	srv.Register("ops.reply", func(ctx context.Context, p map[string]any) (any, error) {
@@ -309,6 +293,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 	// triageable locally, with notifications suppressed.
 	srv.Register("threads.searchRemote", d.searchRemote)
 	srv.Register("threads.fetchArchived", d.fetchArchived)
+	srv.Register("threads.fetchSent", d.fetchSent)
 
 	// ui.openSearch continues a local search in the account's webmail
 	// (full history lives there; the local cache only spans retention).
@@ -450,51 +435,75 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 // by local thread IDs ({ids: [int]}).
 func (d *daemon) simpleOpHandler(opType dsync.OpType) ipc.Handler {
 	return func(ctx context.Context, p map[string]any) (any, error) {
-		accountID, ptids, err := d.resolveThreads(ctx, p)
-		if err != nil {
-			return nil, err
-		}
-		return "ok", d.queue.Enqueue(ctx, dsync.Op{AccountID: accountID, Type: opType, ThreadIDs: ptids})
+		return "ok", d.enqueueThreadOp(ctx, p, opType, dsync.OpPayload{})
 	}
 }
 
-// resolveThreads maps local thread IDs ({id: n} or {ids: [n...]}) to the
-// owning account and its provider-native thread IDs. All threads must
-// belong to one account (the UI batches per account).
-func (d *daemon) resolveThreads(ctx context.Context, p map[string]any) (uuid.UUID, []string, error) {
-	var ids []int
+// Resolve the complete selection before enqueueing, then route each group to
+// its owner. Provider IDs can be identical in two different mailboxes.
+func (d *daemon) enqueueThreadOp(ctx context.Context, p map[string]any, kind dsync.OpType, payload dsync.OpPayload) error {
+	groups, err := d.resolveThreadGroups(ctx, p)
+	if err != nil {
+		return err
+	}
+	var failures []error
+	for accountID, ids := range groups {
+		if err := d.queue.Enqueue(ctx, dsync.Op{AccountID: accountID, Type: kind, ThreadIDs: ids, Payload: payload}); err != nil {
+			failures = append(failures, fmt.Errorf("account %s: %w", accountID, err))
+		}
+	}
+	return errors.Join(failures...)
+}
+
+func (d *daemon) resolveThreadGroups(ctx context.Context, p map[string]any) (map[uuid.UUID][]string, error) {
+	ids := map[int]bool{}
 	if id, err := intParam(p, "id"); err == nil {
-		ids = append(ids, id)
+		ids[id] = true
 	}
 	if raw, ok := p["ids"].([]any); ok {
 		for _, v := range raw {
-			if f, ok := v.(float64); ok {
-				ids = append(ids, int(f))
+			f, ok := v.(float64)
+			if !ok || f <= 0 || f != float64(int(f)) {
+				return nil, fmt.Errorf("invalid thread id")
 			}
+			ids[int(f)] = true
 		}
 	}
 	if len(ids) == 0 {
-		return uuid.Nil, nil, fmt.Errorf("missing thread id(s)")
+		return nil, fmt.Errorf("missing thread id(s)")
 	}
-	rows, err := d.db.Thread.Query().
-		Where(thread.IDIn(ids...)).
-		WithAccount().
-		All(ctx)
+	list := make([]int, 0, len(ids))
+	for id := range ids {
+		list = append(list, id)
+	}
+	rows, err := d.db.Thread.Query().Where(thread.IDIn(list...)).WithAccount().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != len(ids) {
+		return nil, fmt.Errorf("one or more threads no longer exist; refresh the selection")
+	}
+	groups := map[uuid.UUID][]string{}
+	for _, t := range rows {
+		id := t.Edges.Account.ID
+		groups[id] = append(groups[id], t.ProviderThreadID)
+	}
+	return groups, nil
+}
+
+// Single-thread flows such as preview still require exactly one owner.
+func (d *daemon) resolveThreads(ctx context.Context, p map[string]any) (uuid.UUID, []string, error) {
+	groups, err := d.resolveThreadGroups(ctx, p)
 	if err != nil {
 		return uuid.Nil, nil, err
 	}
-	if len(rows) == 0 {
-		return uuid.Nil, nil, fmt.Errorf("threads not found")
+	if len(groups) != 1 {
+		return uuid.Nil, nil, fmt.Errorf("this operation requires one account")
 	}
-	accountID := rows[0].Edges.Account.ID
-	ptids := make([]string, 0, len(rows))
-	for _, t := range rows {
-		if t.Edges.Account.ID != accountID {
-			return uuid.Nil, nil, fmt.Errorf("threads span multiple accounts; batch per account")
-		}
-		ptids = append(ptids, t.ProviderThreadID)
+	for id, threads := range groups {
+		return id, threads, nil
 	}
-	return accountID, ptids, nil
+	return uuid.Nil, nil, fmt.Errorf("threads not found")
 }
 
 // enqueueByProviderIDs is the notification-action path: it already has

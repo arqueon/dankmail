@@ -26,6 +26,7 @@ func (Message) Fields() []ent.Field {
 		field.JSON("to", []string{}).Default([]string{}),
 		field.JSON("cc", []string{}).Default([]string{}),
 		field.Time("date"),
+		field.Bool("is_sent").Default(false),
 		field.String("snippet").Default(""),
 		// Plain text, truncated at ingest to the configured cap
 		// (default 32 KiB).

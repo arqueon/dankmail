@@ -75,6 +75,11 @@ func Date(v time.Time) predicate.Message {
 	return predicate.Message(sql.FieldEQ(FieldDate, v))
 }
 
+// IsSent applies equality check predicate on the "is_sent" field. It's identical to IsSentEQ.
+func IsSent(v bool) predicate.Message {
+	return predicate.Message(sql.FieldEQ(FieldIsSent, v))
+}
+
 // Snippet applies equality check predicate on the "snippet" field. It's identical to SnippetEQ.
 func Snippet(v string) predicate.Message {
 	return predicate.Message(sql.FieldEQ(FieldSnippet, v))
@@ -318,6 +323,16 @@ func DateLT(v time.Time) predicate.Message {
 // DateLTE applies the LTE predicate on the "date" field.
 func DateLTE(v time.Time) predicate.Message {
 	return predicate.Message(sql.FieldLTE(FieldDate, v))
+}
+
+// IsSentEQ applies the EQ predicate on the "is_sent" field.
+func IsSentEQ(v bool) predicate.Message {
+	return predicate.Message(sql.FieldEQ(FieldIsSent, v))
+}
+
+// IsSentNEQ applies the NEQ predicate on the "is_sent" field.
+func IsSentNEQ(v bool) predicate.Message {
+	return predicate.Message(sql.FieldNEQ(FieldIsSent, v))
 }
 
 // SnippetEQ applies the EQ predicate on the "snippet" field.

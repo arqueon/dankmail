@@ -24,6 +24,7 @@ type ThreadFilter struct {
 	// ArchivedOnly selects cached mail outside the inbox, excluding spam,
 	// trash, drafts and snoozed threads.
 	ArchivedOnly bool
+	SentOnly     bool
 	// Label keeps only threads carrying this provider label (e.g.
 	// "SPAM" for the spam-review view).
 	Label string
@@ -42,9 +43,21 @@ type ThreadFilter struct {
 // threads are hidden (they come back when they wake) except when
 // searching.
 func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.ThreadSummary, error) {
-	q := r.client.Thread.Query().
-		WithAccount().
-		Order(ent.Desc(thread.FieldLastMessageAt), ent.Desc(thread.FieldID))
+	q := r.client.Thread.Query().WithAccount()
+	if f.SentOnly {
+		q = q.WithMessages(func(m *ent.MessageQuery) {
+			m.Where(message.IsSentEQ(true)).Select(message.FieldID, message.FieldDate, message.FieldSnippet, message.FieldTo).Order(ent.Desc(message.FieldDate))
+		})
+		q = q.Where(thread.HasMessagesWith(message.IsSentEQ(true))).Order(func(s *sql.Selector) {
+			m := sql.Table(message.Table).As("sent_message")
+			latest := sql.Select(sql.Max(m.C(message.FieldDate))).From(m).Where(sql.And(
+				sql.ColumnsEQ(m.C(message.ThreadColumn), s.C(thread.FieldID)), sql.EQ(m.C(message.FieldIsSent), true)))
+			query, args := latest.Query()
+			s.OrderExpr(sql.Expr("("+query+") DESC", args...))
+		}, ent.Desc(thread.FieldID))
+	} else {
+		q = q.Order(ent.Desc(thread.FieldLastMessageAt), ent.Desc(thread.FieldID))
+	}
 	if f.Query == "" {
 		q = q.Where(thread.SnoozedUntilIsNil())
 	} else {
@@ -92,7 +105,16 @@ func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.Thread
 	}
 	out := make([]models.ThreadSummary, 0, len(rows))
 	for _, t := range rows {
-		out = append(out, threadSummary(t))
+		summary := threadSummary(t)
+		if f.SentOnly && len(t.Edges.Messages) > 0 {
+			sent := t.Edges.Messages[0]
+			summary.LastMessageAt = sent.Date
+			summary.Snippet = sent.Snippet
+			if len(sent.To) > 0 {
+				summary.Participants = sent.To
+			}
+		}
+		out = append(out, summary)
 	}
 	return out, nil
 }
@@ -112,6 +134,7 @@ func (r *Repo) GetThread(ctx context.Context, id int) (*models.ThreadDetail, err
 		mv := models.MessageView{
 			ID:                m.ID,
 			ProviderMessageID: m.ProviderMessageID,
+			IsSent:            m.IsSent,
 			From:              m.From,
 			To:                m.To,
 			Cc:                m.Cc,
