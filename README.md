@@ -163,3 +163,10 @@ open conversation and bulk selections, including selections across accounts.
 The reader formats distilled text into paragraphs, lists, quotes, tables and code
 blocks. Links allow HTTP(S) and mailto only; remote images and original message
 HTML are not loaded. Button styling follows DankCalendar and DMS theme colors.
+
+### Companion maintenance
+
+The [DMS companion guide](dms-plugin/README.md#controls-and-connection-status)
+explains the Inbox/Starred popout, theme behavior, translations, and connection
+recovery. A user-installed plugin or symlink takes precedence over the system
+package; updating the package alone does not replace that copy.

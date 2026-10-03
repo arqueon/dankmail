@@ -90,6 +90,8 @@ install-dms-plugin:
 	@echo "Installing DankMaterialShell plugin to $(DMS_PLUGIN_INSTALL_DIR)..."
 	@mkdir -p $(DMS_PLUGIN_INSTALL_DIR)
 	@install -m 644 $(DMS_PLUGIN_DIR)/plugin.json $(DMS_PLUGIN_DIR)/*.qml $(DMS_PLUGIN_INSTALL_DIR)/
+	@mkdir -p $(DMS_PLUGIN_INSTALL_DIR)/translations
+	@install -m 644 $(DMS_PLUGIN_DIR)/translations/*.json $(DMS_PLUGIN_INSTALL_DIR)/translations/
 	@if [ -n "$(SUDO_USER)" ]; then chown -R $(SUDO_USER) $(DMS_PLUGIN_INSTALL_DIR); fi
 	@echo "Enable it in DankMaterialShell: Settings > Plugins > $(DMS_PLUGIN_ID)."
 

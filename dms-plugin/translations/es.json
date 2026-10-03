@@ -1,18 +1,101 @@
 {
-  "%1 accounts · ": {"%1 accounts · ": "%1 cuentas · "},
-  "%1 unread": {"%1 unread": "%1 sin leer"},
-  "(no subject)": {"(no subject)": "(sin asunto)"},
-  "Account": {"Account": "Cuenta"},
-  "Collapse the pill while there is no unread mail": {"Collapse the pill while there is no unread mail": "Oculta el indicador si no hay mensajes sin leer"},
-  "Daemon stopped": {"Daemon stopped": "Servicio detenido"},
-  "Dankmail is stopped. Click the title above to start it.": {"Dankmail is stopped. Click the title above to start it.": "Dankmail está detenido. Pulsa el título de arriba para iniciarlo."},
-  "Do-not-disturb indicator": {"Do-not-disturb indicator": "Indicador de no molestar"},
-  "Hide when inbox is clear": {"Hide when inbox is clear": "Ocultar cuando no haya mensajes sin leer"},
-  "Inbox": {"Inbox": "Recibidos"},
-  "Inbox clear": {"Inbox clear": "Bandeja en cero"},
-  "Live unread badge and triage popout for Dankmail. Left click opens the popout, middle click toggles the app, and right click syncs.": {"Live unread badge and triage popout for Dankmail. Left click opens the popout, middle click toggles the app, and right click syncs.": "Indicador de mensajes sin leer y panel de revisión de Dankmail. Clic izquierdo abre el panel, clic central muestra u oculta la aplicación y clic derecho sincroniza."},
-  "No mail in the inbox.": {"No mail in the inbox.": "No hay mensajes en Recibidos."},
-  "No starred mail.": {"No starred mail.": "No hay mensajes destacados."},
-  "Show a small dot while Dankmail's DND mode is active": {"Show a small dot while Dankmail's DND mode is active": "Muestra un punto cuando está activo el modo No molestar de Dankmail"},
-  "Starred": {"Starred": "Destacados"}
+  "%1 accounts · ": {
+    "%1 accounts · ": "%1 cuentas · "
+  },
+  "%1 unread": {
+    "%1 unread": "%1 sin leer"
+  },
+  "(no subject)": {
+    "(no subject)": "(sin asunto)"
+  },
+  "Account": {
+    "Account": "Cuenta"
+  },
+  "Collapse the pill while there is no unread mail": {
+    "Collapse the pill while there is no unread mail": "Oculta el indicador si no hay mensajes sin leer"
+  },
+  "Daemon stopped": {
+    "Daemon stopped": "Servicio detenido"
+  },
+  "Dankmail is stopped. Click the title above to start it.": {
+    "Dankmail is stopped. Click the title above to start it.": "Dankmail está detenido. Pulsa el título de arriba para iniciarlo."
+  },
+  "Do-not-disturb indicator": {
+    "Do-not-disturb indicator": "Indicador de no molestar"
+  },
+  "Hide when inbox is clear": {
+    "Hide when inbox is clear": "Ocultar cuando no haya mensajes sin leer"
+  },
+  "Inbox": {
+    "Inbox": "Recibidos"
+  },
+  "Inbox clear": {
+    "Inbox clear": "Bandeja en cero"
+  },
+  "Live unread badge and triage popout for Dankmail. Left click opens the popout, middle click toggles the app, and right click syncs.": {
+    "Live unread badge and triage popout for Dankmail. Left click opens the popout, middle click toggles the app, and right click syncs.": "Indicador de mensajes sin leer y panel de revisión de Dankmail. Clic izquierdo abre el panel, clic central muestra u oculta la aplicación y clic derecho sincroniza."
+  },
+  "No mail in the inbox.": {
+    "No mail in the inbox.": "No hay mensajes en Recibidos."
+  },
+  "No starred mail.": {
+    "No starred mail.": "No hay mensajes destacados."
+  },
+  "Show a small dot while Dankmail's DND mode is active": {
+    "Show a small dot while Dankmail's DND mode is active": "Muestra un punto cuando está activo el modo No molestar de Dankmail"
+  },
+  "Starred": {
+    "Starred": "Destacados"
+  },
+  "Compose": {
+    "Compose": "Redactar"
+  },
+  "Sync now": {
+    "Sync now": "Sincronizar ahora"
+  },
+  "Close": {
+    "Close": "Cerrar"
+  },
+  "Archive": {
+    "Archive": "Archivar"
+  },
+  "Move to trash": {
+    "Move to trash": "Mover a la papelera"
+  },
+  "Snooze": {
+    "Snooze": "Posponer"
+  },
+  "Open in webmail": {
+    "Open in webmail": "Abrir en correo web"
+  },
+  "Reply": {
+    "Reply": "Responder"
+  },
+  "Disable do not disturb": {
+    "Disable do not disturb": "Desactivar No molestar"
+  },
+  "Enable do not disturb": {
+    "Enable do not disturb": "Activar No molestar"
+  },
+  "Mark as read": {
+    "Mark as read": "Marcar como leído"
+  },
+  "Mark as unread": {
+    "Mark as unread": "Marcar como no leído"
+  },
+  "Remove star": {
+    "Remove star": "Quitar destacado"
+  },
+  "Star": {
+    "Star": "Destacar"
+  },
+  "The request failed. Open Dankmail to check the account and retry.": {
+    "The request failed. Open Dankmail to check the account and retry.": "La solicitud falló. Abre Dankmail para revisar la cuenta y volver a intentarlo."
+  },
+  "Dank Mail": {
+    "Dank Mail": "Dank Mail"
+  },
+  "Dankmail Unread": {
+    "Dankmail Unread": "Dankmail Unread"
+  }
 }

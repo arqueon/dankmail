@@ -21,7 +21,7 @@ clean:
 	rm -rf $(BUILD_DIR)
 
 test: check-i18n
-	node --test scripts/test-thread-search.cjs scripts/test-archive-history.cjs scripts/test-body-formatter.cjs
+	node --test scripts/test-thread-search.cjs scripts/test-archive-history.cjs scripts/test-body-formatter.cjs scripts/test-plugin.cjs
 	go test ./...
 
 # English is the source language; Spanish belongs only in the i18n layers.

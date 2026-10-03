@@ -7,8 +7,8 @@ import qs.Widgets
 
 // Unread badge for dankmail (https://github.com/arqueon/dankmail).
 // Live updates: subscribes to the dmail daemon's IPC socket (line-JSON
-// protocol) instead of polling. Left click toggles the triage window
-// (the daemon relaunches the UI if it was closed); right click syncs.
+// protocol) with a safety poll. Left click opens the popout, middle
+// click toggles the app, and right click syncs.
 // If the daemon is down, the icon dims and a click starts the service.
 PluginComponent {
     id: root
@@ -23,6 +23,7 @@ PluginComponent {
     property var accounts: []
     property var threads: []
     property string mailboxView: "inbox"
+    property string requestError: ""
     property bool syncing: false
     property int _reqId: 0
     property int _statusReqId: -1
@@ -124,6 +125,7 @@ PluginComponent {
         if (!cmdSocket.connected || root.syncing)
             return;
         root._reqId++;
+        root.requestError = "";
         root._syncReqId = root._reqId;
         root.syncing = true;
         syncGuard.restart();
@@ -132,6 +134,37 @@ PluginComponent {
             "method": "system.sync",
             "params": {}
         });
+    }
+
+    function clearConnectionState() {
+        root.unread = 0;
+        root.dnd = false;
+        root.accounts = [];
+        root.threads = [];
+        root.syncing = false;
+        root.requestError = "";
+        root._statusReqId = -1;
+        root._threadsReqId = -1;
+        root._syncReqId = -1;
+        syncGuard.stop();
+    }
+
+    function handleResponse(msg) {
+        if (msg.id === root._syncReqId) {
+            root.syncing = false;
+            syncGuard.stop();
+        }
+        if (msg.error) {
+            root.requestError = I18n.trFor("dankmailUnread", "The request failed. Open Dankmail to check the account and retry.");
+            return;
+        }
+        if (msg.id === root._statusReqId && msg.result) {
+            root.unread = msg.result.unread || 0;
+            root.dnd = !!msg.result.dnd;
+            root.accounts = msg.result.accounts || [];
+        } else if (msg.id === root._threadsReqId && Array.isArray(msg.result)) {
+            root.threads = msg.result;
+        }
     }
 
     Component.onCompleted: cmdSocket.connected = true
@@ -148,10 +181,10 @@ PluginComponent {
             if (connected) {
                 subSocket.connected = true;
                 root.refreshStatus();
+                retryTimer.stop();
             } else {
                 subSocket.connected = false;
-                root.unread = 0;
-                root.accounts = [];
+                root.clearConnectionState();
                 retryTimer.restart();
             }
         }
@@ -169,18 +202,7 @@ PluginComponent {
                 }
                 if (msg.id === undefined)
                     return;
-                if (msg.id === root._syncReqId) {
-                    root.syncing = false;
-                    syncGuard.stop();
-                    return;
-                }
-                if (msg.id === root._statusReqId && msg.result) {
-                    root.unread = msg.result.unread || 0;
-                    root.dnd = !!msg.result.dnd;
-                    root.accounts = msg.result.accounts || [];
-                } else if (msg.id === root._threadsReqId) {
-                    root.threads = msg.result || [];
-                }
+                root.handleResponse(msg);
             }
         }
     }
@@ -193,11 +215,15 @@ PluginComponent {
         connected: false
 
         onConnectionStateChanged: {
-            if (connected)
+            if (connected) {
+                subscriptionRetry.stop();
                 root.send(subSocket, {
                     "id": 1,
                     "method": "subscribe"
                 });
+            } else if (root.daemonConnected) {
+                subscriptionRetry.restart();
+            }
         }
 
         parser: SplitParser {
@@ -223,6 +249,16 @@ PluginComponent {
                     break;
                 }
             }
+        }
+    }
+
+    Timer {
+        id: subscriptionRetry
+        interval: 4000
+        repeat: false
+        onTriggered: {
+            if (cmdSocket.connected)
+                subSocket.connected = true;
         }
     }
 
@@ -398,6 +434,7 @@ PluginComponent {
                     anchors.verticalCenter: parent.verticalCenter
 
                     DankActionButton {
+                        tooltipText: I18n.trFor("dankmailUnread", "Compose")
                         iconName: "edit_square"
                         visible: root.daemonConnected
                         onClicked: {
@@ -408,6 +445,7 @@ PluginComponent {
                     }
 
                     DankActionButton {
+                        tooltipText: I18n.trFor("dankmailUnread", "Sync now")
                         iconName: "sync"
                         iconColor: root.syncing ? Theme.primary : Theme.surfaceText
                         visible: root.daemonConnected
@@ -415,6 +453,7 @@ PluginComponent {
                     }
 
                     DankActionButton {
+                        tooltipText: root.dnd ? I18n.trFor("dankmailUnread", "Disable do not disturb") : I18n.trFor("dankmailUnread", "Enable do not disturb")
                         iconName: root.dnd ? "notifications_off" : "notifications"
                         iconColor: root.dnd ? Theme.warning : Theme.surfaceText
                         visible: root.daemonConnected
@@ -422,6 +461,7 @@ PluginComponent {
                     }
 
                     DankActionButton {
+                        tooltipText: I18n.trFor("dankmailUnread", "Close")
                         iconName: "close"
                         onClicked: {
                             if (popout.closePopout)
@@ -501,6 +541,8 @@ PluginComponent {
 
                         TapHandler {
                             onTapped: {
+                                root.requestError = "";
+                                root.threads = [];
                                 root.mailboxView = parent.modelData.key;
                                 root.refreshStatus();
                             }
@@ -537,11 +579,20 @@ PluginComponent {
                     }
 
                     StyledText {
-                        visible: root.daemonConnected && root.threads.length === 0
+                        visible: root.daemonConnected && root.threads.length === 0 && root.requestError === ""
                         width: parent.width
                         text: root.mailboxView === "starred" ? I18n.trFor("dankmailUnread", "No starred mail.") : I18n.trFor("dankmailUnread", "No mail in the inbox.")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
+                    }
+
+                    StyledText {
+                        visible: root.daemonConnected && root.requestError !== ""
+                        width: parent.width
+                        text: root.requestError
+                        color: Theme.error
+                        font.pixelSize: Theme.fontSizeSmall
+                        wrapMode: Text.WordWrap
                     }
 
                     Repeater {
@@ -632,6 +683,7 @@ PluginComponent {
                                 // Same order as dankmail's own triage row,
                                 // followed by a focused quick-reply entry.
                                 DankActionButton {
+                                        tooltipText: I18n.trFor("dankmailUnread", "Archive")
                                     iconName: "archive"
                                     buttonSize: 26
                                     iconSize: 15
@@ -639,6 +691,7 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
+                                        tooltipText: I18n.trFor("dankmailUnread", "Move to trash")
                                     iconName: "delete"
                                     buttonSize: 26
                                     iconSize: 15
@@ -647,6 +700,7 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
+                                        tooltipText: mailRow.modelData.unread ? I18n.trFor("dankmailUnread", "Mark as read") : I18n.trFor("dankmailUnread", "Mark as unread")
                                     iconName: mailRow.modelData.unread ? "drafts" : "mark_email_unread"
                                     buttonSize: 26
                                     iconSize: 15
@@ -654,6 +708,7 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
+                                        tooltipText: mailRow.modelData.starred ? I18n.trFor("dankmailUnread", "Remove star") : I18n.trFor("dankmailUnread", "Star")
                                     iconName: "star"
                                     buttonSize: 26
                                     iconSize: 15
@@ -662,6 +717,7 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
+                                        tooltipText: I18n.trFor("dankmailUnread", "Snooze")
                                     iconName: "snooze"
                                     buttonSize: 26
                                     iconSize: 15
@@ -669,6 +725,7 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
+                                        tooltipText: I18n.trFor("dankmailUnread", "Open in webmail")
                                     iconName: "open_in_new"
                                     buttonSize: 26
                                     iconSize: 15
@@ -678,6 +735,7 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
+                                        tooltipText: I18n.trFor("dankmailUnread", "Reply")
                                     iconName: "reply"
                                     buttonSize: 26
                                     iconSize: 15
