@@ -17,6 +17,7 @@ import (
 	"github.com/arqueon/dankmail/core/ent"
 	"github.com/arqueon/dankmail/core/internal/bus"
 	"github.com/arqueon/dankmail/core/internal/contacts"
+	"github.com/arqueon/dankmail/core/internal/drafts"
 	"github.com/arqueon/dankmail/core/internal/i18n"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/keyring"
@@ -38,6 +39,7 @@ type daemon struct {
 	registry *registry
 	notifier notify.Notifier
 	settings *settings.Store
+	drafts   *drafts.Store
 
 	dnd    atomic.Bool
 	reload chan struct{}
@@ -95,6 +97,7 @@ func runDaemon(shellDir string, hidden bool) error {
 		registry: newRegistry(cfg, db),
 		notifier: notify.NewBest(),
 		settings: settings.NewStore(paths.SettingsPath()),
+		drafts:   drafts.NewStore(paths.DraftsPath()),
 		reload:   make(chan struct{}, 1),
 		exit:     cancel,
 		flows:    newFlowRegistry(),

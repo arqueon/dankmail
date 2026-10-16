@@ -141,3 +141,60 @@ func (r *realAPI) GetProfile(ctx context.Context) (string, uint64, error) {
 	}
 	return p.EmailAddress, p.HistoryId, nil
 }
+
+func (r *realAPI) ListDrafts(ctx context.Context) ([]*gmailv1.Draft, error) {
+	resp, err := readCall(ctx, r, 5, func() (*gmailv1.ListDraftsResponse, error) {
+		return r.svc.Users.Drafts.List(userID).IncludeSpamTrash(false).MaxResults(40).Context(ctx).Do()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return resp.Drafts, nil
+}
+
+func (r *realAPI) GetDraft(ctx context.Context, draftID string) (*gmailv1.Draft, error) {
+	return readCall(ctx, r, 5, func() (*gmailv1.Draft, error) {
+		return r.svc.Users.Drafts.Get(userID, draftID).Format("full").Context(ctx).Do()
+	})
+}
+
+func (r *realAPI) CreateDraft(ctx context.Context, threadID string, raw []byte) (*gmailv1.Draft, error) {
+	if err := r.waitQuota(ctx, 10); err != nil {
+		return nil, err
+	}
+	msg := &gmailv1.Message{Raw: base64.RawURLEncoding.EncodeToString(raw)}
+	if threadID != "" {
+		msg.ThreadId = threadID
+	}
+	d, err := r.svc.Users.Drafts.Create(userID, &gmailv1.Draft{Message: msg}).Context(ctx).Do()
+	if deferred := r.deferFailure(err, 0); deferred != nil {
+		return nil, deferred
+	}
+	return d, err
+}
+
+func (r *realAPI) UpdateDraft(ctx context.Context, draftID, threadID string, raw []byte) (*gmailv1.Draft, error) {
+	if err := r.waitQuota(ctx, 10); err != nil {
+		return nil, err
+	}
+	msg := &gmailv1.Message{Raw: base64.RawURLEncoding.EncodeToString(raw)}
+	if threadID != "" {
+		msg.ThreadId = threadID
+	}
+	d, err := r.svc.Users.Drafts.Update(userID, draftID, &gmailv1.Draft{Id: draftID, Message: msg}).Context(ctx).Do()
+	if deferred := r.deferFailure(err, 0); deferred != nil {
+		return nil, deferred
+	}
+	return d, err
+}
+
+func (r *realAPI) DeleteDraft(ctx context.Context, draftID string) error {
+	if err := r.waitQuota(ctx, 10); err != nil {
+		return err
+	}
+	err := r.svc.Users.Drafts.Delete(userID, draftID).Context(ctx).Do()
+	if deferred := r.deferFailure(err, 0); deferred != nil {
+		return deferred
+	}
+	return err
+}

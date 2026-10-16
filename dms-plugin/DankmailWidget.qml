@@ -66,15 +66,25 @@ PluginComponent {
         });
         root._reqId++;
         root._threadsReqId = root._reqId;
-        send(cmdSocket, {
-            "id": root._threadsReqId,
-            "method": "threads.list",
-            "params": {
-                "inbox": root.mailboxView === "inbox",
-                "starred": root.mailboxView === "starred",
-                "limit": 20
-            }
-        });
+        if (root.mailboxView === "drafts") {
+            send(cmdSocket, {
+                "id": root._threadsReqId,
+                "method": "drafts.list",
+                "params": {
+                    "remote": true
+                }
+            });
+        } else {
+            send(cmdSocket, {
+                "id": root._threadsReqId,
+                "method": "threads.list",
+                "params": {
+                    "inbox": root.mailboxView === "inbox",
+                    "starred": root.mailboxView === "starred",
+                    "limit": 20
+                }
+            });
+        }
     }
 
     // op fires a thread action from the popout; the daemon's optimistic
@@ -104,6 +114,13 @@ PluginComponent {
     }
 
     function senderOf(t) {
+        if (Array.isArray(t.to)) {
+            if (t.to.length === 0)
+                return I18n.trFor("dankmailUnread", "Draft");
+            const first = t.to[0];
+            const dm = first.match(/^\s*"?([^"<]*?)"?\s*<[^>]+>\s*$/);
+            return dm && dm[1].trim() !== "" ? dm[1].trim() : first;
+        }
         const raw = (t.participants && t.participants.length > 0) ? t.participants[0] : "";
         const m = raw.match(/^\s*"?([^"<]*?)"?\s*<[^>]+>\s*$/);
         return m && m[1].trim() !== "" ? m[1].trim() : raw;
@@ -238,6 +255,7 @@ PluginComponent {
                 }
                 switch (ev.topic) {
                 case "threads.changed":
+                case "drafts.changed":
                 case "unread.changed":
                 case "ops.applied":
                 case "accounts.changed":
@@ -520,7 +538,8 @@ PluginComponent {
                 Repeater {
                     model: [
                         { "key": "inbox", "label": I18n.trFor("dankmailUnread", "Inbox") },
-                        { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") }
+                        { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") },
+                        { "key": "drafts", "label": I18n.trFor("dankmailUnread", "Drafts") }
                     ]
 
                     delegate: Rectangle {
@@ -581,7 +600,7 @@ PluginComponent {
                     StyledText {
                         visible: root.daemonConnected && root.threads.length === 0 && root.requestError === ""
                         width: parent.width
-                        text: root.mailboxView === "starred" ? I18n.trFor("dankmailUnread", "No starred mail.") : I18n.trFor("dankmailUnread", "No mail in the inbox.")
+                        text: root.mailboxView === "starred" ? I18n.trFor("dankmailUnread", "No starred mail.") : root.mailboxView === "drafts" ? I18n.trFor("dankmailUnread", "No drafts.") : I18n.trFor("dankmailUnread", "No mail in the inbox.")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                     }
@@ -664,7 +683,7 @@ PluginComponent {
 
                                 StyledText {
                                     id: timeLabel
-                                    text: root.timeOf(mailRow.modelData.lastMessageAt)
+                                    text: root.timeOf(mailRow.modelData.lastMessageAt || mailRow.modelData.updatedAt)
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: Theme.surfaceVariantText
                                     anchors.verticalCenter: parent.verticalCenter
@@ -680,10 +699,26 @@ PluginComponent {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 0
 
+                                DankActionButton {
+                                    visible: root.mailboxView === "drafts"
+                                    tooltipText: I18n.trFor("dankmailUnread", "Edit draft")
+                                    iconName: "edit"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    onClicked: {
+                                        root.uiCall("ui.editDraft", {
+                                            "id": mailRow.modelData.id
+                                        });
+                                        if (popout.closePopout)
+                                            popout.closePopout();
+                                    }
+                                }
+
                                 // Same order as dankmail's own triage row,
                                 // followed by a focused quick-reply entry.
                                 DankActionButton {
-                                        tooltipText: I18n.trFor("dankmailUnread", "Archive")
+                                    visible: root.mailboxView !== "drafts"
+                                    tooltipText: I18n.trFor("dankmailUnread", "Archive")
                                     iconName: "archive"
                                     buttonSize: 26
                                     iconSize: 15
@@ -696,11 +731,17 @@ PluginComponent {
                                     buttonSize: 26
                                     iconSize: 15
                                     iconColor: Theme.error
-                                    onClicked: root.op("ops.trash", mailRow.modelData.id)
+                                    onClicked: {
+                                        if (root.mailboxView === "drafts")
+                                            root.uiCall("drafts.delete", { "id": mailRow.modelData.id });
+                                        else
+                                            root.op("ops.trash", mailRow.modelData.id);
+                                    }
                                 }
 
                                 DankActionButton {
-                                        tooltipText: mailRow.modelData.unread ? I18n.trFor("dankmailUnread", "Mark as read") : I18n.trFor("dankmailUnread", "Mark as unread")
+                                    visible: root.mailboxView !== "drafts"
+                                    tooltipText: mailRow.modelData.unread ? I18n.trFor("dankmailUnread", "Mark as read") : I18n.trFor("dankmailUnread", "Mark as unread")
                                     iconName: mailRow.modelData.unread ? "drafts" : "mark_email_unread"
                                     buttonSize: 26
                                     iconSize: 15
@@ -708,7 +749,8 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
-                                        tooltipText: mailRow.modelData.starred ? I18n.trFor("dankmailUnread", "Remove star") : I18n.trFor("dankmailUnread", "Star")
+                                    visible: root.mailboxView !== "drafts"
+                                    tooltipText: mailRow.modelData.starred ? I18n.trFor("dankmailUnread", "Remove star") : I18n.trFor("dankmailUnread", "Star")
                                     iconName: "star"
                                     buttonSize: 26
                                     iconSize: 15
@@ -717,7 +759,8 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
-                                        tooltipText: I18n.trFor("dankmailUnread", "Snooze")
+                                    visible: root.mailboxView !== "drafts"
+                                    tooltipText: I18n.trFor("dankmailUnread", "Snooze")
                                     iconName: "snooze"
                                     buttonSize: 26
                                     iconSize: 15
@@ -725,7 +768,8 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
-                                        tooltipText: I18n.trFor("dankmailUnread", "Open in webmail")
+                                    visible: root.mailboxView !== "drafts"
+                                    tooltipText: I18n.trFor("dankmailUnread", "Open in webmail")
                                     iconName: "open_in_new"
                                     buttonSize: 26
                                     iconSize: 15
@@ -735,7 +779,8 @@ PluginComponent {
                                 }
 
                                 DankActionButton {
-                                        tooltipText: I18n.trFor("dankmailUnread", "Reply")
+                                    visible: root.mailboxView !== "drafts"
+                                    tooltipText: I18n.trFor("dankmailUnread", "Reply")
                                     iconName: "reply"
                                     buttonSize: 26
                                     iconSize: 15
@@ -755,9 +800,15 @@ PluginComponent {
                             // take precedence over this handler).
                             TapHandler {
                                 onTapped: {
-                                    root.uiCall("ui.showThread", {
-                                        "id": mailRow.modelData.id
-                                    });
+                                    if (root.mailboxView === "drafts") {
+                                        root.uiCall("ui.editDraft", {
+                                            "id": mailRow.modelData.id
+                                        });
+                                    } else {
+                                        root.uiCall("ui.showThread", {
+                                            "id": mailRow.modelData.id
+                                        });
+                                    }
                                     if (popout.closePopout)
                                         popout.closePopout();
                                 }

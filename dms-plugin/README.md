@@ -6,9 +6,9 @@ project as the `dmail` daemon and the Dankmail desktop interface; it is not a
 separate mail client or a second implementation.
 
 The plugin adds Dankmail to DankBar with live unread status, truthful
-per-account counters, a popout with up to 20 recent Inbox or Starred threads, triage actions, compose and sync
+per-account counters, a popout with up to 20 recent Inbox, Starred, or Drafts entries, triage actions, compose and sync
 controls, do-not-disturb status, and a shortcut into Dankmail's existing quick
-reply flow. Mail access, synchronization, account state, and mutations remain
+reply and draft-editing flows. Mail access, synchronization, account state, and mutations remain
 owned by the `dmail` daemon.
 
 ## Requirements

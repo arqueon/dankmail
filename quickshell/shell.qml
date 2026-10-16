@@ -63,6 +63,7 @@ ShellRoot {
     property int pendingThreadId: -1
     property bool pendingReply: false
     property bool pendingCompose: false
+    property string pendingDraftId: ""
 
     function applyPending() {
         if (!windowLoader.item)
@@ -78,6 +79,10 @@ ShellRoot {
         if (pendingCompose) {
             windowLoader.item.openCompose();
             pendingCompose = false;
+        }
+        if (pendingDraftId !== "") {
+            windowLoader.item.openDraftById(pendingDraftId);
+            pendingDraftId = "";
         }
     }
 
@@ -100,6 +105,11 @@ ShellRoot {
         }
         function onComposeRequested() {
             root.pendingCompose = true;
+            root.showAndFocus();
+            root.applyPending();
+        }
+        function onEditDraftRequested(draftId) {
+            root.pendingDraftId = draftId;
             root.showAndFocus();
             root.applyPending();
         }

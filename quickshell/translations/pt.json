@@ -16,7 +16,11 @@
     "Starred": "Com estrela",
     "Archived": "Arquivados",
     "Spam": "Spam",
-    "Sent": "Enviados"
+    "Sent": "Enviados",
+    "Drafts": "Rascunhos"
+  },
+  "drafts": {
+    "(no recipients)": "(sem destinatários)"
   },
   "bulk action": {
     "%1 selected": "%1 selecionadas"
@@ -34,7 +38,8 @@
     "No accounts yet": "Nenhuma conta ainda",
     "Add a Gmail account": "Adicionar uma conta do Gmail",
     "No local results — search the full history or the web": "Nenhum resultado local — busque no histórico completo ou na web",
-    "No sent mail": "Nenhum e-mail enviado"
+    "No sent mail": "Nenhum e-mail enviado",
+    "No saved drafts": "Nenhum rascunho salvo"
   },
   "search": {
     "Search mail…": "Buscar e-mails…",
@@ -147,10 +152,26 @@
   },
   "compose": {
     "New message": "Nova mensagem",
+    "Edit draft": "Editar rascunho",
     "To — type a name or address": "Para — digite um nome ou endereço",
+    "Cc / Bcc": "Cc / Cco",
+    "Cc — carbon copy recipients": "Cc — destinatários em cópia",
+    "Bcc — blind carbon copy recipients": "Cco — destinatários em cópia oculta",
     "Subject": "Assunto",
     "Write your message… Ctrl+Enter sends": "Escreva sua mensagem… Ctrl+Enter envia",
-    "Google contact suggestions need a re-consent: run 'dmail account reauth <id>' or re-add the account.": "As sugestões de contatos do Google precisam de novo consentimento: execute 'dmail account reauth <id>' ou adicione a conta de novo."
+    "Google contact suggestions need a re-consent: run 'dmail account reauth <id>' or re-add the account.": "As sugestões de contatos do Google precisam de novo consentimento: execute 'dmail account reauth <id>' ou adicione a conta de novo.",
+    "Attach files": "Anexar arquivos",
+    "bold": "negrito",
+    "italic": "itálico",
+    "Edit text": "Editar texto",
+    "Preview": "Prévia",
+    "Link text": "Texto do link",
+    "https://example.org": "https://exemplo.org",
+    "Insert link": "Inserir link",
+    "Discard draft": "Descartar rascunho",
+    "Save draft": "Salvar rascunho",
+    "Saving…": "Salvando…",
+    "Draft saved": "Rascunho salvo"
   },
   "quick reply": {
     "To": "Para",
@@ -172,7 +193,20 @@
   "preview header": {
     "To": "Para",
     "Cc": "Cc",
-    "Received via BCC — your address is not in To or Cc": "Recebido via Cco — seu endereço não está em Para nem em Cc"
+    "Received via BCC — your address is not in To or Cc": "Recebido via Cco — seu endereço não está em Para nem em Cc",
+    "Copied: %1": "Copiado: %1",
+    "Copy all emails": "Copiar todos os e-mails"
+  },
+  "file picker": {
+    "Home": "Início",
+    "Downloads": "Downloads",
+    "Documents": "Documentos",
+    "Desktop": "Área de trabalho",
+    "Pictures": "Imagens",
+    "Filter files…": "Filtrar arquivos…",
+    "Empty folder": "Pasta vazia",
+    "Click files to select one or more attachments": "Clique nos arquivos para selecionar um ou mais anexos",
+    "Attach": "Anexar"
   },
   "undo banner": {
     "Undo": "Desfazer",

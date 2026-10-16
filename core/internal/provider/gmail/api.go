@@ -47,3 +47,12 @@ type gmailAPI interface {
 	// search query (users.threads.list with q; full-history, server-side).
 	SearchThreads(ctx context.Context, query string, pageToken string, pageSize int) (ids []string, nextPageToken string, err error)
 }
+
+// gmailDraftsAPI is an optional extension of gmailAPI for managing remote drafts.
+type gmailDraftsAPI interface {
+	ListDrafts(ctx context.Context) ([]*gmailv1.Draft, error)
+	GetDraft(ctx context.Context, draftID string) (*gmailv1.Draft, error)
+	CreateDraft(ctx context.Context, threadID string, raw []byte) (*gmailv1.Draft, error)
+	UpdateDraft(ctx context.Context, draftID, threadID string, raw []byte) (*gmailv1.Draft, error)
+	DeleteDraft(ctx context.Context, draftID string) error
+}
