@@ -34,3 +34,6 @@ func UISettingsPath() string { return filepath.Join(ConfigDir(), "ui-settings.js
 // SettingsPath is the daemon's own settings file (notification actions,
 // snooze default, …).
 func SettingsPath() string { return filepath.Join(ConfigDir(), "settings.json") }
+
+// DraftsPath is the local drafts persistence file.
+func DraftsPath() string { return filepath.Join(DataDir(), "drafts.json") }

@@ -262,6 +262,120 @@ func (p *Provider) Compose(ctx context.Context, m provider.ComposeDraft) error {
 	return nil
 }
 
+// ListDrafts fetches the current account's drafts when the underlying API supports it.
+func (p *Provider) ListDrafts(ctx context.Context) ([]provider.DraftItem, error) {
+	dapi, ok := p.api.(gmailDraftsAPI)
+	if !ok {
+		return nil, nil
+	}
+	ctx = withRetryBudget(ctx)
+	stubs, err := dapi.ListDrafts(ctx)
+	if err != nil {
+		return nil, classify(err)
+	}
+	out := make([]provider.DraftItem, 0, len(stubs))
+	for _, stub := range stubs {
+		if stub == nil || stub.Id == "" {
+			continue
+		}
+		d, err := dapi.GetDraft(ctx, stub.Id)
+		if err != nil {
+			if isNotFound(err) {
+				continue
+			}
+			return out, classify(err)
+		}
+		if d == nil || d.Message == nil {
+			continue
+		}
+		out = append(out, p.draftItem(d))
+	}
+	return out, nil
+}
+
+// SaveDraft creates or updates a draft in Gmail.
+func (p *Provider) SaveDraft(ctx context.Context, d provider.DraftSave) (provider.DraftItem, error) {
+	dapi, ok := p.api.(gmailDraftsAPI)
+	if !ok {
+		return provider.DraftItem{}, nil
+	}
+	ctx = withRetryBudget(ctx)
+	raw, err := mailmime.BuildDraft(p.email, d)
+	if err != nil {
+		return provider.DraftItem{}, errdefs.Wrap(errdefs.KindPermanent, err)
+	}
+	var saved *gmailv1.Draft
+	if d.ProviderDraftID != "" {
+		saved, err = dapi.UpdateDraft(ctx, d.ProviderDraftID, d.ProviderThreadID, raw)
+		if err != nil && isNotFound(err) {
+			saved, err = dapi.CreateDraft(ctx, d.ProviderThreadID, raw)
+		}
+	} else {
+		saved, err = dapi.CreateDraft(ctx, d.ProviderThreadID, raw)
+	}
+	if err != nil {
+		return provider.DraftItem{}, classify(err)
+	}
+	res := provider.DraftItem{
+		ProviderDraftID:  saved.Id,
+		ProviderThreadID: d.ProviderThreadID,
+		InReplyTo:        d.InReplyTo,
+		To:               d.To,
+		Cc:               d.Cc,
+		Bcc:              d.Bcc,
+		Subject:          d.Subject,
+		Body:             d.Body,
+		Attachments:      d.Attachments,
+	}
+	if saved.Message != nil {
+		res.ProviderMessageID = saved.Message.Id
+		if saved.Message.ThreadId != "" {
+			res.ProviderThreadID = saved.Message.ThreadId
+		}
+	}
+	return res, nil
+}
+
+// DeleteDraft deletes a draft in Gmail.
+func (p *Provider) DeleteDraft(ctx context.Context, providerDraftID string) error {
+	dapi, ok := p.api.(gmailDraftsAPI)
+	if !ok || providerDraftID == "" {
+		return nil
+	}
+	ctx = withRetryBudget(ctx)
+	err := dapi.DeleteDraft(ctx, providerDraftID)
+	if err != nil && !isNotFound(err) {
+		return classify(err)
+	}
+	return nil
+}
+
+func (p *Provider) draftItem(d *gmailv1.Draft) provider.DraftItem {
+	m := d.Message
+	md := p.messageDelta(m)
+	item := provider.DraftItem{
+		ProviderDraftID:   d.Id,
+		ProviderMessageID: m.Id,
+		ProviderThreadID:  m.ThreadId,
+		InReplyTo:         headerValue(m.Payload, "In-Reply-To"),
+		To:                md.To,
+		Cc:                md.Cc,
+		Bcc:               splitAddrList(headerValue(m.Payload, "Bcc")),
+		Subject:           headerValue(m.Payload, "Subject"),
+		Body:              md.BodyText,
+		Snippet:           md.Snippet,
+		UpdatedAt:         md.Date,
+	}
+	for _, a := range md.Attachments {
+		item.Attachments = append(item.Attachments, provider.AttachmentFile{
+			Filename: a.Filename,
+			MimeType: a.MimeType,
+			Size:     a.Size,
+		})
+	}
+	return item
+}
+
 // WebLink returns a Gmail webmail deep link. With a thread ID it targets
 // the thread; with only an RFC 822 Message-ID it falls back to an
 // rfc822msgid: search. The authuser query pins the right account in

@@ -5,7 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,9 +17,11 @@ import (
 	"github.com/arqueon/dankmail/core/api/server"
 	"github.com/arqueon/dankmail/core/ent/thread"
 	"github.com/arqueon/dankmail/core/internal/contacts"
+	"github.com/arqueon/dankmail/core/internal/drafts"
 	"github.com/arqueon/dankmail/core/internal/ipc"
 	"github.com/arqueon/dankmail/core/internal/provider"
 	dsync "github.com/arqueon/dankmail/core/internal/sync"
+	"github.com/arqueon/dankmail/core/models"
 	"github.com/arqueon/dankmail/core/repo"
 )
 
@@ -141,15 +146,24 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		return "ok", d.queue.Enqueue(ctx, dsync.Op{
+		provAtts, _ := parseAttachments(p["attachments"])
+		err = d.queue.Enqueue(ctx, dsync.Op{
 			AccountID: accountID, Type: dsync.OpSendReply,
 			ThreadIDs: []string{detail.ProviderThreadID},
 			Payload: dsync.OpPayload{Reply: &provider.ReplyDraft{
 				InReplyToMessageID: last.ProviderMessageID,
 				Body:               body,
 				ReplyAll:           replyAll,
+				Attachments:        provAtts,
 			}},
 		})
+		if err != nil {
+			return nil, err
+		}
+		if draftID, _ := p["draftId"].(string); draftID != "" {
+			d.removeDraftByID(ctx, draftID)
+		}
+		return "ok", nil
 	})
 
 	srv.Register("ops.compose", func(ctx context.Context, p map[string]any) (any, error) {
@@ -161,20 +175,168 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		draft := provider.ComposeDraft{}
 		draft.Subject, _ = p["subject"].(string)
 		draft.Body, _ = p["body"].(string)
-		if to, ok := p["to"].([]any); ok {
-			for _, t := range to {
-				if s, ok := t.(string); ok {
-					draft.To = append(draft.To, s)
+		draft.To = parseStringSlice(p["to"])
+		draft.Cc = parseStringSlice(p["cc"])
+		draft.Bcc = parseStringSlice(p["bcc"])
+		draft.Attachments, _ = parseAttachments(p["attachments"])
+		if len(draft.To) == 0 && len(draft.Cc) == 0 && len(draft.Bcc) == 0 {
+			return nil, fmt.Errorf("no recipients")
+		}
+		if err := d.queue.Enqueue(ctx, dsync.Op{
+			AccountID: accountID, Type: dsync.OpCompose,
+			Payload: dsync.OpPayload{Compose: &draft},
+		}); err != nil {
+			return nil, err
+		}
+		if draftID, _ := p["draftId"].(string); draftID != "" {
+			d.removeDraftByID(ctx, draftID)
+		}
+		return "ok", nil
+	})
+
+	srv.Register("drafts.list", func(ctx context.Context, p map[string]any) (any, error) {
+		accountStr, _ := p["account"].(string)
+		query, _ := p["query"].(string)
+		if remote, _ := p["remote"].(bool); remote {
+			d.syncRemoteDrafts(ctx, accountStr)
+		}
+		return d.draftsStore().List(accountStr, query), nil
+	})
+
+	srv.Register("drafts.save", func(ctx context.Context, p map[string]any) (any, error) {
+		accountStr, _ := p["account"].(string)
+		if accountStr == "" {
+			accounts, err := d.repo.Accounts(ctx)
+			if err == nil && len(accounts) > 0 {
+				accountStr = accounts[0].ID
+			}
+		}
+		if accountStr == "" {
+			return nil, fmt.Errorf("missing account for draft")
+		}
+		id, _ := p["id"].(string)
+		subject, _ := p["subject"].(string)
+		body, _ := p["body"].(string)
+		to := parseStringSlice(p["to"])
+		cc := parseStringSlice(p["cc"])
+		bcc := parseStringSlice(p["bcc"])
+		provAtts, viewAtts := parseAttachments(p["attachments"])
+		threadID, _ := intParam(p, "threadId")
+		inReplyTo, _ := p["inReplyTo"].(string)
+		providerThreadID, _ := p["providerThreadId"].(string)
+
+		store := d.draftsStore()
+		var providerDraftID string
+		if id != "" {
+			if existing, ok := store.Get(id); ok {
+				providerDraftID = existing.ProviderDraftID
+				if providerThreadID == "" {
+					providerThreadID = existing.ProviderThreadID
+				}
+				if inReplyTo == "" {
+					inReplyTo = existing.InReplyTo
+				}
+				if threadID == 0 {
+					threadID = existing.ThreadID
 				}
 			}
 		}
-		if len(draft.To) == 0 {
-			return nil, fmt.Errorf("no recipients")
+		if threadID > 0 && (providerThreadID == "" || inReplyTo == "") {
+			if detail, err := d.repo.GetThread(ctx, threadID); err == nil {
+				providerThreadID = detail.ProviderThreadID
+				if len(detail.Messages) > 0 && inReplyTo == "" {
+					inReplyTo = detail.Messages[len(detail.Messages)-1].ProviderMessageID
+				}
+			}
 		}
-		return "ok", d.queue.Enqueue(ctx, dsync.Op{
-			AccountID: accountID, Type: dsync.OpCompose,
-			Payload: dsync.OpPayload{Compose: &draft},
+
+		// Sync with remote provider when available (non-fatal if offline).
+		if acctUUID, err := parseUUID(accountStr); err == nil && d.registry != nil {
+			if prov, ok := d.registry.Provider(acctUUID); ok {
+				if dm, ok := prov.(provider.DraftManager); ok {
+					if rItem, err := dm.SaveDraft(ctx, provider.DraftSave{
+						ProviderDraftID:  providerDraftID,
+						ProviderThreadID: providerThreadID,
+						InReplyTo:        inReplyTo,
+						To:               to,
+						Cc:               cc,
+						Bcc:              bcc,
+						Subject:          subject,
+						Body:             body,
+						Attachments:      provAtts,
+					}); err == nil && rItem.ProviderDraftID != "" {
+						providerDraftID = rItem.ProviderDraftID
+						if rItem.ProviderThreadID != "" {
+							providerThreadID = rItem.ProviderThreadID
+						}
+					}
+				}
+			}
+		}
+
+		saved, err := store.Save(models.DraftView{
+			ID:               id,
+			AccountID:        accountStr,
+			ProviderDraftID:  providerDraftID,
+			ProviderThreadID: providerThreadID,
+			ThreadID:         threadID,
+			InReplyTo:        inReplyTo,
+			To:               to,
+			Cc:               cc,
+			Bcc:              bcc,
+			Subject:          subject,
+			Body:             body,
+			UpdatedAt:        time.Now().UTC(),
+			Attachments:      viewAtts,
 		})
+		if err != nil {
+			return nil, err
+		}
+		d.bus.Publish("drafts.changed", map[string]any{"accountId": accountStr, "id": saved.ID})
+		return saved, nil
+	})
+
+	srv.Register("drafts.delete", func(ctx context.Context, p map[string]any) (any, error) {
+		id, _ := p["id"].(string)
+		if id == "" {
+			return nil, fmt.Errorf("missing draft id")
+		}
+		d.removeDraftByID(ctx, id)
+		return "ok", nil
+	})
+
+	srv.Register("ui.editDraft", func(ctx context.Context, p map[string]any) (any, error) {
+		id, _ := p["id"].(string)
+		if id == "" {
+			return nil, fmt.Errorf("missing draft id")
+		}
+		d.ensureUIVisible()
+		d.bus.Publish("ui.editDraft", map[string]any{"id": id})
+		return "ok", nil
+	})
+
+	srv.Register("ui.openUrl", func(ctx context.Context, p map[string]any) (any, error) {
+		rawURL, _ := p["url"].(string)
+		rawURL = strings.TrimSpace(rawURL)
+		if rawURL == "" {
+			return nil, fmt.Errorf("empty url")
+		}
+		parsed, err := url.Parse(rawURL)
+		if err != nil {
+			return nil, fmt.Errorf("invalid url")
+		}
+		scheme := strings.ToLower(parsed.Scheme)
+		if scheme != "http" && scheme != "https" && scheme != "mailto" {
+			return nil, fmt.Errorf("unsupported url scheme %q", scheme)
+		}
+		_ = exec.Command("xdg-open", rawURL).Start()
+		return "ok", nil
+	})
+
+	srv.Register("fs.list", func(ctx context.Context, p map[string]any) (any, error) {
+		dirPath, _ := p["path"].(string)
+		showHidden, _ := p["showHidden"].(bool)
+		return listDirectory(dirPath, showHidden)
 	})
 
 	// ops.forward sends the thread's latest message to new recipients as a
@@ -588,4 +750,205 @@ func (d *daemon) searchRemote(ctx context.Context, p map[string]any) (any, error
 		return nil, fmt.Errorf("no account supports remote search")
 	}
 	return map[string]any{"ingested": found}, errors.Join(failures...)
+}
+
+func (d *daemon) draftsStore() *drafts.Store {
+	if d.drafts == nil {
+		d.drafts = drafts.NewStore("")
+	}
+	return d.drafts
+}
+
+func (d *daemon) syncRemoteDrafts(ctx context.Context, wantedAccount string) {
+	if d.repo == nil || d.registry == nil {
+		return
+	}
+	accounts, err := d.repo.Accounts(ctx)
+	if err != nil {
+		return
+	}
+	store := d.draftsStore()
+	for _, a := range accounts {
+		if wantedAccount != "" && a.ID != wantedAccount {
+			continue
+		}
+		id, err := parseUUID(a.ID)
+		if err != nil {
+			continue
+		}
+		prov, ok := d.registry.Provider(id)
+		if !ok {
+			continue
+		}
+		dm, ok := prov.(provider.DraftManager)
+		if !ok {
+			continue
+		}
+		items, err := dm.ListDrafts(ctx)
+		if err != nil {
+			continue
+		}
+		store.MergeRemote(a.ID, items)
+	}
+}
+
+func (d *daemon) removeDraftByID(ctx context.Context, id string) {
+	store := d.draftsStore()
+	removed, ok, _ := store.Delete(id)
+	if !ok {
+		return
+	}
+	if removed.ProviderDraftID != "" && removed.AccountID != "" && d.registry != nil {
+		if acctUUID, err := parseUUID(removed.AccountID); err == nil {
+			if prov, ok := d.registry.Provider(acctUUID); ok {
+				if dm, ok := prov.(provider.DraftManager); ok {
+					_ = dm.DeleteDraft(ctx, removed.ProviderDraftID)
+				}
+			}
+		}
+	}
+	if d.bus != nil {
+		d.bus.Publish("drafts.changed", map[string]any{"accountId": removed.AccountID, "id": id})
+	}
+}
+
+func parseStringSlice(raw any) []string {
+	var out []string
+	if arr, ok := raw.([]any); ok {
+		for _, item := range arr {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				out = append(out, strings.TrimSpace(s))
+			}
+		}
+	}
+	return out
+}
+
+func parseAttachments(raw any) ([]provider.AttachmentFile, []models.AttachmentView) {
+	var viewAtts []models.AttachmentView
+	if arr, ok := raw.([]any); ok {
+		for _, item := range arr {
+			switch v := item.(type) {
+			case string:
+				if strings.TrimSpace(v) != "" {
+					viewAtts = append(viewAtts, models.AttachmentView{Path: strings.TrimSpace(v)})
+				}
+			case map[string]any:
+				path, _ := v["path"].(string)
+				filename, _ := v["filename"].(string)
+				mimeType, _ := v["mimeType"].(string)
+				var size int64
+				if f, ok := v["size"].(float64); ok {
+					size = int64(f)
+				}
+				viewAtts = append(viewAtts, models.AttachmentView{
+					Filename: filename,
+					MimeType: mimeType,
+					Size:     size,
+					Path:     path,
+				})
+			}
+		}
+	}
+	viewAtts = drafts.NormalizeAttachments(viewAtts)
+	provAtts := make([]provider.AttachmentFile, 0, len(viewAtts))
+	for _, a := range viewAtts {
+		provAtts = append(provAtts, provider.AttachmentFile{
+			Filename: a.Filename,
+			MimeType: a.MimeType,
+			Size:     a.Size,
+			Path:     a.Path,
+		})
+	}
+	return provAtts, viewAtts
+}
+
+func listDirectory(rawPath string, showHidden bool) (map[string]any, error) {
+	home, _ := os.UserHomeDir()
+	if home == "" {
+		home = "/"
+	}
+	target := strings.TrimSpace(rawPath)
+	if target == "" {
+		dl := filepath.Join(home, "Downloads")
+		if st, err := os.Stat(dl); err == nil && st.IsDir() {
+			target = dl
+		} else {
+			target = home
+		}
+	} else if target == "~" {
+		target = home
+	} else if strings.HasPrefix(target, "~/") {
+		target = filepath.Join(home, target[2:])
+	}
+	target = filepath.Clean(target)
+	entries, err := os.ReadDir(target)
+	if err != nil {
+		return nil, err
+	}
+	type fileEntry struct {
+		Name    string `json:"name"`
+		Path    string `json:"path"`
+		IsDir   bool   `json:"isDir"`
+		Size    int64  `json:"size"`
+		ModTime string `json:"modTime"`
+	}
+	list := make([]fileEntry, 0, len(entries))
+	for _, e := range entries {
+		name := e.Name()
+		if !showHidden && strings.HasPrefix(name, ".") {
+			continue
+		}
+		full := filepath.Join(target, name)
+		info, err := os.Stat(full)
+		if err != nil {
+			info, err = e.Info()
+			if err != nil {
+				continue
+			}
+		}
+		list = append(list, fileEntry{
+			Name:    name,
+			Path:    full,
+			IsDir:   info.IsDir(),
+			Size:    info.Size(),
+			ModTime: info.ModTime().Format(time.RFC3339),
+		})
+	}
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].IsDir != list[j].IsDir {
+			return list[i].IsDir
+		}
+		return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name)
+	})
+	places := []map[string]string{
+		{"key": "home", "icon": "home", "path": home},
+	}
+	for _, candidate := range []struct {
+		key  string
+		icon string
+		rel  string
+	}{
+		{"downloads", "download", "Downloads"},
+		{"documents", "description", "Documents"},
+		{"desktop", "desktop_windows", "Desktop"},
+		{"pictures", "image", "Pictures"},
+		{"nextcloud", "cloud", "Nextcloud"},
+	} {
+		p := filepath.Join(home, candidate.rel)
+		if st, err := os.Stat(p); err == nil && st.IsDir() {
+			places = append(places, map[string]string{
+				"key":  candidate.key,
+				"icon": candidate.icon,
+				"path": p,
+			})
+		}
+	}
+	parent := filepath.Dir(target)
+	return map[string]any{
+		"path":    target,
+		"parent":  parent,
+		"places":  places,
+		"entries": list,
+	}, nil
 }

@@ -97,5 +97,17 @@
   },
   "Dankmail Unread": {
     "Dankmail Unread": "Dankmail Unread"
+  },
+  "Draft": {
+    "Draft": "Borrador"
+  },
+  "Drafts": {
+    "Drafts": "Borradores"
+  },
+  "Edit draft": {
+    "Edit draft": "Editar borrador"
+  },
+  "No drafts.": {
+    "No drafts.": "No hay borradores."
   }
 }

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../quickshell/Common/BodyFormatter.js'), 'utf8');
-const {format, safeUrl} = vm.runInNewContext(source.replace(/^\.pragma library\s*/, '') + '\n({format, safeUrl})');
+const {format, safeUrl, unwrapUrl, extractLinks} = vm.runInNewContext(source.replace(/^\.pragma library\s*/, '') + '\n({format, safeUrl, unwrapUrl, extractLinks})');
 test('distilled headings, paragraphs, lists, quotes, code and tables retain structure', () => {
  const html = format('# Heading\r\n\r\nFirst line\r\nsecond line\n\n- one\n- two\n\n2. second\n3. third\n\n> quoted\n>> nested\n\n```js\n<a> & code\n```\n\n| A | B |\n| --- | --- |\n| **bold** | value |');
  for (const term of ['<b>Heading</b>', 'First line<br>second line', '<ul><li>one</li><li>two</li></ul>', '<ol start="2">', '<blockquote', '&lt;a&gt; &amp; code', '<table', '<th>A</th>', '<td><b>bold</b></td>']) assert.ok(html.includes(term), term);
@@ -40,4 +40,27 @@ test('inline code in a link label restores generated tokens safely', () => {
  const html = format('[`details`](https://example.org)');
  assert.ok(html.includes('<code>details</code>'));
  assert.ok(!html.includes('\x01'));
+});
+
+test('gmail plain-text links, google redirects, wrapped lists and nested sublists render cleanly', () => {
+ const sample = [
+  'Les pido un ajuste en *plataformas.udgplus.udg.mx',
+  '<https://www.google.com/url?q=http://plataformas.udgplus.udg.mx&source=gmail&ust=1792185885752000&sa=E>*',
+  '',
+  '   1. *Recomendada:* en *Administración del sitio →',
+  '   Definir roles*, marcar la casilla.',
+  '   2. O aplicarlo directamente:',
+  '      - Planeación didáctica (id',
+  '      124)',
+  '      - Evaluación (id 128)'
+ ].join('\r\n');
+ const html = format(sample);
+ assert.equal(unwrapUrl('https://www.google.com/url?q=http://plataformas.udgplus.udg.mx&source=gmail'), 'http://plataformas.udgplus.udg.mx');
+ assert.ok(html.includes('href="http://plataformas.udgplus.udg.mx"'));
+ assert.ok(html.includes('<b>Recomendada:</b>'));
+ assert.ok(html.includes('<b>Administración del sitio → Definir roles</b>'));
+ assert.ok(html.includes('<ul><li>Planeación didáctica (id 124)</li><li>Evaluación (id 128)</li></ul>'));
+ const links = extractLinks(sample);
+ assert.equal(links.length, 1);
+ assert.equal(links[0].url, 'http://plataformas.udgplus.udg.mx');
 });

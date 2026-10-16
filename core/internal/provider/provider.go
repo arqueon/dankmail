@@ -143,24 +143,73 @@ const (
 	HeaderReplyTo    = "Reply-To"
 )
 
-// ReplyDraft is a plain-text reply to an existing thread. The provider is
+// AttachmentFile describes an outgoing file attachment for compose/reply/drafts.
+type AttachmentFile struct {
+	Filename string `json:"filename"`
+	MimeType string `json:"mimeType,omitempty"`
+	Size     int64  `json:"size,omitempty"`
+	Path     string `json:"path,omitempty"`
+	Data     []byte `json:"data,omitempty"`
+}
+
+// ReplyDraft is a reply to an existing thread. The provider is
 // responsible for building the MIME message: quoting is NOT included, the
 // body is sent as-is; In-Reply-To/References come from the original message.
 type ReplyDraft struct {
 	// InReplyToMessageID is the provider-native ID of the message being
 	// answered (normally the newest in the thread).
-	InReplyToMessageID string
-	Body               string
+	InReplyToMessageID string `json:"inReplyToMessageId,omitempty"`
+	Body               string `json:"body"`
 	// ReplyAll includes the original To/Cc recipients besides the sender.
-	ReplyAll bool
+	ReplyAll    bool             `json:"replyAll,omitempty"`
+	Attachments []AttachmentFile `json:"attachments,omitempty"`
 }
 
-// ComposeDraft is a minimal new message: recipients, subject, plain body.
-// No attachments, no HTML, no editable Cc/Bcc — by design.
+// ComposeDraft is a new outgoing message: recipients, subject, body, and optional attachments.
 type ComposeDraft struct {
-	To      []string
-	Subject string
-	Body    string
+	To          []string         `json:"to"`
+	Cc          []string         `json:"cc,omitempty"`
+	Bcc         []string         `json:"bcc,omitempty"`
+	Subject     string           `json:"subject"`
+	Body        string           `json:"body"`
+	Attachments []AttachmentFile `json:"attachments,omitempty"`
+}
+
+// DraftItem represents a draft stored locally or on a remote provider.
+type DraftItem struct {
+	ProviderDraftID   string           `json:"providerDraftId,omitempty"`
+	ProviderMessageID string           `json:"providerMessageId,omitempty"`
+	ProviderThreadID  string           `json:"providerThreadId,omitempty"`
+	InReplyTo         string           `json:"inReplyTo,omitempty"`
+	To                []string         `json:"to"`
+	Cc                []string         `json:"cc,omitempty"`
+	Bcc               []string         `json:"bcc,omitempty"`
+	Subject           string           `json:"subject"`
+	Body              string           `json:"body"`
+	Snippet           string           `json:"snippet"`
+	UpdatedAt         int64            `json:"updatedAt"`
+	Attachments       []AttachmentFile `json:"attachments,omitempty"`
+}
+
+// DraftSave holds parameters to create or update a remote draft.
+type DraftSave struct {
+	ProviderDraftID  string           `json:"providerDraftId,omitempty"`
+	ProviderThreadID string           `json:"providerThreadId,omitempty"`
+	InReplyTo        string           `json:"inReplyTo,omitempty"`
+	To               []string         `json:"to"`
+	Cc               []string         `json:"cc,omitempty"`
+	Bcc              []string         `json:"bcc,omitempty"`
+	Subject          string           `json:"subject"`
+	Body             string           `json:"body"`
+	Attachments      []AttachmentFile `json:"attachments,omitempty"`
+}
+
+// DraftManager is an optional interface implemented by providers that can
+// list, save, and delete remote drafts (e.g., Gmail users.drafts).
+type DraftManager interface {
+	ListDrafts(ctx context.Context) ([]DraftItem, error)
+	SaveDraft(ctx context.Context, d DraftSave) (DraftItem, error)
+	DeleteDraft(ctx context.Context, providerDraftID string) error
 }
 
 // RemoteSearcher is an optional interface (dcal-style: assert with a

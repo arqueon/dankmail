@@ -157,12 +157,20 @@ resume without discarding all earlier progress. A slow account does not block a
 manual sync of the others. Account settings show the last completed sync and errors.
 
 **Sent** loads recent outgoing conversations from Gmail or Microsoft in pages of
-25, with an explicit control for older mail. **Not spam** is available for the
-open conversation and bulk selections, including selections across accounts.
+25, with an explicit control for older mail. **Drafts** lists local and synced
+Gmail drafts in both the desktop triage window and the DankBar companion popout,
+opening them directly in the composer to edit, attach files, insert links, or
+discard. **Not spam** is available for the open conversation and bulk
+selections, including selections across accounts.
 
-The reader formats distilled text into paragraphs, lists, quotes, tables and code
-blocks. Links allow HTTP(S) and mailto only; remote images and original message
-HTML are not loaded. Button styling follows DankCalendar and DMS theme colors.
+The reader formats distilled text into paragraphs, lists, nested sublists,
+quotes, tables and code blocks, unwrapping Gmail redirect URLs and angle-bracket
+links so HTTP(S) and mailto links open reliably on click. Sender and recipient
+addresses (`From`, `To`, `Cc`) are shown as interactive chips with one-click
+copy and a **Copy all emails** action, plus a message selector for
+multi-message threads. The composer supports `Cc`/`Bcc`, Markdown formatting and
+link insertion, live preview, and multi-file attachments via a native
+DankMail-styled file picker.
 
 ### Companion maintenance
 

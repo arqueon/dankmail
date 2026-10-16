@@ -32,7 +32,38 @@ FloatingWindow {
     color: Theme.surface
 
     property int selectedThreadId: -1
+    property int selectedMessageIndex: -1
     property string operationError: ""
+    property string copiedNotice: ""
+    property double _lastLinkOpenMs: 0
+
+    Timer {
+        id: copiedNoticeTimer
+        interval: 2200
+        repeat: false
+        onTriggered: window.copiedNotice = ""
+    }
+
+    function copyWithFeedback(value) {
+        if (!value || String(value).trim() === "")
+            return;
+        DankMailService.copyText(value);
+        window.copiedNotice = I18n.tr("Copied: %1", "preview header").arg(String(value).trim());
+        copiedNoticeTimer.restart();
+    }
+
+    function openBodyLink(rawLink) {
+        if (!rawLink)
+            return;
+        const now = Date.now();
+        if (now - window._lastLinkOpenMs < 250)
+            return;
+        const clean = BodyFormatter.unwrapUrl ? BodyFormatter.unwrapUrl(rawLink) : String(rawLink);
+        if (!BodyFormatter.safeUrl(clean))
+            return;
+        window._lastLinkOpenMs = now;
+        DankMailService.openExternalUrl(clean);
+    }
 
     Connections {
         target: DankMailService
@@ -41,16 +72,57 @@ FloatingWindow {
         }
     }
 
-    function previewMessage() {
+    function visibleThreadMessages() {
         const t = DankMailService.currentThread;
         if (!t || !t.messages)
+            return [];
+        const filtered = DankMailService.filterLabel === "SENT" ? t.messages.filter(m => m.isSent) : t.messages;
+        return filtered.length > 0 ? filtered : t.messages;
+    }
+
+    function previewMessage() {
+        const messages = visibleThreadMessages();
+        if (messages.length === 0)
             return null;
-        const messages = DankMailService.filterLabel === "SENT" ? t.messages.filter(m => m.isSent) : t.messages;
-        return messages.length ? messages[messages.length - 1] : null;
+        if (selectedMessageIndex >= 0 && selectedMessageIndex < messages.length)
+            return messages[selectedMessageIndex];
+        return messages[messages.length - 1];
+    }
+
+    function allMessageEmails() {
+        const msg = previewMessage();
+        const t = DankMailService.currentThread;
+        const rawList = [];
+        if (msg) {
+            if (msg.from)
+                rawList.push(msg.from);
+            for (const r of (msg.to || []))
+                rawList.push(r);
+            for (const r of (msg.cc || []))
+                rawList.push(r);
+        }
+        if (t && t.participants) {
+            for (const p of t.participants)
+                rawList.push(p);
+        }
+        const seen = {};
+        const out = [];
+        for (const raw of rawList) {
+            const parsed = DankMailService.parseAddress(raw);
+            const email = (parsed.email || "").trim();
+            const key = email.toLowerCase();
+            if (email !== "" && !seen[key]) {
+                seen[key] = true;
+                out.push(email);
+            }
+        }
+        return out;
     }
 
     function selectThread(t) {
         selectedThreadId = t.id;
+        selectedMessageIndex = -1;
+        DankMailService.currentDraft = null;
         replyArea.reset();
         forwardArea.reset();
         DankMailService.loadThread(t.id, true);
@@ -224,7 +296,11 @@ FloatingWindow {
     // Entry points for the shell's pending-intent dispatch (ui.showThread
     // / ui.compose events may arrive before this window exists).
     function openThread(threadId) {
+        if (DankMailService.filterLabel === "DRAFTS")
+            DankMailService.filterLabel = "";
         selectedThreadId = threadId;
+        selectedMessageIndex = -1;
+        DankMailService.currentDraft = null;
         replyArea.reset();
         forwardArea.reset();
         DankMailService.loadThread(threadId, true);
@@ -238,6 +314,31 @@ FloatingWindow {
 
     function openCompose() {
         composeModal.show();
+    }
+
+    function openDraftById(draftId) {
+        DankMailService.filterUnread = false;
+        DankMailService.filterStarred = false;
+        DankMailService.filterArchived = false;
+        DankMailService.filterLabel = "DRAFTS";
+        const findAndEdit = () => {
+            for (let i = 0; i < DankMailService.drafts.length; i++) {
+                if (DankMailService.drafts[i].id === draftId) {
+                    DankMailService.currentDraft = DankMailService.drafts[i];
+                    composeModal.editDraft(DankMailService.drafts[i]);
+                    return true;
+                }
+            }
+            return false;
+        };
+        if (!findAndEdit()) {
+            DankMailService.sendRequest("drafts.list", { "remote": true }, resp => {
+                if (!resp.error && resp.result) {
+                    DankMailService.drafts = resp.result;
+                    findAndEdit();
+                }
+            });
+        }
     }
 
     AccountAddModal {
@@ -488,6 +589,10 @@ FloatingWindow {
                         "label": I18n.tr("Sent", "filter")
                     },
                     {
+                        "key": "drafts",
+                        "label": DankMailService.drafts.length > 0 ? (I18n.tr("Drafts", "filter") + " (" + DankMailService.drafts.length + ")") : I18n.tr("Drafts", "filter")
+                    },
+                    {
                         "key": "spam",
                         "label": I18n.tr("Spam", "filter")
                     }
@@ -495,9 +600,11 @@ FloatingWindow {
 
                 delegate: StyledRect {
                     required property var modelData
-                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "sent" && DankMailService.filterLabel === "SENT") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterArchived && DankMailService.filterLabel === "")
+                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "sent" && DankMailService.filterLabel === "SENT") || (modelData.key === "drafts" && DankMailService.filterLabel === "DRAFTS") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterArchived && DankMailService.filterLabel === "")
 
-                    width: filterLabel.implicitWidth + Theme.spacingL
+                    implicitWidth: Math.ceil(filterLabel.contentWidth) + Theme.spacingL
+                    implicitHeight: 30
+                    width: implicitWidth
                     height: 30
                     radius: 15
                     color: active ? Theme.primaryContainer : "transparent"
@@ -506,6 +613,8 @@ FloatingWindow {
                         id: filterLabel
                         anchors.centerIn: parent
                         text: parent.modelData.label
+                        wrapMode: Text.NoWrap
+                        elide: Text.ElideNone
                         font.pixelSize: Theme.fontSizeSmall
                         color: parent.active ? Theme.primary : Theme.surfaceTextMedium
                     }
@@ -516,9 +625,15 @@ FloatingWindow {
                             DankMailService.filterUnread = parent.modelData.key === "unread";
                             DankMailService.filterStarred = parent.modelData.key === "starred";
                             DankMailService.filterArchived = parent.modelData.key === "archived";
-                            DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : parent.modelData.key === "sent" ? "SENT" : "";
+                            DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : parent.modelData.key === "sent" ? "SENT" : parent.modelData.key === "drafts" ? "DRAFTS" : "";
                             window.checkedIds = [];
-                            DankMailService.refreshThreads();
+                            if (parent.modelData.key === "drafts") {
+                                DankMailService.currentThread = null;
+                                DankMailService.refreshDrafts(true);
+                            } else {
+                                DankMailService.currentDraft = null;
+                                DankMailService.refreshThreads();
+                            }
                         }
                     }
                 }
@@ -691,6 +806,7 @@ FloatingWindow {
                 ListView {
                     id: threadList
                     objectName: "threadList"
+                    visible: DankMailService.filterLabel !== "DRAFTS"
                     anchors.fill: parent
                     clip: true
                     model: threadModel
@@ -1105,15 +1221,173 @@ FloatingWindow {
                     }
                 }
 
+                // Drafts list (when Drafts filter is active).
+                ListView {
+                    id: draftList
+                    objectName: "draftList"
+                    visible: DankMailService.filterLabel === "DRAFTS"
+                    anchors.fill: parent
+                    clip: true
+                    model: DankMailService.drafts
+                    boundsBehavior: Flickable.StopAtBounds
+                    spacing: 0
+
+                    delegate: Rectangle {
+                        id: draftRow
+                        required property var modelData
+                        readonly property bool selected: DankMailService.currentDraft && DankMailService.currentDraft.id === modelData.id
+
+                        width: draftList.width
+                        height: 76
+                        color: selected ? Theme.surfaceSelected : "transparent"
+
+                        Rectangle {
+                            anchors.left: parent.left
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 3
+                            color: DankMailService.accountColor(draftRow.modelData.accountId)
+                        }
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: Theme.spacingM
+                            anchors.rightMargin: Theme.spacingM
+                            spacing: Theme.spacingM
+
+                            Rectangle {
+                                width: 38
+                                height: 38
+                                radius: 19
+                                color: Theme.primaryContainer
+
+                                DankIcon {
+                                    anchors.centerIn: parent
+                                    name: "edit_note"
+                                    size: Theme.iconSizeSmall
+                                    color: Theme.primary
+                                }
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                RowLayout {
+                                    Layout.fillWidth: true
+
+                                    StyledText {
+                                        Layout.fillWidth: true
+                                        text: (draftRow.modelData.to && draftRow.modelData.to.length > 0) ? draftRow.modelData.to.map(a => DankMailService.displayName(a)).join(", ") : I18n.tr("(no recipients)", "drafts")
+                                        font.weight: Font.Bold
+                                        color: Theme.surfaceText
+                                        maximumLineCount: 1
+                                    }
+
+                                    StyledText {
+                                        text: draftRow.modelData.updatedAt ? window.timeLabel(draftRow.modelData.updatedAt) : ""
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: Theme.surfaceTextMedium
+                                    }
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: draftRow.modelData.subject || I18n.tr("(no subject)", "thread list")
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: Font.Medium
+                                    color: Theme.surfaceText
+                                    maximumLineCount: 1
+                                }
+
+                                StyledText {
+                                    Layout.fillWidth: true
+                                    text: draftRow.modelData.snippet || ""
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.surfaceTextMedium
+                                    maximumLineCount: 1
+                                }
+                            }
+
+                            DankIcon {
+                                visible: draftRow.modelData.attachments && draftRow.modelData.attachments.length > 0
+                                name: "attach_file"
+                                size: Theme.iconSizeSmall
+                                color: Theme.surfaceTextMedium
+                            }
+                        }
+
+                        Rectangle {
+                            anchors.bottom: parent.bottom
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            height: 1
+                            color: Theme.outlineLight
+                        }
+
+                        StateLayer {
+                            stateColor: Theme.primary
+                            cornerRadius: 0
+                            onClicked: {
+                                DankMailService.currentThread = null;
+                                DankMailService.currentDraft = draftRow.modelData;
+                            }
+                        }
+
+                        HoverHandler {
+                            id: draftRowHover
+                        }
+
+                        Rectangle {
+                            visible: draftRowHover.hovered
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.spacingS
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: draftRowActionLayout.implicitWidth + Theme.spacingS * 2
+                            height: 36
+                            radius: Theme.cornerRadius
+                            color: Theme.surfaceContainerHigh
+                            border.width: 1
+                            border.color: Theme.outlineLight
+
+                            MouseArea {
+                                anchors.fill: parent
+                            }
+
+                            RowLayout {
+                                id: draftRowActionLayout
+                                anchors.centerIn: parent
+                                spacing: 0
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "edit"
+                                    onClicked: {
+                                        DankMailService.currentDraft = draftRow.modelData;
+                                        composeModal.editDraft(draftRow.modelData);
+                                    }
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 30
+                                    iconName: "delete"
+                                    iconColor: Theme.error
+                                    onClicked: DankMailService.deleteDraft(draftRow.modelData.id, null)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Empty state.
                 ColumnLayout {
                     anchors.centerIn: parent
-                    visible: DankMailService.threads.length === 0 && !DankMailService.threadsLoading && !DankMailService.archiveLoading
+                    visible: DankMailService.filterLabel === "DRAFTS" ? (DankMailService.drafts.length === 0 && !DankMailService.draftsLoading) : (DankMailService.threads.length === 0 && !DankMailService.threadsLoading && !DankMailService.archiveLoading)
                     spacing: Theme.spacingM
 
                     DankIcon {
                         Layout.alignment: Qt.AlignHCenter
-                        name: DankMailService.connected ? "inbox" : "cloud_off"
+                        name: DankMailService.connected ? (DankMailService.filterLabel === "DRAFTS" ? "edit_note" : "inbox") : "cloud_off"
                         size: 48
                         color: Theme.surfaceTextAlpha
                     }
@@ -1125,6 +1399,8 @@ FloatingWindow {
                                 return I18n.tr("Daemon offline", "empty state");
                             if (DankMailService.accounts.length === 0)
                                 return I18n.tr("No accounts yet", "empty state");
+                            if (DankMailService.filterLabel === "DRAFTS")
+                                return I18n.tr("No saved drafts", "empty state");
                             if (DankMailService.searchQuery !== "")
                                 return I18n.tr("No local results — search the full history or the web", "empty state");
                             if (DankMailService.filterLabel === "SENT")
@@ -1174,7 +1450,7 @@ FloatingWindow {
                     anchors.fill: parent
                     anchors.margins: Theme.spacingL
                     spacing: Theme.spacingM
-                    visible: DankMailService.currentThread !== null
+                    visible: DankMailService.currentThread !== null && DankMailService.filterLabel !== "DRAFTS"
 
                     StyledText {
                         Layout.fillWidth: true
@@ -1184,108 +1460,341 @@ FloatingWindow {
                         maximumLineCount: 2
                     }
 
+                    // Thread message selector when the conversation has multiple messages.
+                    Flickable {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 28
+                        visible: window.visibleThreadMessages().length > 1
+                        contentWidth: msgStepRowContainer.implicitWidth
+                        contentHeight: 28
+                        boundsBehavior: Flickable.StopAtBounds
+                        clip: true
+
+                        Row {
+                            id: msgStepRowContainer
+                            height: 28
+                            spacing: Theme.spacingXS
+
+                            Repeater {
+                                model: window.visibleThreadMessages()
+
+                                delegate: StyledRect {
+                                    id: msgStepChip
+                                    required property var modelData
+                                    required property int index
+                                    readonly property int totalCount: window.visibleThreadMessages().length
+                                    readonly property bool active: (window.selectedMessageIndex === -1 && index === totalCount - 1) || window.selectedMessageIndex === index
+
+                                    implicitWidth: Math.ceil(msgStepRow.implicitWidth) + Theme.spacingM * 2
+                                    width: implicitWidth
+                                    height: 26
+                                    radius: 13
+                                    color: active ? Theme.primaryContainer : Theme.surfaceContainerHigh
+
+                                    Row {
+                                        id: msgStepRow
+                                        anchors.centerIn: parent
+                                        spacing: 4
+
+                                        StyledText {
+                                            text: (msgStepChip.index + 1) + ". " + DankMailService.displayName(msgStepChip.modelData.from)
+                                            wrapMode: Text.NoWrap
+                                            elide: Text.ElideNone
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            font.weight: msgStepChip.active ? Font.DemiBold : Font.Normal
+                                            color: msgStepChip.active ? Theme.primary : Theme.surfaceTextMedium
+                                        }
+
+                                        StyledText {
+                                            text: "· " + window.timeLabel(msgStepChip.modelData.date)
+                                            wrapMode: Text.NoWrap
+                                            elide: Text.ElideNone
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceTextAlpha
+                                        }
+                                    }
+
+                                    StateLayer {
+                                        stateColor: Theme.primary
+                                        onClicked: window.selectedMessageIndex = msgStepChip.index
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: Theme.spacingS
 
+                        readonly property var lastMsg: window.previewMessage()
+                        readonly property var fromAddr: lastMsg ? DankMailService.parseAddress(lastMsg.from) : null
+                        id: fromLine
+
                         Rectangle {
+                            Layout.preferredWidth: 10
+                            Layout.preferredHeight: 10
                             width: 10
                             height: 10
                             radius: 5
                             color: DankMailService.currentThread ? DankMailService.accountColor(DankMailService.currentThread.accountId) : "transparent"
                         }
 
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: Theme.spacingS
+                        StyledText {
+                            text: fromLine.fromAddr ? (fromLine.fromAddr.name !== "" ? fromLine.fromAddr.name : fromLine.fromAddr.email) : ""
+                            font.weight: Font.DemiBold
+                            font.pixelSize: Theme.fontSizeMedium
+                            wrapMode: Text.NoWrap
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
+                        }
 
-                            readonly property var lastMsg: window.previewMessage()
-                            readonly property var fromAddr: lastMsg ? DankMailService.parseAddress(lastMsg.from) : null
-                            id: fromLine
+                        StyledRect {
+                            visible: fromLine.fromAddr !== null && fromLine.fromAddr.email !== ""
+                            implicitWidth: Math.ceil(senderEmailText.contentWidth) + 18 + Theme.spacingM * 2
+                            implicitHeight: 24
+                            Layout.preferredWidth: implicitWidth
+                            Layout.preferredHeight: 24
+                            radius: 12
+                            color: Theme.surfaceContainerHigh
 
-                            StyledText {
-                                text: fromLine.fromAddr ? (fromLine.fromAddr.name !== "" ? fromLine.fromAddr.name : fromLine.fromAddr.email) : ""
-                                font.weight: Font.DemiBold
-                                font.pixelSize: Theme.fontSizeMedium
+                            Row {
+                                id: senderEmailRow
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                StyledText {
+                                    id: senderEmailText
+                                    text: fromLine.fromAddr ? fromLine.fromAddr.email : ""
+                                    wrapMode: Text.NoWrap
+                                    elide: Text.ElideNone
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.primary
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                DankIcon {
+                                    name: "content_copy"
+                                    size: 13
+                                    color: Theme.surfaceTextMedium
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
                             }
 
-                            StyledText {
-                                Layout.fillWidth: true
-                                text: {
-                                    if (!fromLine.fromAddr)
-                                        return "";
-                                    const addr = fromLine.fromAddr.name !== "" ? fromLine.fromAddr.email : "";
-                                    const when = Qt.formatDateTime(new Date(fromLine.lastMsg.date), "ddd d MMM, HH:mm");
-                                    return (addr !== "" ? addr + "  ·  " : "") + when;
+                            StateLayer {
+                                stateColor: Theme.primary
+                                onClicked: {
+                                    if (fromLine.fromAddr && fromLine.fromAddr.email !== "")
+                                        window.copyWithFeedback(fromLine.fromAddr.email);
                                 }
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.surfaceTextAlpha
-                                maximumLineCount: 1
+                            }
+                        }
+
+                        Item {
+                            Layout.fillWidth: true
+                        }
+
+                        StyledText {
+                            text: fromLine.lastMsg ? Qt.formatDateTime(new Date(fromLine.lastMsg.date), "ddd d MMM, HH:mm") : ""
+                            wrapMode: Text.NoWrap
+                            elide: Text.ElideNone
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceTextAlpha
+                            maximumLineCount: 1
+                        }
+
+                        StyledRect {
+                            visible: window.allMessageEmails().length > 1
+                            implicitWidth: Math.ceil(copyAllLabel.contentWidth) + 18 + Theme.spacingM * 2
+                            implicitHeight: 24
+                            Layout.preferredWidth: implicitWidth
+                            Layout.preferredHeight: 24
+                            radius: 12
+                            color: Theme.surfaceContainerHigh
+
+                            Row {
+                                id: copyAllRow
+                                anchors.centerIn: parent
+                                spacing: 4
+
+                                DankIcon {
+                                    name: "content_copy"
+                                    size: 13
+                                    color: Theme.primary
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+
+                                StyledText {
+                                    id: copyAllLabel
+                                    text: I18n.tr("Copy all emails", "preview header")
+                                    wrapMode: Text.NoWrap
+                                    elide: Text.ElideNone
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    color: Theme.primary
+                                    anchors.verticalCenter: parent.verticalCenter
+                                }
+                            }
+
+                            StateLayer {
+                                stateColor: Theme.primary
+                                onClicked: window.copyWithFeedback(window.allMessageEmails().join(", "))
                             }
                         }
                     }
 
-                    // Recipients of the shown (newest) message. BCC of
-                    // received mail never travels in the headers, so when
-                    // the account's own address is in neither To nor CC the
-                    // message very likely arrived via BCC — say so.
+                    StyledText {
+                        visible: window.copiedNotice !== ""
+                        Layout.fillWidth: true
+                        text: window.copiedNotice
+                        font.pixelSize: Theme.fontSizeSmall
+                        color: Theme.primary
+                        elide: Text.ElideRight
+                        maximumLineCount: 1
+                    }
+
+                    // Recipients of the shown message + thread participants, each clickable to copy.
                     DankFlickable {
                         id: rcptScroll
                         Layout.fillWidth: true
-                        Layout.preferredHeight: Math.min(rcptLines.implicitHeight, 60)
+                        Layout.preferredHeight: Math.min(rcptLines.implicitHeight, 84)
                         visible: fromLine.lastMsg !== null && (rcptLines.toList.length > 0 || rcptLines.ccList.length > 0 || rcptLines.bccLikely)
                         contentHeight: rcptLines.implicitHeight
                         clip: true
 
-                        ColumnLayout {
+                        Column {
                             id: rcptLines
                             width: rcptScroll.width
-                            spacing: 0
+                            spacing: 4
 
                             readonly property var toList: fromLine.lastMsg ? (fromLine.lastMsg.to || []) : []
                             readonly property var ccList: fromLine.lastMsg ? (fromLine.lastMsg.cc || []) : []
-                            readonly property string ownEmail: {
-                                const t = DankMailService.currentThread;
-                                if (!t)
-                                    return "";
-                                const accs = DankMailService.accounts || [];
-                                for (let i = 0; i < accs.length; i++) {
-                                    if (accs[i].id === t.accountId)
-                                        return String(accs[i].email || "").toLowerCase();
-                                }
-                                return "";
-                            }
                             readonly property bool bccLikely: {
-                                if (ownEmail === "" || !fromLine.lastMsg || fromLine.lastMsg.isSent)
+                                if (!fromLine.lastMsg || fromLine.lastMsg.isSent)
                                     return false;
-                                const all = toList.concat(ccList);
-                                for (let i = 0; i < all.length; i++) {
-                                    if (String(all[i]).toLowerCase().indexOf(ownEmail) !== -1)
-                                        return false;
-                                }
-                                return true;
+                                return toList.length === 0 && ccList.length === 0;
                             }
 
-                            StyledText {
-                                Layout.fillWidth: true
+                            Flow {
+                                width: parent.width
+                                spacing: 4
                                 visible: rcptLines.toList.length > 0
-                                text: I18n.tr("To", "preview header") + ": " + rcptLines.toList.join(", ")
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.surfaceTextAlpha
-                                wrapMode: Text.WrapAnywhere
+
+                                StyledText {
+                                    height: 22
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: I18n.tr("To", "preview header") + ":"
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: Font.Medium
+                                    color: Theme.surfaceTextMedium
+                                }
+
+                                Repeater {
+                                    model: rcptLines.toList
+
+                                    delegate: StyledRect {
+                                        id: toAddrChip
+                                        required property string modelData
+                                        readonly property var parsed: DankMailService.parseAddress(modelData)
+                                        readonly property real maxChipW: Math.max(180, rcptLines.width - 48)
+                                        implicitWidth: Math.min(Math.ceil(toAddrLabel.contentWidth) + 18 + Theme.spacingM * 2, maxChipW)
+                                        width: implicitWidth
+                                        height: 22
+                                        radius: 11
+                                        color: Theme.surfaceContainerHigh
+                                        clip: true
+
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            StyledText {
+                                                id: toAddrLabel
+                                                text: DankMailService.formatAddressFull(toAddrChip.modelData)
+                                                wrapMode: Text.NoWrap
+                                                elide: Text.ElideNone
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: Theme.surfaceText
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            DankIcon {
+                                                name: "content_copy"
+                                                size: 12
+                                                color: Theme.surfaceTextAlpha
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                        }
+
+                                        StateLayer {
+                                            stateColor: Theme.primary
+                                            onClicked: window.copyWithFeedback(toAddrChip.parsed.email !== "" ? toAddrChip.parsed.email : toAddrChip.modelData)
+                                        }
+                                    }
+                                }
                             }
 
-                            StyledText {
-                                Layout.fillWidth: true
+                            Flow {
+                                width: parent.width
+                                spacing: 4
                                 visible: rcptLines.ccList.length > 0
-                                text: I18n.tr("Cc", "preview header") + ": " + rcptLines.ccList.join(", ")
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: Theme.surfaceTextAlpha
-                                wrapMode: Text.WrapAnywhere
+
+                                StyledText {
+                                    height: 22
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: I18n.tr("Cc", "preview header") + ":"
+                                    wrapMode: Text.NoWrap
+                                    font.pixelSize: Theme.fontSizeSmall
+                                    font.weight: Font.Medium
+                                    color: Theme.surfaceTextMedium
+                                }
+
+                                Repeater {
+                                    model: rcptLines.ccList
+
+                                    delegate: StyledRect {
+                                        id: ccAddrChip
+                                        required property string modelData
+                                        readonly property var parsed: DankMailService.parseAddress(modelData)
+                                        readonly property real maxChipW: Math.max(180, rcptLines.width - 48)
+                                        implicitWidth: Math.min(Math.ceil(ccAddrLabel.contentWidth) + 18 + Theme.spacingM * 2, maxChipW)
+                                        width: implicitWidth
+                                        height: 22
+                                        radius: 11
+                                        color: Theme.surfaceContainerHigh
+                                        clip: true
+
+                                        Row {
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            StyledText {
+                                                id: ccAddrLabel
+                                                text: DankMailService.formatAddressFull(ccAddrChip.modelData)
+                                                wrapMode: Text.NoWrap
+                                                elide: Text.ElideNone
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: Theme.surfaceText
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            DankIcon {
+                                                name: "content_copy"
+                                                size: 12
+                                                color: Theme.surfaceTextAlpha
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                        }
+
+                                        StateLayer {
+                                            stateColor: Theme.primary
+                                            onClicked: window.copyWithFeedback(ccAddrChip.parsed.email !== "" ? ccAddrChip.parsed.email : ccAddrChip.modelData)
+                                        }
+                                    }
+                                }
                             }
 
                             StyledText {
-                                Layout.fillWidth: true
+                                width: parent.width
                                 visible: rcptLines.bccLikely
                                 text: I18n.tr("Received via BCC — your address is not in To or Cc", "preview header")
                                 font.pixelSize: Theme.fontSizeSmall
@@ -1630,7 +2139,7 @@ FloatingWindow {
                         color: Theme.outlineMedium
                     }
 
-                    // Plain-text body of the newest message.
+                    // Rich formatted body of the selected message.
                     DankFlickable {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
@@ -1654,21 +2163,26 @@ FloatingWindow {
                                 const message = window.previewMessage();
                                 return message ? window.formatBody(message.bodyText || "") : "";
                             }
-                            onLinkActivated: link => {
-                                if (BodyFormatter.safeUrl(link))
-                                    Qt.openUrlExternally(link);
-                            }
+                            onLinkActivated: link => window.openBodyLink(link)
 
                             HoverHandler {
-                                enabled: bodyText.hoveredLink !== ""
-                                cursorShape: Qt.PointingHandCursor
+                                id: bodyHoverHandler
+                                cursorShape: bodyText.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
+                            }
+
+                            TapHandler {
+                                onTapped: eventPoint => {
+                                    if (bodyText.selectedText !== "")
+                                        return;
+                                    const target = bodyText.linkAt(eventPoint.position.x, eventPoint.position.y) || bodyText.hoveredLink;
+                                    if (target && target !== "")
+                                        window.openBodyLink(target);
+                                }
                             }
                         }
                     }
 
-                    // Quick reply (spec §7): plain textarea, Ctrl+Enter
-                    // sends, reply-all as a toggle. No CC/BCC, no
-                    // attachments, no rich signature — by design.
+                    // Quick reply: supports attachments, inline links, saving as draft, or expanding to full composer.
                     StyledRect {
                         id: replyArea
                         visible: false
@@ -1677,20 +2191,107 @@ FloatingWindow {
                         color: Theme.surfaceContainerHigh
 
                         property bool sending: false
+                        property bool savingDraft: false
                         property bool replyAll: false
+                        property var attachments: []
+                        property string draftId: ""
                         property string error: ""
 
                         function reset() {
                             visible = false;
                             sending = false;
+                            savingDraft = false;
                             replyAll = false;
+                            attachments = [];
+                            draftId = "";
                             error = "";
                             replyInput.text = "";
                         }
 
+                        function addAttachmentFiles(fileUrls) {
+                            const list = attachments.slice();
+                            for (let i = 0; i < fileUrls.length; i++) {
+                                let p = String(fileUrls[i] || "").trim();
+                                if (p.startsWith("file://")) {
+                                    try {
+                                        p = decodeURIComponent(p.substring(7));
+                                    } catch (e) {
+                                        p = p.substring(7);
+                                    }
+                                }
+                                if (p === "")
+                                    continue;
+                                const slash = p.lastIndexOf("/");
+                                const name = slash >= 0 ? p.substring(slash + 1) : p;
+                                list.push({ "filename": name, "path": p, "size": 0, "mimeType": "" });
+                            }
+                            attachments = list;
+                        }
+
+                        function saveAsDraft() {
+                            const t = DankMailService.currentThread;
+                            if (!t || savingDraft || (replyInput.text.trim() === "" && attachments.length === 0))
+                                return;
+                            savingDraft = true;
+                            error = "";
+                            const last = window.previewMessage();
+                            const toList = last ? [DankMailService.parseAddress(last.from).email || last.from] : [];
+                            const ccList = (replyAll && last) ? (last.to || []).concat(last.cc || []) : [];
+                            let subj = t.subject || "";
+                            if (!/^re:/i.test(subj.trim()))
+                                subj = "Re: " + subj;
+                            DankMailService.saveDraft({
+                                "id": draftId,
+                                "account": t.accountId,
+                                "threadId": t.id,
+                                "providerThreadId": t.providerThreadId,
+                                "inReplyTo": last ? last.providerMessageId : "",
+                                "to": toList,
+                                "cc": ccList,
+                                "subject": subj,
+                                "body": replyInput.text,
+                                "attachments": attachments
+                            }, resp => {
+                                replyArea.savingDraft = false;
+                                if (resp.error) {
+                                    replyArea.error = resp.error;
+                                    return;
+                                }
+                                if (resp.result && resp.result.id)
+                                    replyArea.draftId = resp.result.id;
+                                window.copiedNotice = I18n.tr("Draft saved", "compose");
+                                copiedNoticeTimer.restart();
+                            });
+                        }
+
+                        function expandToComposer() {
+                            const t = DankMailService.currentThread;
+                            if (!t)
+                                return;
+                            const last = window.previewMessage();
+                            const toList = last ? [DankMailService.parseAddress(last.from).email || last.from] : [];
+                            const ccList = (replyAll && last) ? (last.to || []).map(a => DankMailService.parseAddress(a).email || a) : [];
+                            let subj = t.subject || "";
+                            if (!/^re:/i.test(subj.trim()))
+                                subj = "Re: " + subj;
+                            composeModal.editDraft({
+                                "id": draftId,
+                                "accountId": t.accountId,
+                                "threadId": t.id,
+                                "providerThreadId": t.providerThreadId,
+                                "inReplyTo": last ? last.providerMessageId : "",
+                                "to": toList,
+                                "cc": ccList,
+                                "subject": subj,
+                                "body": replyInput.text,
+                                "attachments": attachments
+                            });
+                            replyArea.reset();
+                        }
+
                         function send() {
                             const t = DankMailService.currentThread;
-                            if (!t || replyInput.text.trim() === "" || sending)
+                            if (!t || (replyInput.text.trim() === "" && attachments.length === 0) || sending)
                                 return;
                             sending = true;
                             error = "";
@@ -1701,7 +2302,15 @@ FloatingWindow {
                                     return;
                                 }
                                 replyArea.reset();
+                            }, {
+                                "attachments": attachments,
+                                "draftId": draftId
                             });
+                        }
+
+                        FilePickerModal {
+                            id: replyFilePicker
+                            onFilesSelected: paths => replyArea.addAttachmentFiles(paths)
                         }
 
                         ColumnLayout {
@@ -1731,6 +2340,20 @@ FloatingWindow {
                                     maximumLineCount: 1
                                 }
 
+                                DankActionButton {
+                                    buttonSize: 28
+                                    iconSize: 16
+                                    iconName: "attach_file"
+                                    onClicked: replyFilePicker.open()
+                                }
+
+                                DankActionButton {
+                                    buttonSize: 28
+                                    iconSize: 16
+                                    iconName: "open_in_full"
+                                    onClicked: replyArea.expandToComposer()
+                                }
+
                                 StyledRect {
                                     width: replyAllLabel.implicitWidth + Theme.spacingL
                                     height: 28
@@ -1748,6 +2371,59 @@ FloatingWindow {
                                     StateLayer {
                                         stateColor: Theme.primary
                                         onClicked: replyArea.replyAll = !replyArea.replyAll
+                                    }
+                                }
+                            }
+
+                            Flow {
+                                Layout.fillWidth: true
+                                spacing: Theme.spacingXS
+                                visible: replyArea.attachments.length > 0
+
+                                Repeater {
+                                    model: replyArea.attachments
+
+                                    delegate: StyledRect {
+                                        id: replyAttChip
+                                        required property var modelData
+                                        required property int index
+                                        width: replyAttRow.implicitWidth + Theme.spacingM
+                                        height: 24
+                                        radius: 12
+                                        color: Theme.surfaceContainerHighest
+
+                                        RowLayout {
+                                            id: replyAttRow
+                                            anchors.centerIn: parent
+                                            spacing: 4
+
+                                            DankIcon {
+                                                name: "attach_file"
+                                                size: 13
+                                                color: Theme.primary
+                                            }
+
+                                            StyledText {
+                                                text: replyAttChip.modelData.filename
+                                                font.pixelSize: Theme.fontSizeSmall
+                                            }
+
+                                            DankIcon {
+                                                name: "close"
+                                                size: 13
+                                                color: Theme.surfaceTextMedium
+
+                                                MouseArea {
+                                                    anchors.fill: parent
+                                                    anchors.margins: -4
+                                                    onClicked: {
+                                                        const next = replyArea.attachments.slice();
+                                                        next.splice(replyAttChip.index, 1);
+                                                        replyArea.attachments = next;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -1810,7 +2486,30 @@ FloatingWindow {
                                 }
 
                                 StyledRect {
-                                    readonly property bool ready: replyInput.text.trim() !== "" && !replyArea.sending
+                                    readonly property bool canSave: (replyInput.text.trim() !== "" || replyArea.attachments.length > 0) && !replyArea.savingDraft
+                                    width: replySaveDraftLabel.implicitWidth + Theme.spacingL
+                                    height: 32
+                                    radius: 16
+                                    color: Theme.surfaceContainerHighest
+                                    opacity: canSave ? 1 : 0.6
+
+                                    StyledText {
+                                        id: replySaveDraftLabel
+                                        anchors.centerIn: parent
+                                        text: replyArea.savingDraft ? I18n.tr("Saving…", "compose") : I18n.tr("Save draft", "compose")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        color: parent.canSave ? Theme.surfaceText : Theme.surfaceTextMedium
+                                    }
+
+                                    StateLayer {
+                                        disabled: !parent.canSave
+                                        stateColor: Theme.primary
+                                        onClicked: replyArea.saveAsDraft()
+                                    }
+                                }
+
+                                StyledRect {
+                                    readonly property bool ready: (replyInput.text.trim() !== "" || replyArea.attachments.length > 0) && !replyArea.sending
                                     width: sendLabel.implicitWidth + Theme.spacingXL
                                     height: 32
                                     radius: 16
@@ -2058,16 +2757,186 @@ FloatingWindow {
 
                     StyledText {
                         Layout.fillWidth: true
-                        text: I18n.tr("Plain-text preview — open in web for the full message.", "preview footer")
+                        text: bodyText.hoveredLink !== "" ? bodyText.hoveredLink : I18n.tr("Plain-text preview — open in web for the full message.", "preview footer")
                         font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceTextAlpha
+                        color: bodyText.hoveredLink !== "" ? Theme.primary : Theme.surfaceTextAlpha
+                        elide: Text.ElideMiddle
+                        maximumLineCount: 1
+                    }
+                }
+
+                // Draft preview pane.
+                ColumnLayout {
+                    anchors.fill: parent
+                    anchors.margins: Theme.spacingL
+                    spacing: Theme.spacingM
+                    visible: DankMailService.filterLabel === "DRAFTS" && DankMailService.currentDraft !== null
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingS
+
+                        DankIcon {
+                            name: "edit_note"
+                            size: Theme.iconSize
+                            color: Theme.primary
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: DankMailService.currentDraft ? (DankMailService.currentDraft.subject || I18n.tr("(no subject)", "thread list")) : ""
+                            font.pixelSize: Theme.fontSizeXLarge
+                            font.weight: Font.DemiBold
+                            maximumLineCount: 2
+                        }
+
+                        DankButton {
+                            buttonHeight: 34
+                            horizontalPadding: Theme.spacingM
+                            text: I18n.tr("Edit draft", "compose")
+                            iconName: "edit"
+                            onClicked: {
+                                if (DankMailService.currentDraft)
+                                    composeModal.editDraft(DankMailService.currentDraft);
+                            }
+                        }
+
+                        DankActionButton {
+                            iconName: "delete"
+                            iconColor: Theme.error
+                            onClicked: {
+                                if (DankMailService.currentDraft)
+                                    DankMailService.deleteDraft(DankMailService.currentDraft.id, null);
+                            }
+                        }
+                    }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: 4
+                        visible: DankMailService.currentDraft !== null && (DankMailService.currentDraft.to || []).length > 0
+
+                        StyledText {
+                            text: I18n.tr("To", "preview header") + ":"
+                            font.pixelSize: Theme.fontSizeSmall
+                            font.weight: Font.Medium
+                            color: Theme.surfaceTextMedium
+                        }
+
+                        Repeater {
+                            model: DankMailService.currentDraft ? (DankMailService.currentDraft.to || []) : []
+
+                            delegate: StyledRect {
+                                id: draftToChip
+                                required property string modelData
+                                width: draftToRow.implicitWidth + Theme.spacingM
+                                height: 22
+                                radius: 11
+                                color: Theme.surfaceContainerHigh
+
+                                RowLayout {
+                                    id: draftToRow
+                                    anchors.centerIn: parent
+                                    spacing: 4
+
+                                    StyledText {
+                                        text: DankMailService.formatAddressFull(draftToChip.modelData)
+                                        font.pixelSize: Theme.fontSizeSmall
+                                    }
+
+                                    DankIcon {
+                                        name: "content_copy"
+                                        size: 12
+                                        color: Theme.surfaceTextAlpha
+                                    }
+                                }
+
+                                StateLayer {
+                                    stateColor: Theme.primary
+                                    onClicked: window.copyWithFeedback(DankMailService.parseAddress(draftToChip.modelData).email || draftToChip.modelData)
+                                }
+                            }
+                        }
+                    }
+
+                    Flow {
+                        Layout.fillWidth: true
+                        spacing: Theme.spacingXS
+                        visible: DankMailService.currentDraft !== null && (DankMailService.currentDraft.attachments || []).length > 0
+
+                        Repeater {
+                            model: DankMailService.currentDraft ? (DankMailService.currentDraft.attachments || []) : []
+
+                            delegate: StyledRect {
+                                id: draftAttPreviewChip
+                                required property var modelData
+                                width: draftAttPreviewRow.implicitWidth + Theme.spacingL
+                                height: 28
+                                radius: 14
+                                color: Theme.surfaceContainerHigh
+                                border.width: 1
+                                border.color: Theme.outlineMedium
+
+                                RowLayout {
+                                    id: draftAttPreviewRow
+                                    anchors.centerIn: parent
+                                    spacing: Theme.spacingXS
+
+                                    DankIcon {
+                                        name: "attach_file"
+                                        size: Theme.iconSizeSmall
+                                        color: Theme.primary
+                                    }
+
+                                    StyledText {
+                                        text: draftAttPreviewChip.modelData.filename + (window.formatSize(draftAttPreviewChip.modelData.size) !== "" ? "  ·  " + window.formatSize(draftAttPreviewChip.modelData.size) : "")
+                                        font.pixelSize: Theme.fontSizeSmall
+                                        maximumLineCount: 1
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 1
+                        color: Theme.outlineMedium
+                    }
+
+                    DankFlickable {
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+                        contentHeight: draftBodyPreview.implicitHeight + Theme.spacingL * 2
+                        clip: true
+
+                        TextEdit {
+                            id: draftBodyPreview
+                            width: Math.min(parent.width - Theme.spacingL * 2, 760)
+                            x: (parent.width - width) / 2
+                            y: Theme.spacingL
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.Wrap
+                            textFormat: TextEdit.RichText
+                            color: Theme.surfaceText
+                            selectionColor: Theme.primarySelected
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeMedium
+                            text: DankMailService.currentDraft ? window.formatBody(DankMailService.currentDraft.body || "") : ""
+                            onLinkActivated: link => window.openBodyLink(link)
+
+                            HoverHandler {
+                                cursorShape: draftBodyPreview.hoveredLink !== "" ? Qt.PointingHandCursor : Qt.IBeamCursor
+                            }
+                        }
                     }
                 }
 
                 // Preview empty state.
                 ColumnLayout {
                     anchors.centerIn: parent
-                    visible: DankMailService.currentThread === null
+                    visible: DankMailService.filterLabel === "DRAFTS" ? (DankMailService.currentDraft === null) : (DankMailService.currentThread === null)
                     spacing: Theme.spacingM
 
                     DankIcon {

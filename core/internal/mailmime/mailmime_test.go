@@ -260,3 +260,37 @@ func TestBuildReplySelfConversationAddressesSelf(t *testing.T) {
 		t.Errorf("To = %v, want self", to)
 	}
 }
+
+func TestBuildComposeWithCcBccLinksAndAttachments(t *testing.T) {
+	raw, err := BuildCompose(self, provider.ComposeDraft{
+		To:      []string{"ada@example.com"},
+		Cc:      []string{"carlos@example.net"},
+		Bcc:     []string{"dana@example.io"},
+		Subject: "Con adjunto y enlace",
+		Body:    "Hola, revisa [Plataformas UDG+](https://plataformas.udgplus.udg.mx) y **este documento**.",
+		Attachments: []provider.AttachmentFile{
+			{
+				Filename: "notas.txt",
+				MimeType: "text/plain",
+				Data:     []byte("contenido del archivo adjunto"),
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if !strings.Contains(s, "multipart/mixed") {
+		t.Errorf("expected multipart/mixed, got:\n%s", s)
+	}
+	if !strings.Contains(s, "multipart/alternative") {
+		t.Errorf("expected multipart/alternative for markdown link/bold, got:\n%s", s)
+	}
+	unwrapped := strings.ReplaceAll(strings.ReplaceAll(s, "=\r\n", ""), "=3D", "=")
+	if !strings.Contains(unwrapped, `<a href="https://plataformas.udgplus.udg.mx">Plataformas UDG+</a>`) {
+		t.Errorf("expected HTML link in multipart body, got:\n%s", s)
+	}
+	if !strings.Contains(s, "Content-Disposition: attachment;") || !strings.Contains(s, "notas.txt") {
+		t.Errorf("expected attachment part for notas.txt, got:\n%s", s)
+	}
+}

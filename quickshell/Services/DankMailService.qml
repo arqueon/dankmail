@@ -39,8 +39,11 @@ Singleton {
 
     property var accounts: []
     property var threads: []
+    property var drafts: []
     property var currentThread: null
+    property var currentDraft: null
     property bool threadsLoading: false
+    property bool draftsLoading: false
     property bool threadsHasMore: false
     property var _threadSearch: null
     property bool dndEnabled: false
@@ -56,12 +59,17 @@ Singleton {
     // the webmail via openWebSearch.
     property string searchQuery: ""
 
-    onSearchQueryChanged: invalidateThreadSearch()
+    onSearchQueryChanged: { invalidateThreadSearch(); refreshDrafts(false); }
     onFilterUnreadChanged: invalidateThreadSearch()
     onFilterStarredChanged: invalidateThreadSearch()
     onFilterArchivedChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
-    onFilterAccountChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
-    onFilterLabelChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
+    onFilterAccountChanged: { invalidateThreadSearch(); resetArchiveHistory(); refreshDrafts(true); }
+    onFilterLabelChanged: {
+        invalidateThreadSearch();
+        resetArchiveHistory();
+        if (filterLabel === "DRAFTS")
+            refreshDrafts(true);
+    }
 
     readonly property int unreadTotal: {
         let n = 0;
@@ -88,6 +96,29 @@ Singleton {
         return "";
     }
 
+    function decodeMimeWords(str) {
+        if (!str)
+            return "";
+        return String(str).replace(/=\?([^?]+)\?([qQbB])\?([^?]*)\?=/g, (match, charset, enc, text) => {
+            if (enc.toUpperCase() === "Q") {
+                const qText = text.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_, hex) => "%" + hex);
+                try {
+                    return decodeURIComponent(qText);
+                } catch (e) {
+                    return text;
+                }
+            }
+            if (enc.toUpperCase() === "B") {
+                try {
+                    return Qt.atob(text);
+                } catch (e) {
+                    return text;
+                }
+            }
+            return match;
+        });
+    }
+
     // parseAddress splits an RFC-style display string ('"Ada L." <a@x>')
     // into {name, email}; bare addresses land in email with empty name.
     function parseAddress(raw) {
@@ -96,16 +127,59 @@ Singleton {
                 "name": "",
                 "email": ""
             };
-        const m = raw.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
+        const decoded = decodeMimeWords(raw);
+        const m = decoded.match(/^\s*"?([^"<]*?)"?\s*<([^>]+)>\s*$/);
         if (m)
             return {
-                "name": m[1].trim(),
+                "name": m[1].replace(/^"+|"+$/g, "").trim(),
                 "email": m[2].trim()
             };
+        const cleaned = decoded.replace(/^<|>$/g, "").trim();
         return {
             "name": "",
-            "email": raw.trim()
+            "email": cleaned
         };
+    }
+
+    function formatAddressFull(raw) {
+        const a = parseAddress(raw);
+        if (a.name !== "" && a.email !== "" && a.name.toLowerCase() !== a.email.toLowerCase())
+            return a.name + " <" + a.email + ">";
+        return a.email || a.name;
+    }
+
+    function copyText(text) {
+        if (!text || String(text).trim() === "")
+            return;
+        const val = String(text).trim();
+        try {
+            Quickshell.clipboardText = val;
+        } catch (e) {}
+        Quickshell.execDetached(["sh", "-c", "if command -v dms >/dev/null 2>&1; then dms cl copy \"$1\"; elif command -v wl-copy >/dev/null 2>&1; then printf '%s' \"$1\" | wl-copy; fi", "sh", val]);
+    }
+
+    function openExternalUrl(url) {
+        if (!url || String(url).trim() === "")
+            return;
+        const target = String(url).trim();
+        if (connected) {
+            sendRequest("ui.openUrl", { "url": target }, resp => {
+                if (resp && resp.error)
+                    Quickshell.execDetached(["xdg-open", target]);
+            });
+        } else {
+            Quickshell.execDetached(["xdg-open", target]);
+        }
+    }
+
+    function listDirectory(dirPath, showHidden, callback) {
+        sendRequest("fs.list", {
+            "path": dirPath || "",
+            "showHidden": !!showHidden
+        }, resp => {
+            if (callback)
+                callback(resp);
+        });
     }
 
     // displayName favors the human name, falling back to the address.
@@ -149,6 +223,7 @@ Singleton {
     signal connectionStateChanged
     signal windowActionRequested(string action)
     signal composeRequested
+    signal editDraftRequested(string draftId)
     signal showThreadRequested(int threadId)
     signal replyThreadRequested(int threadId)
     signal opFailed(string opType, string error)
@@ -299,6 +374,14 @@ Singleton {
             windowActionRequested("show");
             composeRequested();
             break;
+        case "ui.editDraft":
+            windowActionRequested("show");
+            if (event.payload && event.payload.id !== undefined)
+                editDraftRequested(String(event.payload.id));
+            break;
+        case "drafts.changed":
+            refreshDrafts(false);
+            break;
         case "ui.showThread":
             windowActionRequested("show");
             if (event.payload && event.payload.id !== undefined)
@@ -354,10 +437,70 @@ Singleton {
         resetArchiveHistory();
         refreshAccounts();
         refreshThreads();
+        refreshDrafts(true);
         refreshDnd();
         refreshGmailSetupSteps();
         refreshMicrosoftSetupSteps();
         refreshSettings();
+    }
+
+    function refreshDrafts(remote) {
+        if (!connected)
+            return;
+        draftsLoading = true;
+        const params = {
+            "remote": !!remote
+        };
+        if (filterAccount !== "")
+            params.account = filterAccount;
+        if (searchQuery !== "")
+            params.query = searchQuery;
+        sendRequest("drafts.list", params, resp => {
+            draftsLoading = false;
+            if (resp.error) {
+                log.warn("drafts.list:", resp.error);
+                return;
+            }
+            drafts = resp.result || [];
+            if (currentDraft) {
+                let found = null;
+                for (let i = 0; i < drafts.length; i++) {
+                    if (drafts[i].id === currentDraft.id) {
+                        found = drafts[i];
+                        break;
+                    }
+                }
+                currentDraft = found;
+            }
+        });
+    }
+
+    function saveDraft(params, callback) {
+        sendRequest("drafts.save", params, resp => {
+            if (resp.error) {
+                log.warn("drafts.save:", resp.error);
+                if (callback)
+                    callback(resp);
+                return;
+            }
+            refreshDrafts(false);
+            if (callback)
+                callback(resp);
+        });
+    }
+
+    function deleteDraft(id, callback) {
+        sendRequest("drafts.delete", {
+            "id": id
+        }, resp => {
+            if (resp.error)
+                log.warn("drafts.delete:", resp.error);
+            if (currentDraft && currentDraft.id === id)
+                currentDraft = null;
+            refreshDrafts(false);
+            if (callback)
+                callback(resp);
+        });
     }
 
     function refreshSettings() {
@@ -564,33 +707,53 @@ Singleton {
         });
     }
 
-    // compose sends a new plain-text message from the given account.
-    function compose(accountId, to, subject, body, callback) {
-        sendRequest("ops.compose", {
+    // compose sends a new message from the given account (with optional cc, bcc, attachments, draftId).
+    function compose(accountId, to, subject, body, callback, extra) {
+        const params = {
             "account": accountId,
             "to": to,
             "subject": subject,
             "body": body
-        }, resp => {
+        };
+        if (extra) {
+            if (extra.cc && extra.cc.length > 0)
+                params.cc = extra.cc;
+            if (extra.bcc && extra.bcc.length > 0)
+                params.bcc = extra.bcc;
+            if (extra.attachments && extra.attachments.length > 0)
+                params.attachments = extra.attachments;
+            if (extra.draftId && extra.draftId !== "")
+                params.draftId = extra.draftId;
+        }
+        sendRequest("ops.compose", params, resp => {
             if (resp.error)
                 log.warn("ops.compose:", resp.error);
+            refreshDrafts(false);
             if (callback)
                 callback(resp);
         });
     }
 
-    // reply enqueues a plain-text reply on the thread (send_reply op:
+    // reply enqueues a reply on the thread (send_reply op:
     // optimistic, retried, mark-read hook applies). replyAll includes
     // the original To/Cc besides the sender.
-    function reply(id, body, replyAll, callback) {
-        sendRequest("ops.reply", {
+    function reply(id, body, replyAll, callback, extra) {
+        const params = {
             "id": id,
             "body": body,
             "replyAll": replyAll
-        }, resp => {
+        };
+        if (extra) {
+            if (extra.attachments && extra.attachments.length > 0)
+                params.attachments = extra.attachments;
+            if (extra.draftId && extra.draftId !== "")
+                params.draftId = extra.draftId;
+        }
+        sendRequest("ops.reply", params, resp => {
             if (resp.error)
                 log.warn("ops.reply:", resp.error);
             refreshDebounce.restart();
+            refreshDrafts(false);
             if (callback)
                 callback(resp);
         });

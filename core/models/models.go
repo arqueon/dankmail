@@ -41,6 +41,25 @@ type AttachmentView struct {
 	Filename string `json:"filename"`
 	MimeType string `json:"mimeType"`
 	Size     int64  `json:"size"`
+	Path     string `json:"path,omitempty"`
+}
+
+type DraftView struct {
+	ID                string           `json:"id"`
+	AccountID         string           `json:"accountId"`
+	ProviderDraftID   string           `json:"providerDraftId,omitempty"`
+	ProviderMessageID string           `json:"providerMessageId,omitempty"`
+	ProviderThreadID  string           `json:"providerThreadId,omitempty"`
+	ThreadID          int              `json:"threadId,omitempty"`
+	InReplyTo         string           `json:"inReplyTo,omitempty"`
+	To                []string         `json:"to"`
+	Cc                []string         `json:"cc,omitempty"`
+	Bcc               []string         `json:"bcc,omitempty"`
+	Subject           string           `json:"subject"`
+	Body              string           `json:"body"`
+	Snippet           string           `json:"snippet"`
+	UpdatedAt         time.Time        `json:"updatedAt"`
+	Attachments       []AttachmentView `json:"attachments,omitempty"`
 }
 
 type MessageView struct {
