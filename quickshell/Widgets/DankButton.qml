@@ -7,11 +7,12 @@ Rectangle {
 
     property string text: ""
     property string iconName: ""
+    property bool busy: false
     property int iconSize: Theme.iconSizeSmall
     property bool hovered: mouseArea.containsMouse
     property bool pressed: mouseArea.pressed
-    property color backgroundColor: Theme.primaryContainer
-    property color textColor: Theme.primary
+    property color backgroundColor: Theme.primary
+    property color textColor: Theme.primaryText
     property int buttonHeight: 40
     property int horizontalPadding: Theme.spacingL
 
@@ -58,10 +59,10 @@ Rectangle {
         spacing: Theme.spacingS
 
         DankIcon {
-            name: root.iconName
+            name: root.busy ? "hourglass_top" : root.iconName
             size: root.iconSize
             color: root.textColor
-            visible: root.iconName !== ""
+            visible: root.busy || root.iconName !== ""
             anchors.verticalCenter: parent.verticalCenter
         }
 

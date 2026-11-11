@@ -10,14 +10,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
 	"net/mail"
 	"net/url"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
 	"github.com/arqueon/dankmail/core/errdefs"
 	"github.com/arqueon/dankmail/core/internal/mailmime"
+	"github.com/arqueon/dankmail/core/internal/mailtext"
 	"github.com/arqueon/dankmail/core/internal/provider"
 	gmailv1 "google.golang.org/api/gmail/v1"
 )
@@ -477,38 +478,92 @@ func (p *Provider) messageDelta(m *gmailv1.Message) provider.MessageDelta {
 	if len(replyHeaders) > 0 {
 		d.ReplyHeaders = replyHeaders
 	}
-	body := firstPlainText(m.Payload)
-	if body == "" {
-		// HTML-only message: distill the first text/html part to plain
-		// markdown-ish text (never rendered — spec §1).
-		body = htmlToText(firstHTML(m.Payload))
-	}
+	body := mailtext.ExtractPreferredBody(firstHTML(m.Payload), firstPlainText(m.Payload))
 	d.BodyText = truncateAtRune(body, p.bodyCap)
 	d.Attachments = collectAttachments(m.Payload, nil)
 	return d
 }
 
-// collectAttachments walks the payload tree gathering metadata for every
-// named part (regular and inline attachments). Content is never fetched.
+// collectAttachments walks the payload tree gathering metadata and download
+// identifiers for every named part (regular and inline attachments).
 func collectAttachments(part *gmailv1.MessagePart, acc []provider.AttachmentMeta) []provider.AttachmentMeta {
 	if part == nil {
 		return acc
 	}
 	if part.Filename != "" {
 		size := int64(0)
+		attID := ""
 		if part.Body != nil {
 			size = part.Body.Size
+			attID = part.Body.AttachmentId
+			if attID == "" && part.Body.Data != "" {
+				attID = "inline:" + strconv.Itoa(len(acc))
+			}
 		}
 		acc = append(acc, provider.AttachmentMeta{
-			Filename: part.Filename,
-			MimeType: part.MimeType,
-			Size:     size,
+			AttachmentID: attID,
+			Filename:     part.Filename,
+			MimeType:     part.MimeType,
+			Size:         size,
 		})
 	}
 	for _, child := range part.Parts {
 		acc = collectAttachments(child, acc)
 	}
 	return acc
+}
+
+// FetchAttachment downloads attachment bytes on demand for opening or saving locally.
+func (p *Provider) FetchAttachment(ctx context.Context, messageID, attachmentID, filename string) ([]byte, error) {
+	ctx = withRetryBudget(ctx)
+	attAPI, ok := p.api.(gmailAttachmentsAPI)
+	if !ok {
+		return nil, errdefs.Wrap(errdefs.KindPermanent, fmt.Errorf("gmail: attachment download not supported"))
+	}
+	if attachmentID != "" && !strings.HasPrefix(attachmentID, "inline:") {
+		raw, err := attAPI.GetAttachment(ctx, messageID, attachmentID)
+		return raw, classify(err)
+	}
+	msg, err := attAPI.GetMessageFull(ctx, messageID)
+	if err != nil {
+		return nil, classify(err)
+	}
+	targetIdx := -1
+	if strings.HasPrefix(attachmentID, "inline:") {
+		if n, convErr := strconv.Atoi(strings.TrimPrefix(attachmentID, "inline:")); convErr == nil {
+			targetIdx = n
+		}
+	}
+	curIdx := 0
+	var found *gmailv1.MessagePart
+	var walk func(*gmailv1.MessagePart)
+	walk = func(part *gmailv1.MessagePart) {
+		if part == nil || found != nil {
+			return
+		}
+		if part.Filename != "" {
+			if (targetIdx >= 0 && curIdx == targetIdx) || (filename != "" && part.Filename == filename) {
+				found = part
+				return
+			}
+			curIdx++
+		}
+		for _, ch := range part.Parts {
+			walk(ch)
+		}
+	}
+	walk(msg.Payload)
+	if found == nil || found.Body == nil {
+		return nil, errdefs.Wrap(errdefs.KindPermanent, fmt.Errorf("gmail: attachment %q not found on message", filename))
+	}
+	if found.Body.Data != "" {
+		return decodeBase64URLBytes(found.Body.Data)
+	}
+	if found.Body.AttachmentId != "" {
+		raw, err := attAPI.GetAttachment(ctx, messageID, found.Body.AttachmentId)
+		return raw, classify(err)
+	}
+	return nil, errdefs.Wrap(errdefs.KindPermanent, fmt.Errorf("gmail: attachment %q has no payload", filename))
 }
 
 // isSystemLabel filters Gmail system labels out of ThreadDelta.Labels;
@@ -598,14 +653,7 @@ func firstHTML(part *gmailv1.MessagePart) string {
 // htmlToText distills HTML to plain markdown-ish text. Errors degrade to
 // an empty body (the snippet still shows in the UI).
 func htmlToText(html string) string {
-	if html == "" {
-		return ""
-	}
-	text, err := htmltomarkdown.ConvertString(html)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(text)
+	return mailtext.HTMLToText(html)
 }
 
 // decodeBase64URL decodes Gmail body data, which is base64url with or

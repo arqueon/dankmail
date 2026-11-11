@@ -2,10 +2,10 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	gosync "sync"
 
 	"github.com/google/uuid"
@@ -13,15 +13,14 @@ import (
 	"github.com/arqueon/dankmail/core/config"
 	"github.com/arqueon/dankmail/core/ent"
 	"github.com/arqueon/dankmail/core/ent/account"
+	"github.com/arqueon/dankmail/core/internal/accounts"
+	"github.com/arqueon/dankmail/core/internal/keyring"
 	"github.com/arqueon/dankmail/core/internal/oauth"
 	"github.com/arqueon/dankmail/core/internal/provider"
 	"github.com/arqueon/dankmail/core/internal/provider/gmail"
+	"github.com/arqueon/dankmail/core/internal/provider/imap"
 	"github.com/arqueon/dankmail/core/internal/provider/microsoft"
 )
-
-// errProviderPending marks account types whose sync provider is not
-// shipped yet (IMAP: anillo 2). The account is stored and parked.
-var errProviderPending = errors.New("sync provider for this account type arrives in the next ring; account parked (paused)")
 
 // registry builds and caches one provider instance per account. rebuild
 // is called at daemon start and on system.reload (account added/removed
@@ -66,25 +65,22 @@ func (r *registry) rebuild(ctx context.Context) error {
 	}
 	next := map[uuid.UUID]provider.Provider{}
 	for _, a := range accts {
-		p, err := r.build(ctx, a)
-		switch {
-		case errors.Is(err, errProviderPending):
-			// Account type stored but its sync provider isn't shipped
-			// yet: park it (paused, not an auth failure).
-			if a.Status == account.StatusActive {
-				_, _ = r.db.Account.UpdateOneID(a.ID).
-					SetStatus(account.StatusPaused).
-					SetLastError(err.Error()).
-					Save(ctx)
-			}
-			continue
-		case err != nil:
+		p, err := r.build(ctx, a, accts)
+		if err != nil {
 			slog.Warn("provider unavailable", "account", a.Email, "err", err)
 			_, _ = r.db.Account.UpdateOneID(a.ID).
 				SetStatus(account.StatusAuthError).
 				SetLastError(err.Error()).
 				Save(ctx)
 			continue
+		}
+		// Un-park IMAP accounts that were stored while the IMAP sync
+		// provider was still pending in an older release.
+		if a.Type == account.TypeImap && a.Status == account.StatusPaused && strings.Contains(a.LastError, "next ring") {
+			_, _ = r.db.Account.UpdateOneID(a.ID).
+				SetStatus(account.StatusActive).
+				SetLastError("").
+				Save(ctx)
 		}
 		next[a.ID] = p
 	}
@@ -94,15 +90,28 @@ func (r *registry) rebuild(ctx context.Context) error {
 	return nil
 }
 
-func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider, error) {
+func accountIDStringsByType(accts []*ent.Account, t account.Type) []string {
+	out := make([]string, 0, len(accts))
+	for _, a := range accts {
+		if a.Type == t {
+			out = append(out, a.ID.String())
+		}
+	}
+	return out
+}
+
+func (r *registry) build(ctx context.Context, a *ent.Account, all []*ent.Account) (provider.Provider, error) {
 	switch a.Type {
 	case account.TypeGmail:
-		// The account's own OAuth client lives in the keyring (stored at
-		// add time); the environment is only a fallback for accounts
-		// added before that existed.
-		creds, err := oauth.LoadClientCreds(a.ID.String())
-		if err != nil || creds.ClientID == "" {
-			creds = oauth.ClientCreds{ClientID: r.cfg.GoogleClientID, ClientSecret: r.cfg.GoogleClientSecret}
+		explicit, _ := oauth.LoadClientCreds(a.ID.String())
+		creds, err := oauth.ResolveGoogleClient(
+			explicit,
+			r.cfg.GoogleClientID,
+			r.cfg.GoogleClientSecret,
+			accountIDStringsByType(all, account.TypeGmail)...,
+		)
+		if err != nil {
+			return nil, err
 		}
 		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, r.cfg.OAuthBindAddr)
 		hc, err := broker.Client(ctx, a.ID.String())
@@ -122,9 +131,14 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 		}
 		return gmail.NewWithClient(a.ID.String(), a.Email, hc, opts)
 	case account.TypeMicrosoft:
-		creds, err := oauth.LoadClientCreds(a.ID.String())
-		if err != nil || creds.ClientID == "" {
-			return nil, fmt.Errorf("no OAuth client stored for %s; re-add the account", a.Email)
+		explicit, _ := oauth.LoadClientCreds(a.ID.String())
+		creds, err := oauth.ResolveMicrosoftClient(
+			explicit.ClientID,
+			r.cfg.MicrosoftClientID,
+			accountIDStringsByType(all, account.TypeMicrosoft)...,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("no OAuth client stored for %s: %w", a.Email, err)
 		}
 		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", r.cfg.OAuthBindAddr)
 		hc, err := broker.Client(ctx, a.ID.String())
@@ -137,7 +151,21 @@ func (r *registry) build(ctx context.Context, a *ent.Account) (provider.Provider
 		opts := microsoft.Options{BodyCapBytes: r.cfg.BodyCapKB * 1024}
 		return microsoft.New(a.ID.String(), a.Email, microsoft.NewClient(hc), opts), nil
 	case account.TypeImap:
-		return nil, errProviderPending
+		imapCfg, err := accounts.IMAPConfigFromMap(a.Config, a.Email)
+		if err != nil {
+			return nil, err
+		}
+		pw, err := keyring.Get(a.ID.String(), keyring.KeyIMAPPassword)
+		if err != nil || pw == "" {
+			return nil, fmt.Errorf("missing IMAP password in keyring for %s", a.Email)
+		}
+		smtpPW, _ := keyring.Get(a.ID.String(), keyring.KeySMTPPassword)
+		return imap.New(a.ID.String(), a.Email, imap.Options{
+			Config:       imapCfg,
+			Password:     pw,
+			SMTPPassword: smtpPW,
+			BodyCapBytes: r.cfg.BodyCapKB * 1024,
+		}), nil
 	default:
 		return nil, fmt.Errorf("unknown account type %q", a.Type)
 	}

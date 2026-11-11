@@ -308,3 +308,13 @@ func (p *Provider) WebLink(threadID, messageID string) (string, bool) {
 	}
 	return "https://outlook.live.com/mail/", true
 }
+
+// FetchAttachment downloads attachment bytes on demand for opening or saving locally.
+func (p *Provider) FetchAttachment(ctx context.Context, messageID, attachmentID, filename string) ([]byte, error) {
+	attAPI, ok := p.api.(graphAttachmentsAPI)
+	if !ok {
+		return nil, errdefs.Wrap(errdefs.KindPermanent, fmt.Errorf("microsoft: attachment download not supported"))
+	}
+	raw, err := attAPI.GetAttachment(ctx, messageID, attachmentID, filename)
+	return raw, classify(err)
+}

@@ -101,16 +101,20 @@ type ClientCreds struct {
 }
 
 // ParseClientJSON extracts the credentials from the client_secret_*.json
-// file Google Console offers for download. Only the "installed"
-// (Desktop app) shape is accepted — "web" clients cannot do the
-// loopback flow.
+// file Google Console offers for download, or a flat OAuth client JSON
+// object ({client_id, client_secret} / {clientId, clientSecret}). "web"
+// clients are rejected because they cannot use the loopback redirect flow.
 func ParseClientJSON(raw []byte) (ClientCreds, error) {
 	var doc struct {
 		Installed *struct {
 			ClientID     string `json:"client_id"`
 			ClientSecret string `json:"client_secret"`
 		} `json:"installed"`
-		Web *struct{} `json:"web"`
+		Web          *struct{} `json:"web"`
+		ClientID     string    `json:"client_id"`
+		ClientSecret string    `json:"client_secret"`
+		AltID        string    `json:"clientId"`
+		AltSecret    string    `json:"clientSecret"`
 	}
 	if err := json.Unmarshal(raw, &doc); err != nil {
 		return ClientCreds{}, fmt.Errorf("not a Google client JSON: %w", err)
@@ -118,10 +122,21 @@ func ParseClientJSON(raw []byte) (ClientCreds, error) {
 	if doc.Web != nil {
 		return ClientCreds{}, fmt.Errorf("this is a \"web application\" client; create one of type \"Desktop app\" instead")
 	}
-	if doc.Installed == nil || doc.Installed.ClientID == "" || doc.Installed.ClientSecret == "" {
-		return ClientCreds{}, fmt.Errorf("client JSON is missing the installed.client_id/client_secret fields")
+	if doc.Installed != nil && doc.Installed.ClientID != "" && doc.Installed.ClientSecret != "" {
+		return ClientCreds{ClientID: doc.Installed.ClientID, ClientSecret: doc.Installed.ClientSecret}, nil
 	}
-	return ClientCreds{ClientID: doc.Installed.ClientID, ClientSecret: doc.Installed.ClientSecret}, nil
+	id := doc.ClientID
+	if id == "" {
+		id = doc.AltID
+	}
+	secret := doc.ClientSecret
+	if secret == "" {
+		secret = doc.AltSecret
+	}
+	if id != "" && secret != "" {
+		return ClientCreds{ClientID: id, ClientSecret: secret}, nil
+	}
+	return ClientCreds{}, fmt.Errorf("client JSON is missing the installed.client_id/client_secret fields")
 }
 
 func SaveClientCreds(accountID string, c ClientCreds) error {

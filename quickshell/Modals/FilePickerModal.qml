@@ -10,7 +10,7 @@ import qs.Widgets
 FloatingWindow {
     id: picker
 
-    title: I18n.tr("Attach files", "compose")
+    title: folderMode ? I18n.tr("Choose destination folder", "file picker") : singleFile ? I18n.tr("Select file", "file picker") : I18n.tr("Attach files", "compose")
     implicitWidth: 760
     implicitHeight: 540
     minimumSize: Qt.size(620, 420)
@@ -18,7 +18,11 @@ FloatingWindow {
     visible: false
 
     signal filesSelected(var paths)
+    signal folderSelected(string path)
 
+    property bool folderMode: false
+    property bool singleFile: false
+    property var allowedExtensions: []
     property string currentPath: ""
     property string parentPath: ""
     property bool showHidden: false
@@ -30,12 +34,39 @@ FloatingWindow {
 
     readonly property var filteredEntries: {
         const q = filterText.trim().toLowerCase();
-        if (q === "")
-            return entries;
-        return entries.filter(e => String(e.name || "").toLowerCase().indexOf(q) !== -1);
+        const exts = (allowedExtensions || []).map(x => String(x || "").toLowerCase());
+        return entries.filter(e => {
+            const name = String(e.name || "").toLowerCase();
+            if (!e.isDir && exts.length > 0 && !exts.some(ext => name.endsWith(ext)))
+                return false;
+            if (q !== "" && name.indexOf(q) === -1)
+                return false;
+            return true;
+        });
     }
 
     function open() {
+        folderMode = false;
+        singleFile = false;
+        allowedExtensions = [];
+        _openCommon();
+    }
+
+    function openFolder() {
+        folderMode = true;
+        singleFile = false;
+        allowedExtensions = [];
+        _openCommon();
+    }
+
+    function openSingle(extensions) {
+        folderMode = false;
+        singleFile = true;
+        allowedExtensions = extensions || [];
+        _openCommon();
+    }
+
+    function _openCommon() {
         selectedPaths = [];
         filterText = "";
         filterField.text = "";
@@ -61,6 +92,12 @@ FloatingWindow {
     }
 
     function toggleSelect(filePath) {
+        if (folderMode)
+            return;
+        if (singleFile) {
+            selectedPaths = [filePath];
+            return;
+        }
         const list = selectedPaths.slice();
         const idx = list.indexOf(filePath);
         if (idx === -1)
@@ -71,6 +108,14 @@ FloatingWindow {
     }
 
     function confirmSelection() {
+        if (folderMode) {
+            if (currentPath === "")
+                return;
+            const outDir = currentPath;
+            visible = false;
+            folderSelected(outDir);
+            return;
+        }
         if (selectedPaths.length === 0)
             return;
         const out = selectedPaths.slice();
@@ -234,7 +279,7 @@ FloatingWindow {
                                 DankIcon {
                                     name: placeItem.modelData.icon || "folder"
                                     size: 18
-                                    color: placeItem.active ? Theme.primary : Theme.surfaceTextMedium
+                                    color: placeItem.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
 
@@ -242,7 +287,7 @@ FloatingWindow {
                                     text: picker.placeLabel(placeItem.modelData.key)
                                     font.pixelSize: Theme.fontSizeSmall
                                     font.weight: placeItem.active ? Font.DemiBold : Font.Normal
-                                    color: placeItem.active ? Theme.primary : Theme.surfaceText
+                                    color: placeItem.active ? Theme.onPrimaryContainer : Theme.surfaceText
                                     anchors.verticalCenter: parent.verticalCenter
                                 }
                             }
@@ -297,7 +342,7 @@ FloatingWindow {
                             spacing: Theme.spacingS
 
                             Rectangle {
-                                visible: !entryRow.modelData.isDir
+                                visible: !entryRow.modelData.isDir && !picker.folderMode
                                 width: 18
                                 height: 18
                                 radius: 4
@@ -310,7 +355,7 @@ FloatingWindow {
                                     visible: entryRow.checked
                                     name: "check"
                                     size: 12
-                                    color: Theme.surface
+                                    color: Theme.primaryText
                                 }
                             }
 
@@ -385,10 +430,10 @@ FloatingWindow {
 
                 StyledText {
                     Layout.fillWidth: true
-                    text: picker.selectedPaths.length > 0 ? I18n.tr("%1 selected", "bulk action").arg(picker.selectedPaths.length) : I18n.tr("Click files to select one or more attachments", "file picker")
+                    text: picker.folderMode ? picker.currentPath : (picker.selectedPaths.length > 0 ? I18n.tr("%1 selected", "bulk action").arg(picker.selectedPaths.length) : I18n.tr("Click files to select one or more attachments", "file picker"))
                     font.pixelSize: Theme.fontSizeSmall
-                    color: picker.selectedPaths.length > 0 ? Theme.primary : Theme.surfaceTextMedium
-                    elide: Text.ElideRight
+                    color: (picker.folderMode || picker.selectedPaths.length > 0) ? Theme.primary : Theme.surfaceTextMedium
+                    elide: Text.ElideMiddle
                 }
 
                 StyledRect {
@@ -416,29 +461,29 @@ FloatingWindow {
                 }
 
                 StyledRect {
-                    readonly property bool ready: picker.selectedPaths.length > 0
+                    readonly property bool ready: picker.folderMode ? picker.currentPath !== "" : picker.selectedPaths.length > 0
                     implicitWidth: Math.ceil(attachBtnLabel.contentWidth) + Theme.spacingXL * 2
                     implicitHeight: 34
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: 34
                     radius: 17
-                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                    color: ready ? Theme.primary : Theme.surfaceContainerHighest
                     opacity: ready ? 1 : 0.6
 
                     StyledText {
                         id: attachBtnLabel
                         anchors.centerIn: parent
-                        text: I18n.tr("Attach", "file picker")
+                        text: picker.folderMode ? I18n.tr("Save here", "file picker") : picker.singleFile ? I18n.tr("Select", "file picker") : I18n.tr("Attach", "file picker")
                         wrapMode: Text.NoWrap
                         elide: Text.ElideNone
                         font.pixelSize: Theme.fontSizeSmall
                         font.weight: Font.DemiBold
-                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                        color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
                     }
 
                     StateLayer {
                         disabled: !parent.ready
-                        stateColor: Theme.primary
+                        stateColor: Theme.primaryText
                         onClicked: picker.confirmSelection()
                     }
                 }

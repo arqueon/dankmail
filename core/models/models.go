@@ -38,10 +38,12 @@ type ThreadSummary struct {
 }
 
 type AttachmentView struct {
-	Filename string `json:"filename"`
-	MimeType string `json:"mimeType"`
-	Size     int64  `json:"size"`
-	Path     string `json:"path,omitempty"`
+	MessageID    string `json:"messageId,omitempty"`
+	AttachmentID string `json:"attachmentId,omitempty"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mimeType"`
+	Size         int64  `json:"size"`
+	Path         string `json:"path,omitempty"`
 }
 
 type DraftView struct {

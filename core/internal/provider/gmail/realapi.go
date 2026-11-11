@@ -198,3 +198,26 @@ func (r *realAPI) DeleteDraft(ctx context.Context, draftID string) error {
 	}
 	return err
 }
+
+func (r *realAPI) GetMessageFull(ctx context.Context, id string) (*gmailv1.Message, error) {
+	return readCall(ctx, r, 5, func() (*gmailv1.Message, error) {
+		return r.svc.Users.Messages.Get(userID, id).Format("full").Context(ctx).Do()
+	})
+}
+
+func (r *realAPI) GetAttachment(ctx context.Context, messageID, attachmentID string) ([]byte, error) {
+	part, err := readCall(ctx, r, 5, func() (*gmailv1.MessagePartBody, error) {
+		return r.svc.Users.Messages.Attachments.Get(userID, messageID, attachmentID).Context(ctx).Do()
+	})
+	if err != nil {
+		return nil, err
+	}
+	return decodeBase64URLBytes(part.Data)
+}
+
+func decodeBase64URLBytes(data string) ([]byte, error) {
+	if b, err := base64.URLEncoding.DecodeString(data); err == nil {
+		return b, nil
+	}
+	return base64.RawURLEncoding.DecodeString(data)
+}

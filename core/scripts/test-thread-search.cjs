@@ -120,7 +120,7 @@ test('Archived sends an exclusive mailbox filter and keeps search/account scope'
     const filterFunction = service.slice(service.indexOf('function threadFilterParams()'), service.indexOf('function threadSearchController()'));
     const params = overrides => clone(vm.runInNewContext(filterFunction + '\nthreadFilterParams()', {
         searchQuery: '', filterLabel: '', filterUnread: false, filterStarred: false,
-        filterArchived: false, filterAccount: '', ...overrides
+        filterSnoozed: false, filterArchived: false, filterAccount: '', ...overrides
     }));
     assert.deepEqual(params({filterArchived:true}), {inbox:false, archived:true});
     assert.deepEqual(params({filterArchived:true, searchQuery:'invoice', filterAccount:'one'}),
@@ -128,11 +128,12 @@ test('Archived sends an exclusive mailbox filter and keeps search/account scope'
     assert.deepEqual(params({}), {inbox:true});
     assert.deepEqual(params({filterLabel:'SPAM'}), {inbox:false, label:'SPAM'});
     assert.deepEqual(params({filterStarred:true}), {inbox:false, starred:true});
+    assert.deepEqual(params({filterSnoozed:true}), {inbox:false, snoozed:true});
 });
 
 test('Sent keeps its outgoing filter, pagination and account scope during search', () => {
  const service = fs.readFileSync(path.join(__dirname, '../../quickshell/Services/DankMailService.qml'), 'utf8');
  const fn=service.slice(service.indexOf('function threadFilterParams()'),service.indexOf('function threadSearchController()'));
- const params=clone(vm.runInNewContext(fn+'\nthreadFilterParams()', {searchQuery:'receipt',filterLabel:'SENT',filterUnread:false,filterStarred:false,filterArchived:false,filterAccount:'hotmail'}));
+ const params=clone(vm.runInNewContext(fn+'\nthreadFilterParams()', {searchQuery:'receipt',filterLabel:'SENT',filterUnread:false,filterStarred:false,filterSnoozed:false,filterArchived:false,filterAccount:'hotmail'}));
  assert.deepEqual(params,{inbox:false,query:'receipt',sent:true,account:'hotmail'});
 });

@@ -2,6 +2,28 @@
 
 All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dankmailUnread` DankMaterialShell companion) are documented in this file.
 
+## [0.4.0] - 2026-11-11
+
+### Added
+- **One-click OAuth (`dankcalendar` parity) & CLI account setup**:
+  - Added Step 0 one-click sign-in (`Connect Google Account` / `Connect Microsoft Account`) with PKCE S256 in `AccountAddModal`, reusable OAuth client credential resolution (system keyring + `0600` local fallback + existing accounts + env + `-ldflags -X`), and a native `Import client_secret.json` file picker button.
+  - Added `dmail account setup google|microsoft` and `dmail account add google|microsoft|imap` CLI commands.
+- **Full IMAP + SMTP provider**:
+  - Added `core/internal/provider/imap` (`go-imap/v2` + `net/smtp` STARTTLS/TLS, with loopback self-signed TLS tolerance for Proton Mail Bridge) supporting sync, archive/sent pagination, flag/folder triage, replies, compose, and attachments, automatically un-parking previously stored IMAP accounts.
+- **OS-native attachment opening & Save as**:
+  - Clicking an attachment chip downloads the part on demand into `~/.cache/dankmail/attachments/` (`0600`) and opens it via `xdg-open` (`attachments.open`), with a secondary **Save as…** folder picker button (`attachments.saveAs`) and webmail fallback on error.
+- **Snoozed mailbox view & weekend preset**:
+  - Added a **Snoozed** filter chip ordered by wake time (`SnoozedUntil ASC`), wake-time badges on snoozed threads, **Unsnooze** actions (`ops.unsnooze`), and a **This weekend** (Saturday 09:00) snooze preset.
+- **HTML-to-Markdown message distillation & full body resync**:
+  - Added `core/internal/mailtext` (`html-to-markdown/v2`) across Gmail, Microsoft Graph, and IMAP so HTML messages retain readable link labels, headings, lists, and multi-column data tables while unwrapping layout tables and stripping hidden preheaders, plus a per-account full resync button in `SettingsModal`.
+- **Selectable & copyable `Subject`**:
+  - Replaced static subject labels in thread and draft previews with read-only mouse-selectable `TextEdit` controls and one-click clipboard copy buttons.
+
+### Fixed
+- **Dux Shell (`dms-theme-sync`) theme roles, typography, and WCAG contrast**:
+  - Updated `Theme.qml` to watch `~/.cache/dms/dms-colors.json` and `~/.cache/dms/dms-typography.json` (with `~/.cache/DankMaterialShell/` fallback), honor `"mode": "dark"|"light"`, load full Material 3 `on_*` / `secondary_container` / `tertiary_container` / `inverse_surface` roles, and enforce WCAG contrast safeguards.
+  - Replaced all 30 `primaryContainer`+`primary` low-contrast buttons/chips across `quickshell/` and `dms-plugin/` with `Theme.primary`+`Theme.primaryText` (filled actions) or `Theme.primaryContainer`+`Theme.onPrimaryContainer` (tonal chips), and removed hardcoded hex colors in `TriageWindow.qml`.
+
 ## [0.3.12] - 2026-10-15
 
 ### Added

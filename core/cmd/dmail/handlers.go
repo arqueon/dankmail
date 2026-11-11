@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/url"
@@ -19,6 +21,7 @@ import (
 	"github.com/arqueon/dankmail/core/internal/contacts"
 	"github.com/arqueon/dankmail/core/internal/drafts"
 	"github.com/arqueon/dankmail/core/internal/ipc"
+	"github.com/arqueon/dankmail/core/internal/paths"
 	"github.com/arqueon/dankmail/core/internal/provider"
 	dsync "github.com/arqueon/dankmail/core/internal/sync"
 	"github.com/arqueon/dankmail/core/models"
@@ -43,8 +46,13 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		f.InboxOnly, _ = p["inbox"].(bool)
 		f.ArchivedOnly, _ = p["archived"].(bool)
 		f.SentOnly, _ = p["sent"].(bool)
+		f.SnoozedOnly, _ = p["snoozed"].(bool)
 		f.Label, _ = p["label"].(string)
 		f.Query, _ = p["query"].(string)
+		if f.SnoozedOnly {
+			// Snoozed threads are archived locally until their wake timer fires.
+			f.InboxOnly = false
+		}
 		if f.Query != "" {
 			// A search sweeps the whole cache, not just the inbox.
 			f.InboxOnly = false
@@ -101,6 +109,7 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		"ops.unstar":     dsync.OpUnstar,
 		"ops.archive":    dsync.OpArchive,
 		"ops.unarchive":  dsync.OpUnarchive,
+		"ops.unsnooze":   dsync.OpSnoozeWake,
 		"ops.trash":      dsync.OpTrash,
 		"ops.unspam":     dsync.OpUnspam,
 		"ops.spam":       dsync.OpSpam,
@@ -337,6 +346,45 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		dirPath, _ := p["path"].(string)
 		showHidden, _ := p["showHidden"].(bool)
 		return listDirectory(dirPath, showHidden)
+	})
+
+	srv.Register("attachments.open", func(ctx context.Context, p map[string]any) (any, error) {
+		cachedPath, _, err := d.ensureAttachmentCached(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		if err := exec.Command("xdg-open", cachedPath).Start(); err != nil {
+			return nil, fmt.Errorf("xdg-open failed: %w", err)
+		}
+		return map[string]any{"path": cachedPath}, nil
+	})
+
+	srv.Register("attachments.saveAs", func(ctx context.Context, p map[string]any) (any, error) {
+		cachedPath, cleanName, err := d.ensureAttachmentCached(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		destDir, _ := p["destDir"].(string)
+		destDir = expandUserDir(destDir)
+		if destDir == "" {
+			return nil, fmt.Errorf("destination directory is required")
+		}
+		if err := os.MkdirAll(destDir, 0o755); err != nil {
+			return nil, err
+		}
+		destName, _ := p["destName"].(string)
+		if strings.TrimSpace(destName) != "" {
+			cleanName = sanitizeAttachmentFilename(destName)
+		}
+		outPath := uniqueDestPath(destDir, cleanName)
+		raw, err := os.ReadFile(cachedPath)
+		if err != nil {
+			return nil, err
+		}
+		if err := os.WriteFile(outPath, raw, 0o600); err != nil {
+			return nil, err
+		}
+		return map[string]any{"path": outPath}, nil
 	})
 
 	// ops.forward sends the thread's latest message to new recipients as a
@@ -951,4 +999,136 @@ func listDirectory(rawPath string, showHidden bool) (map[string]any, error) {
 		"places":  places,
 		"entries": list,
 	}, nil
+}
+
+func (d *daemon) ensureAttachmentCached(ctx context.Context, p map[string]any) (string, string, error) {
+	threadID, err := intParam(p, "threadId")
+	if err != nil {
+		threadID, err = intParam(p, "id")
+		if err != nil {
+			return "", "", fmt.Errorf("missing threadId")
+		}
+	}
+	messageID, _ := p["messageId"].(string)
+	attachmentID, _ := p["attachmentId"].(string)
+	filename, _ := p["filename"].(string)
+	cleanName := sanitizeAttachmentFilename(filename)
+
+	detail, err := d.repo.GetThread(ctx, threadID)
+	if err != nil {
+		return "", "", err
+	}
+	if messageID == "" && len(detail.Messages) > 0 {
+		for _, m := range detail.Messages {
+			for _, a := range m.Attachments {
+				if (attachmentID != "" && a.AttachmentID == attachmentID) || (filename != "" && a.Filename == filename) {
+					messageID = m.ProviderMessageID
+					if attachmentID == "" {
+						attachmentID = a.AttachmentID
+					}
+					break
+				}
+			}
+			if messageID != "" {
+				break
+			}
+		}
+	}
+	if messageID == "" {
+		return "", "", fmt.Errorf("missing messageId for attachment")
+	}
+
+	acctUUID, err := parseUUID(detail.AccountID)
+	if err != nil {
+		return "", "", fmt.Errorf("bad account id")
+	}
+	if d.registry == nil {
+		return "", "", fmt.Errorf("provider registry unavailable")
+	}
+	prov, ok := d.registry.Provider(acctUUID)
+	if !ok {
+		return "", "", fmt.Errorf("account provider is not active")
+	}
+	fetcher, ok := prov.(provider.AttachmentFetcher)
+	if !ok {
+		return "", "", fmt.Errorf("provider does not support direct attachment download")
+	}
+
+	sum := sha256.Sum256([]byte(detail.AccountID + "|" + messageID + "|" + attachmentID + "|" + cleanName))
+	slotDir := filepath.Join(paths.AttachmentsCacheDir(), hex.EncodeToString(sum[:8]))
+	cachedPath := filepath.Join(slotDir, cleanName)
+	if st, err := os.Stat(cachedPath); err == nil && !st.IsDir() && st.Size() > 0 {
+		return cachedPath, cleanName, nil
+	}
+
+	data, err := fetcher.FetchAttachment(ctx, messageID, attachmentID, cleanName)
+	if err != nil {
+		return "", "", err
+	}
+	if err := os.MkdirAll(slotDir, 0o700); err != nil {
+		return "", "", err
+	}
+	tmp := cachedPath + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return "", "", err
+	}
+	if err := os.Rename(tmp, cachedPath); err != nil {
+		return "", "", err
+	}
+	return cachedPath, cleanName, nil
+}
+
+func sanitizeAttachmentFilename(name string) string {
+	s := strings.TrimSpace(name)
+	s = strings.ReplaceAll(s, "\\", "/")
+	s = strings.Map(func(r rune) rune {
+		if r < 0x20 || r == 0x7f {
+			return -1
+		}
+		return r
+	}, s)
+	s = filepath.Base(s)
+	s = strings.ReplaceAll(s, "/", "_")
+	if s == "" || s == "." || s == ".." {
+		return "attachment"
+	}
+	return s
+}
+
+func expandUserDir(raw string) string {
+	home, _ := os.UserHomeDir()
+	s := strings.TrimSpace(strings.TrimPrefix(raw, "file://"))
+	if s == "" {
+		if home != "" {
+			dl := filepath.Join(home, "Downloads")
+			if st, err := os.Stat(dl); err == nil && st.IsDir() {
+				return dl
+			}
+			return home
+		}
+		return ""
+	}
+	if s == "~" && home != "" {
+		return home
+	}
+	if strings.HasPrefix(s, "~/") && home != "" {
+		return filepath.Join(home, s[2:])
+	}
+	return filepath.Clean(s)
+}
+
+func uniqueDestPath(dir, name string) string {
+	cand := filepath.Join(dir, name)
+	if _, err := os.Stat(cand); os.IsNotExist(err) {
+		return cand
+	}
+	ext := filepath.Ext(name)
+	base := strings.TrimSuffix(name, ext)
+	for i := 1; i < 1000; i++ {
+		alt := filepath.Join(dir, fmt.Sprintf("%s (%d)%s", base, i, ext))
+		if _, err := os.Stat(alt); os.IsNotExist(err) {
+			return alt
+		}
+	}
+	return cand
 }

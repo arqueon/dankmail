@@ -14,6 +14,7 @@
     "All": "Todos",
     "Unread": "No leídos",
     "Starred": "Destacados",
+    "Snoozed": "Pospuestos",
     "Archived": "Archivados",
     "Spam": "Spam",
     "Sent": "Enviados",
@@ -33,6 +34,7 @@
   },
   "empty state": {
     "No archived mail": "No hay correos archivados",
+    "No snoozed mail": "No hay correos pospuestos",
     "Inbox zero": "Bandeja en cero",
     "Daemon offline": "Daemon desconectado",
     "No accounts yet": "Aún no hay cuentas",
@@ -65,18 +67,31 @@
     "Outlook / Microsoft 365": "Outlook / Microsoft 365",
     "Microsoft Graph: full triage and secure OAuth sign-in; no mailbox password is stored.": "Microsoft Graph: triage completo e inicio de sesión OAuth seguro; no se guarda la contraseña del correo.",
     "Other provider (IMAP)": "Otro proveedor (IMAP)",
-    "iCloud, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.": "iCloud, Yahoo, Fastmail, Proton Bridge o tu propio servidor. Se guarda y verifica ahora; la sincronización llega con el anillo IMAP."
+    "iCloud, Yahoo, Fastmail, Proton Bridge or your own server via IMAP and SMTP.": "iCloud, Yahoo, Fastmail, Proton Bridge o tu propio servidor mediante IMAP y SMTP."
   },
   "account wizard": {
     "Choose your mail provider": "Elige tu proveedor de correo",
+    "Connect Google account": "Conectar cuenta de Google",
+    "Connect Microsoft account": "Conectar cuenta de Microsoft",
+    "Connect Google Account": "Conectar cuenta de Google",
+    "Connect Microsoft Account": "Conectar cuenta de Microsoft",
+    "Sign in with Google in your browser and you're done — no setup needed. Dank Mail syncs your Gmail inbox, labels, and replies.": "Inicia sesión con Google en tu navegador y listo — sin configuración adicional. Dank Mail sincroniza tu bandeja de Gmail, etiquetas y respuestas.",
+    "Sign in with Microsoft in your browser and you're done — no setup needed. Dank Mail syncs your Outlook inbox, folders, and replies.": "Inicia sesión con Microsoft en tu navegador y listo — sin configuración adicional. Dank Mail sincroniza tu bandeja de Outlook, carpetas y respuestas.",
+    "Set up a reusable Google OAuth client once or import an existing client_secret.json. Future Google accounts connect in one click.": "Configura una sola vez un cliente OAuth de Google reutilizable o importa un client_secret.json existente. Las siguientes cuentas de Google se conectan en un clic.",
+    "Set up a reusable Microsoft OAuth client once or paste an existing Client ID. Future Microsoft accounts connect in one click.": "Configura una sola vez un cliente OAuth de Microsoft reutilizable o pega un Client ID existente. Las siguientes cuentas de Microsoft se conectan en un clic.",
+    "Credentials stay on this machine": "Las credenciales no salen de este equipo",
+    "Your client ID, secret, and refresh token are stored in the system keyring (libsecret/kwallet) when available, or a protected local file.": "Tu Client ID, secreto y refresh token se guardan en el keyring del sistema (libsecret/kwallet) cuando está disponible, o en un archivo local protegido.",
+    "Use your own OAuth client": "Usar mi propio cliente OAuth",
+    "Set up OAuth client": "Configurar cliente OAuth",
+    "Enter existing credentials": "Introducir credenciales existentes",
+    "Import client_secret.json": "Importar client_secret.json",
     "IMAP account": "Cuenta IMAP",
     "Pick your provider or configure a custom server. The connection is tested before anything is saved; the password goes to your system keyring.": "Elige tu proveedor o configura un servidor propio. La conexión se prueba antes de guardar nada; la contraseña va al keyring del sistema.",
     "Email address": "Dirección de correo",
     "Password (or app password)": "Contraseña (o app password)",
     "IMAP server": "Servidor IMAP",
     "Port": "Puerto",
-    "SMTP server (for replies, next ring)": "Servidor SMTP (para responder, siguiente anillo)",
-    "Connection verified and account stored. IMAP syncing arrives with the next ring; the account stays parked until then.": "Conexión verificada y cuenta guardada. La sincronización IMAP llega en el siguiente anillo; la cuenta queda en pausa hasta entonces.",
+    "SMTP server (for sending and replies)": "Servidor SMTP (para envíos y respuestas)",
     "Set up your Google OAuth client": "Configura tu cliente OAuth de Google",
     "Set up your Microsoft OAuth client": "Configura tu cliente OAuth de Microsoft",
     "Enter your client credentials": "Introduce las credenciales del cliente",
@@ -198,6 +213,8 @@
     "Copy all emails": "Copiar todos los correos"
   },
   "file picker": {
+    "Choose destination folder": "Elegir carpeta de destino",
+    "Select file": "Seleccionar archivo",
     "Home": "Inicio",
     "Downloads": "Descargas",
     "Documents": "Documentos",
@@ -206,7 +223,12 @@
     "Filter files…": "Filtrar archivos…",
     "Empty folder": "Carpeta vacía",
     "Click files to select one or more attachments": "Haz clic en los archivos para seleccionar uno o más adjuntos",
-    "Attach": "Adjuntar"
+    "Attach": "Adjuntar",
+    "Save here": "Guardar aquí",
+    "Select": "Seleccionar"
+  },
+  "attachments": {
+    "Saved: %1": "Guardado: %1"
   },
   "undo banner": {
     "Undo": "Deshacer",
@@ -225,7 +247,8 @@
     "Link": "Enlace"
   },
   "thread action": {
-    "Not spam": "No es spam"
+    "Not spam": "No es spam",
+    "Unsnooze": "Reactivar"
   },
   "account status": {
     "Sign in required": "Inicia sesión",

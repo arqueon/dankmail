@@ -236,12 +236,32 @@ FloatingWindow {
             d.setDate(d.getDate() + 1);
             d.setHours(9, 0, 0, 0);
             break;
+        case "weekend": {
+            const daysToSat = (6 - d.getDay() + 7) % 7;
+            d.setDate(d.getDate() + daysToSat);
+            d.setHours(9, 0, 0, 0);
+            if (d <= now)
+                d.setDate(d.getDate() + 7);
+            break;
+        }
         case "nextweek":
             d.setDate(d.getDate() + ((8 - d.getDay()) % 7 || 7));
             d.setHours(9, 0, 0, 0);
             break;
         }
         return d;
+    }
+
+    function snoozeBadgeLabel(iso) {
+        if (!iso)
+            return "";
+        const d = new Date(iso);
+        if (isNaN(d.getTime()))
+            return "";
+        const now = new Date();
+        if (d.toDateString() === now.toDateString())
+            return Qt.formatTime(d, "HH:mm");
+        return Qt.formatDateTime(d, "d MMM HH:mm");
     }
 
     function formatSize(bytes) {
@@ -255,7 +275,7 @@ FloatingWindow {
     }
 
     // threadAttachments aggregates unique attachment metadata across the
-    // whole thread (content never leaves the webmail).
+    // thread while preserving messageId + attachmentId for on-demand download.
     function threadAttachments() {
         const t = DankMailService.currentThread;
         if (!t || !t.messages)
@@ -264,7 +284,7 @@ FloatingWindow {
         const out = [];
         for (const m of t.messages) {
             for (const a of (m.attachments || [])) {
-                const key = a.filename + "|" + a.size;
+                const key = (a.attachmentId || "") + "|" + a.filename + "|" + a.size;
                 if (!seen[key]) {
                     seen[key] = true;
                     out.push(a);
@@ -272,6 +292,13 @@ FloatingWindow {
             }
         }
         return out;
+    }
+
+    function previewAttachments() {
+        const m = previewMessage();
+        if (m && m.attachments && m.attachments.length > 0)
+            return m.attachments;
+        return threadAttachments();
     }
 
     function timeLabel(iso) {
@@ -319,6 +346,7 @@ FloatingWindow {
     function openDraftById(draftId) {
         DankMailService.filterUnread = false;
         DankMailService.filterStarred = false;
+        DankMailService.filterSnoozed = false;
         DankMailService.filterArchived = false;
         DankMailService.filterLabel = "DRAFTS";
         const findAndEdit = () => {
@@ -352,6 +380,28 @@ FloatingWindow {
 
     ComposeModal {
         id: composeModal
+    }
+
+    FilePickerModal {
+        id: saveAttachmentPicker
+        property var pendingAttachment: null
+        onFolderSelected: dir => {
+            const t = DankMailService.currentThread;
+            const att = saveAttachmentPicker.pendingAttachment;
+            saveAttachmentPicker.pendingAttachment = null;
+            if (!t || !att || !dir)
+                return;
+            DankMailService.saveAttachmentAs(t.id, att, dir, resp => {
+                if (resp && resp.error) {
+                    window.operationError = I18n.tr("Could not apply the action: %1", "operation error").arg(resp.error);
+                    return;
+                }
+                if (resp && resp.result && resp.result.path) {
+                    window.copiedNotice = I18n.tr("Saved: %1", "attachments").arg(resp.result.path);
+                    copiedNoticeTimer.restart();
+                }
+            });
+        }
     }
 
     Shortcut {
@@ -410,7 +460,7 @@ FloatingWindow {
                         anchors.centerIn: parent
                         text: DankMailService.unreadTotal
                         font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.primary
+                        color: Theme.onPrimaryContainer
                     }
                 }
 
@@ -581,6 +631,10 @@ FloatingWindow {
                         "label": I18n.tr("Starred", "filter")
                     },
                     {
+                        "key": "snoozed",
+                        "label": I18n.tr("Snoozed", "filter")
+                    },
+                    {
                         "key": "archived",
                         "label": I18n.tr("Archived", "filter")
                     },
@@ -600,7 +654,7 @@ FloatingWindow {
 
                 delegate: StyledRect {
                     required property var modelData
-                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "sent" && DankMailService.filterLabel === "SENT") || (modelData.key === "drafts" && DankMailService.filterLabel === "DRAFTS") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterArchived && DankMailService.filterLabel === "")
+                    readonly property bool active: (modelData.key === "unread" && DankMailService.filterUnread) || (modelData.key === "starred" && DankMailService.filterStarred) || (modelData.key === "snoozed" && DankMailService.filterSnoozed) || (modelData.key === "archived" && DankMailService.filterArchived) || (modelData.key === "spam" && DankMailService.filterLabel === "SPAM") || (modelData.key === "sent" && DankMailService.filterLabel === "SENT") || (modelData.key === "drafts" && DankMailService.filterLabel === "DRAFTS") || (modelData.key === "all" && !DankMailService.filterUnread && !DankMailService.filterStarred && !DankMailService.filterSnoozed && !DankMailService.filterArchived && DankMailService.filterLabel === "")
 
                     implicitWidth: Math.ceil(filterLabel.contentWidth) + Theme.spacingL
                     implicitHeight: 30
@@ -616,7 +670,7 @@ FloatingWindow {
                         wrapMode: Text.NoWrap
                         elide: Text.ElideNone
                         font.pixelSize: Theme.fontSizeSmall
-                        color: parent.active ? Theme.primary : Theme.surfaceTextMedium
+                        color: parent.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                     }
 
                     StateLayer {
@@ -624,6 +678,7 @@ FloatingWindow {
                         onClicked: {
                             DankMailService.filterUnread = parent.modelData.key === "unread";
                             DankMailService.filterStarred = parent.modelData.key === "starred";
+                            DankMailService.filterSnoozed = parent.modelData.key === "snoozed";
                             DankMailService.filterArchived = parent.modelData.key === "archived";
                             DankMailService.filterLabel = parent.modelData.key === "spam" ? "SPAM" : parent.modelData.key === "sent" ? "SENT" : parent.modelData.key === "drafts" ? "DRAFTS" : "";
                             window.checkedIds = [];
@@ -832,17 +887,18 @@ FloatingWindow {
                             width: moreLabel.implicitWidth + Theme.spacingXL
                             height: 36
                             radius: 18
-                            color: Theme.primaryContainer
+                            color: Theme.primary
                             enabled: !DankMailService.threadsLoading
 
                             StyledText {
                                 id: moreLabel
                                 anchors.centerIn: parent
                                 text: I18n.tr("Load more", "search")
-                                color: Theme.primary
+                                color: Theme.primaryText
+                                font.weight: Font.Medium
                             }
                             StateLayer {
-                                stateColor: Theme.primary
+                                stateColor: Theme.primaryText
                                 cornerRadius: 18
                                 onClicked: DankMailService.loadMoreThreads()
                             }
@@ -864,7 +920,7 @@ FloatingWindow {
                             width: archiveMoreLabel.implicitWidth + Theme.spacingXL
                             height: 36
                             radius: 18
-                            color: Theme.primaryContainer
+                            color: Theme.primary
                             enabled: !DankMailService.archiveLoading
                             StyledText {
                                 id: archiveMoreLabel
@@ -876,10 +932,11 @@ FloatingWindow {
                                     : DankMailService.archiveWarning !== ""
                                         ? I18n.tr("Retry archived history", "search")
                                         : I18n.tr("Load older archived mail", "search")
-                                color: Theme.primary
+                                color: Theme.primaryText
+                                font.weight: Font.Medium
                             }
                             StateLayer {
-                                stateColor: Theme.primary
+                                stateColor: Theme.primaryText
                                 cornerRadius: 18
                                 onClicked: DankMailService.loadArchiveHistory()
                             }
@@ -939,7 +996,7 @@ FloatingWindow {
                                 Text {
                                     anchors.centerIn: parent
                                     text: DankMailService.senderInitial(rowContent.sender)
-                                    color: "#1d2024"
+                                    color: Theme.bestTextOn(DankMailService.senderColor(rowContent.sender))
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSizeLarge
                                     font.weight: Font.DemiBold
@@ -965,7 +1022,36 @@ FloatingWindow {
                                         maximumLineCount: 1
                                     }
 
+                                    StyledRect {
+                                        visible: !!row.modelData.snoozedUntil
+                                        implicitWidth: rowWakeLayout.implicitWidth + Theme.spacingS * 2
+                                        implicitHeight: 18
+                                        radius: 9
+                                        color: Theme.secondaryContainer
+
+                                        Row {
+                                            id: rowWakeLayout
+                                            anchors.centerIn: parent
+                                            spacing: 3
+
+                                            DankIcon {
+                                                name: "snooze"
+                                                size: 11
+                                                color: Theme.onSecondaryContainer
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+
+                                            StyledText {
+                                                text: window.snoozeBadgeLabel(row.modelData.snoozedUntil)
+                                                font.pixelSize: Theme.fontSizeSmall - 1
+                                                color: Theme.onSecondaryContainer
+                                                anchors.verticalCenter: parent.verticalCenter
+                                            }
+                                        }
+                                    }
+
                                     StyledText {
+                                        visible: !row.modelData.snoozedUntil
                                         text: window.timeLabel(row.modelData.lastMessageAt)
                                         font.pixelSize: Theme.fontSizeSmall
                                         font.weight: row.modelData.unread ? Font.Bold : Font.Normal
@@ -1061,7 +1147,7 @@ FloatingWindow {
                                 visible: parent.checked
                                 name: "check"
                                 size: 14
-                                color: Theme.surface
+                                color: Theme.primaryText
                             }
 
                             MouseArea {
@@ -1148,6 +1234,14 @@ FloatingWindow {
                                 }
 
                                 DankActionButton {
+                                    visible: !!row.modelData.snoozedUntil
+                                    buttonSize: 30
+                                    iconName: "notifications_active"
+                                    iconColor: Theme.primary
+                                    onClicked: DankMailService.unsnooze([row.modelData.id])
+                                }
+
+                                DankActionButton {
                                     buttonSize: 30
                                     iconName: "snooze"
                                     onClicked: rowActions.snoozing = true
@@ -1188,6 +1282,10 @@ FloatingWindow {
                                         {
                                             "key": "tomorrow",
                                             "label": I18n.tr("Tomorrow", "snooze")
+                                        },
+                                        {
+                                            "key": "weekend",
+                                            "label": I18n.tr("This weekend", "snooze")
                                         },
                                         {
                                             "key": "nextweek",
@@ -1265,7 +1363,7 @@ FloatingWindow {
                                     anchors.centerIn: parent
                                     name: "edit_note"
                                     size: Theme.iconSizeSmall
-                                    color: Theme.primary
+                                    color: Theme.onPrimaryContainer
                                 }
                             }
 
@@ -1387,7 +1485,7 @@ FloatingWindow {
 
                     DankIcon {
                         Layout.alignment: Qt.AlignHCenter
-                        name: DankMailService.connected ? (DankMailService.filterLabel === "DRAFTS" ? "edit_note" : "inbox") : "cloud_off"
+                        name: DankMailService.connected ? (DankMailService.filterLabel === "DRAFTS" ? "edit_note" : DankMailService.filterSnoozed ? "snooze" : "inbox") : "cloud_off"
                         size: 48
                         color: Theme.surfaceTextAlpha
                     }
@@ -1405,6 +1503,8 @@ FloatingWindow {
                                 return I18n.tr("No local results — search the full history or the web", "empty state");
                             if (DankMailService.filterLabel === "SENT")
                                 return I18n.tr("No sent mail", "empty state");
+                            if (DankMailService.filterSnoozed)
+                                return I18n.tr("No snoozed mail", "empty state");
                             if (DankMailService.filterArchived)
                                 return I18n.tr("No archived mail", "empty state");
                             return I18n.tr("Inbox zero", "empty state");
@@ -1418,17 +1518,18 @@ FloatingWindow {
                         width: addAccountLabel.implicitWidth + Theme.spacingXL
                         height: 38
                         radius: 19
-                        color: Theme.primaryContainer
+                        color: Theme.primary
 
                         StyledText {
                             id: addAccountLabel
                             anchors.centerIn: parent
                             text: I18n.tr("Add a Gmail account", "empty state")
-                            color: Theme.primary
+                            color: Theme.primaryText
+                            font.weight: Font.Medium
                         }
 
                         StateLayer {
-                            stateColor: Theme.primary
+                            stateColor: Theme.primaryText
                             onClicked: accountModal.show()
                         }
                     }
@@ -1452,12 +1553,35 @@ FloatingWindow {
                     spacing: Theme.spacingM
                     visible: DankMailService.currentThread !== null && DankMailService.filterLabel !== "DRAFTS"
 
-                    StyledText {
+                    RowLayout {
                         Layout.fillWidth: true
-                        text: DankMailService.currentThread ? (DankMailService.currentThread.subject || I18n.tr("(no subject)", "thread list")) : ""
-                        font.pixelSize: Theme.fontSizeXLarge
-                        font.weight: Font.DemiBold
-                        maximumLineCount: 2
+                        spacing: Theme.spacingS
+
+                        TextEdit {
+                            id: subjectTextEdit
+                            Layout.fillWidth: true
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.Wrap
+                            textFormat: TextEdit.PlainText
+                            text: DankMailService.currentThread ? (DankMailService.currentThread.subject || I18n.tr("(no subject)", "thread list")) : ""
+                            color: Theme.surfaceText
+                            selectionColor: Theme.primarySelected
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeXLarge
+                            font.weight: Font.DemiBold
+                        }
+
+                        DankActionButton {
+                            visible: !!DankMailService.currentThread && !!DankMailService.currentThread.subject
+                            buttonSize: 28
+                            iconSize: 16
+                            iconName: "content_copy"
+                            onClicked: {
+                                if (DankMailService.currentThread && DankMailService.currentThread.subject)
+                                    window.copyWithFeedback(DankMailService.currentThread.subject);
+                            }
+                        }
                     }
 
                     // Thread message selector when the conversation has multiple messages.
@@ -1502,7 +1626,7 @@ FloatingWindow {
                                             elide: Text.ElideNone
                                             font.pixelSize: Theme.fontSizeSmall
                                             font.weight: msgStepChip.active ? Font.DemiBold : Font.Normal
-                                            color: msgStepChip.active ? Theme.primary : Theme.surfaceTextMedium
+                                            color: msgStepChip.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                                         }
 
                                         StyledText {
@@ -1510,7 +1634,7 @@ FloatingWindow {
                                             wrapMode: Text.NoWrap
                                             elide: Text.ElideNone
                                             font.pixelSize: Theme.fontSizeSmall
-                                            color: Theme.surfaceTextAlpha
+                                            color: msgStepChip.active ? Theme.onPrimaryContainer : Theme.surfaceTextAlpha
                                         }
                                     }
 
@@ -1804,14 +1928,13 @@ FloatingWindow {
                         }
                     }
 
-                    // Attachment chips: metadata only; clicking opens the
-                    // thread in the webmail (content stays there, spec §1).
-                    // Capped at two chip rows — beyond that the area scrolls
-                    // instead of eating the body's space.
+                    // Attachment chips: clicking downloads on demand and opens via
+                    // xdg-open; the download icon opens Save as… (falls back to
+                    // webmail only if direct fetch fails).
                     DankFlickable {
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.min(attachFlow.implicitHeight, 2 * 30 + Theme.spacingS)
-                        visible: window.threadAttachments().length > 0
+                        visible: window.previewAttachments().length > 0
                         contentHeight: attachFlow.implicitHeight
                         clip: true
 
@@ -1821,12 +1944,13 @@ FloatingWindow {
                             spacing: Theme.spacingS
 
                             Repeater {
-                                model: window.threadAttachments()
+                                model: window.previewAttachments()
 
                                 delegate: StyledRect {
                                     id: attachChip
                                     required property var modelData
-                                    width: attachRow.implicitWidth + Theme.spacingL
+                                    property bool opening: false
+                                    width: attachRow.implicitWidth + Theme.spacingM * 2
                                     height: 30
                                     radius: 15
                                     color: Theme.surfaceContainerHigh
@@ -1838,25 +1962,55 @@ FloatingWindow {
                                         anchors.centerIn: parent
                                         spacing: Theme.spacingXS
 
-                                        DankIcon {
-                                            name: attachChip.modelData.mimeType && attachChip.modelData.mimeType.startsWith("image/") ? "image" : "description"
-                                            size: Theme.iconSizeSmall
-                                            color: Theme.primary
+                                        Item {
+                                            implicitWidth: attachOpenLayout.implicitWidth
+                                            implicitHeight: 28
+
+                                            RowLayout {
+                                                id: attachOpenLayout
+                                                anchors.centerIn: parent
+                                                spacing: Theme.spacingXS
+
+                                                DankIcon {
+                                                    name: attachChip.opening ? "progress_activity" : (attachChip.modelData.mimeType && attachChip.modelData.mimeType.startsWith("image/") ? "image" : "description")
+                                                    size: Theme.iconSizeSmall
+                                                    color: Theme.primary
+                                                }
+
+                                                StyledText {
+                                                    text: attachChip.modelData.filename + (window.formatSize(attachChip.modelData.size) !== "" ? "  ·  " + window.formatSize(attachChip.modelData.size) : "")
+                                                    font.pixelSize: Theme.fontSizeSmall
+                                                    maximumLineCount: 1
+                                                }
+                                            }
+
+                                            StateLayer {
+                                                disabled: attachChip.opening
+                                                stateColor: Theme.primary
+                                                cornerRadius: 12
+                                                onClicked: {
+                                                    const t = DankMailService.currentThread;
+                                                    if (!t)
+                                                        return;
+                                                    attachChip.opening = true;
+                                                    DankMailService.openAttachment(t.id, attachChip.modelData, resp => {
+                                                        attachChip.opening = false;
+                                                        if (resp && resp.error)
+                                                            DankMailService.openWeb(t.id);
+                                                    });
+                                                }
+                                            }
                                         }
 
-                                        StyledText {
-                                            text: attachChip.modelData.filename + (window.formatSize(attachChip.modelData.size) !== "" ? "  ·  " + window.formatSize(attachChip.modelData.size) : "")
-                                            font.pixelSize: Theme.fontSizeSmall
-                                            maximumLineCount: 1
-                                        }
-                                    }
-
-                                    StateLayer {
-                                        stateColor: Theme.primary
-                                        onClicked: {
-                                            const t = DankMailService.currentThread;
-                                            if (t)
-                                                DankMailService.openWeb(t.id);
+                                        DankActionButton {
+                                            buttonSize: 22
+                                            iconSize: 14
+                                            iconName: "download"
+                                            iconColor: Theme.surfaceTextMedium
+                                            onClicked: {
+                                                saveAttachmentPicker.pendingAttachment = attachChip.modelData;
+                                                saveAttachmentPicker.openFolder();
+                                            }
                                         }
                                     }
                                 }
@@ -1868,6 +2022,21 @@ FloatingWindow {
                     Flow {
                         Layout.fillWidth: true
                         spacing: Theme.spacingXS
+
+                        DankButton {
+                            buttonHeight: 32
+                            horizontalPadding: Theme.spacingM
+                            text: I18n.tr("Unsnooze", "thread action") + (DankMailService.currentThread && DankMailService.currentThread.snoozedUntil ? " (" + window.snoozeBadgeLabel(DankMailService.currentThread.snoozedUntil) + ")" : "")
+                            iconName: "notifications_active"
+                            backgroundColor: Theme.secondaryContainer
+                            textColor: Theme.onSecondaryContainer
+                            visible: !!DankMailService.currentThread && !!DankMailService.currentThread.snoozedUntil
+                            onClicked: {
+                                const t = DankMailService.currentThread;
+                                if (t)
+                                    DankMailService.unsnooze([t.id]);
+                            }
+                        }
 
                         DankButton {
                             buttonHeight: 32
@@ -2035,6 +2204,10 @@ FloatingWindow {
                                             "label": I18n.tr("Tomorrow", "snooze")
                                         },
                                         {
+                                            "key": "weekend",
+                                            "label": I18n.tr("This weekend", "snooze")
+                                        },
+                                        {
                                             "key": "nextweek",
                                             "label": I18n.tr("Next week", "snooze")
                                         }
@@ -2073,7 +2246,7 @@ FloatingWindow {
                                         anchors.centerIn: parent
                                         text: I18n.tr("Pick date…", "snooze")
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: snoozeMenu.showCustom ? Theme.primary : Theme.surfaceText
+                                        color: snoozeMenu.showCustom ? Theme.onPrimaryContainer : Theme.surfaceText
                                     }
 
                                     StateLayer {
@@ -2112,7 +2285,7 @@ FloatingWindow {
                                     width: confirmLabel.implicitWidth + Theme.spacingXL
                                     height: 40
                                     radius: 20
-                                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                                    color: ready ? Theme.primary : Theme.surfaceContainerHighest
                                     opacity: ready ? 1 : 0.6
 
                                     StyledText {
@@ -2120,12 +2293,13 @@ FloatingWindow {
                                         anchors.centerIn: parent
                                         text: I18n.tr("Snooze", "snooze")
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                                        color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
+                                        font.weight: Font.Medium
                                     }
 
                                     StateLayer {
                                         disabled: !parent.ready
-                                        stateColor: Theme.primary
+                                        stateColor: Theme.primaryText
                                         onClicked: snoozeMenu.doSnooze(snoozeMenu.customUntil())
                                     }
                                 }
@@ -2365,7 +2539,7 @@ FloatingWindow {
                                         anchors.centerIn: parent
                                         text: I18n.tr("Reply all", "quick reply")
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: replyArea.replyAll ? Theme.primary : Theme.surfaceTextMedium
+                                        color: replyArea.replyAll ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                                     }
 
                                     StateLayer {
@@ -2513,7 +2687,7 @@ FloatingWindow {
                                     width: sendLabel.implicitWidth + Theme.spacingXL
                                     height: 32
                                     radius: 16
-                                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                                    color: ready ? Theme.primary : Theme.surfaceContainerHighest
                                     opacity: ready ? 1 : 0.6
 
                                     StyledText {
@@ -2521,12 +2695,13 @@ FloatingWindow {
                                         anchors.centerIn: parent
                                         text: replyArea.sending ? I18n.tr("Sending…", "quick reply") : I18n.tr("Send", "quick reply")
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                                        color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
+                                        font.weight: Font.Medium
                                     }
 
                                     StateLayer {
                                         disabled: !parent.ready
-                                        stateColor: Theme.primary
+                                        stateColor: Theme.primaryText
                                         onClicked: replyArea.send()
                                     }
                                 }
@@ -2734,7 +2909,7 @@ FloatingWindow {
                                     width: forwardSendLabel.implicitWidth + Theme.spacingXL
                                     height: 32
                                     radius: 16
-                                    color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                                    color: ready ? Theme.primary : Theme.surfaceContainerHighest
                                     opacity: ready ? 1 : 0.6
 
                                     StyledText {
@@ -2742,12 +2917,13 @@ FloatingWindow {
                                         anchors.centerIn: parent
                                         text: forwardArea.sending ? I18n.tr("Sending…", "quick forward") : I18n.tr("Forward", "quick forward")
                                         font.pixelSize: Theme.fontSizeSmall
-                                        color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                                        color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
+                                        font.weight: Font.Medium
                                     }
 
                                     StateLayer {
                                         disabled: !parent.ready
-                                        stateColor: Theme.primary
+                                        stateColor: Theme.primaryText
                                         onClicked: forwardArea.send()
                                     }
                                 }
@@ -2782,12 +2958,29 @@ FloatingWindow {
                             color: Theme.primary
                         }
 
-                        StyledText {
+                        TextEdit {
                             Layout.fillWidth: true
+                            readOnly: true
+                            selectByMouse: true
+                            wrapMode: TextEdit.Wrap
+                            textFormat: TextEdit.PlainText
                             text: DankMailService.currentDraft ? (DankMailService.currentDraft.subject || I18n.tr("(no subject)", "thread list")) : ""
+                            color: Theme.surfaceText
+                            selectionColor: Theme.primarySelected
+                            font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeXLarge
                             font.weight: Font.DemiBold
-                            maximumLineCount: 2
+                        }
+
+                        DankActionButton {
+                            visible: !!DankMailService.currentDraft && !!DankMailService.currentDraft.subject
+                            buttonSize: 28
+                            iconSize: 16
+                            iconName: "content_copy"
+                            onClicked: {
+                                if (DankMailService.currentDraft && DankMailService.currentDraft.subject)
+                                    window.copyWithFeedback(DankMailService.currentDraft.subject);
+                            }
                         }
 
                         DankButton {
@@ -2969,7 +3162,7 @@ FloatingWindow {
         width: undoRow.implicitWidth + Theme.spacingXL
         height: 40
         radius: 8
-        color: "#2d3139" // Premium dark slate background
+        color: Theme.inverseSurface
         border.width: 1
         border.color: Theme.outline
 
@@ -2996,7 +3189,7 @@ FloatingWindow {
                     }
                     return "";
                 }
-                color: "#f5f6f9" // High contrast light text
+                color: Theme.inverseOnSurface
                 font.pixelSize: Theme.fontSizeSmall
             }
 
@@ -3011,7 +3204,7 @@ FloatingWindow {
                     id: undoText
                     anchors.centerIn: parent
                     text: I18n.tr("Undo", "undo banner")
-                    color: Theme.primary
+                    color: Theme.ensureContrast(Theme.primary, Theme.inverseSurface)
                     font.pixelSize: Theme.fontSizeSmall
                     font.weight: Font.Bold
                 }

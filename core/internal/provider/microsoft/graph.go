@@ -83,3 +83,8 @@ type graphAPI interface {
 	// mailbox-specific IDs.
 	FolderIDs(ctx context.Context) (map[string]string, error)
 }
+
+// graphAttachmentsAPI is an optional extension of graphAPI for fetching attachment bytes.
+type graphAttachmentsAPI interface {
+	GetAttachment(ctx context.Context, messageID, attachmentID, filename string) ([]byte, error)
+}

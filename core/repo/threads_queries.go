@@ -24,7 +24,9 @@ type ThreadFilter struct {
 	// ArchivedOnly selects cached mail outside the inbox, excluding spam,
 	// trash, drafts and snoozed threads.
 	ArchivedOnly bool
-	SentOnly     bool
+	// SnoozedOnly selects threads currently snoozed, ordered by wake time.
+	SnoozedOnly bool
+	SentOnly    bool
 	// Label keeps only threads carrying this provider label (e.g.
 	// "SPAM" for the spam-review view).
 	Label string
@@ -55,12 +57,20 @@ func (r *Repo) ListThreads(ctx context.Context, f ThreadFilter) ([]models.Thread
 			query, args := latest.Query()
 			s.OrderExpr(sql.Expr("("+query+") DESC", args...))
 		}, ent.Desc(thread.FieldID))
+	} else if f.SnoozedOnly {
+		q = q.Order(ent.Asc(thread.FieldSnoozedUntil), ent.Desc(thread.FieldLastMessageAt), ent.Desc(thread.FieldID))
 	} else {
 		q = q.Order(ent.Desc(thread.FieldLastMessageAt), ent.Desc(thread.FieldID))
 	}
-	if f.Query == "" {
+	switch {
+	case f.SnoozedOnly:
+		q = q.Where(thread.SnoozedUntilNotNil())
+		if f.Query != "" {
+			q = q.Where(searchPredicate(f.Query))
+		}
+	case f.Query == "":
 		q = q.Where(thread.SnoozedUntilIsNil())
-	} else {
+	default:
 		q = q.Where(searchPredicate(f.Query))
 	}
 	if f.ArchivedOnly {
@@ -144,7 +154,11 @@ func (r *Repo) GetThread(ctx context.Context, id int) (*models.ThreadDetail, err
 		}
 		for _, a := range m.Attachments {
 			mv.Attachments = append(mv.Attachments, models.AttachmentView{
-				Filename: a.Filename, MimeType: a.MimeType, Size: a.Size,
+				MessageID:    m.ProviderMessageID,
+				AttachmentID: a.AttachmentID,
+				Filename:     a.Filename,
+				MimeType:     a.MimeType,
+				Size:         a.Size,
 			})
 		}
 		d.Messages = append(d.Messages, mv)

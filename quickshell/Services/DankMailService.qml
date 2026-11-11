@@ -51,6 +51,7 @@ Singleton {
     property bool filterUnread: false
     property bool filterStarred: false
     property bool filterArchived: false
+    property bool filterSnoozed: false
     property string filterAccount: ""
     // Provider label view ("SPAM" for the spam-review tab; "" = inbox).
     property string filterLabel: ""
@@ -63,6 +64,7 @@ Singleton {
     onFilterUnreadChanged: invalidateThreadSearch()
     onFilterStarredChanged: invalidateThreadSearch()
     onFilterArchivedChanged: { invalidateThreadSearch(); resetArchiveHistory(); }
+    onFilterSnoozedChanged: invalidateThreadSearch()
     onFilterAccountChanged: { invalidateThreadSearch(); resetArchiveHistory(); refreshDrafts(true); }
     onFilterLabelChanged: {
         invalidateThreadSearch();
@@ -211,6 +213,8 @@ Singleton {
     property string gmailDefaultClientId: ""
     property bool gmailHasDefaultCreds: false
     property var microsoftSetupSteps: []
+    property string microsoftDefaultClientId: ""
+    property bool microsoftHasDefaultCreds: false
     property var imapPresets: []
 
     // Daemon settings (notification actions, snooze default, chained
@@ -533,9 +537,9 @@ Singleton {
 
     function threadFilterParams() {
         const params = {
-            // Starred is a mailbox-wide view. Keeping inbox=true here
-            // accidentally reduced it to "starred AND in inbox".
-            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred && !filterArchived
+            // Starred and Snoozed are mailbox-wide views. Keeping inbox=true
+            // would hide snoozed or archived-starred threads.
+            "inbox": searchQuery === "" && filterLabel === "" && !filterStarred && !filterArchived && !filterSnoozed
         };
         if (searchQuery !== "")
             params.query = searchQuery;
@@ -549,6 +553,8 @@ Singleton {
             params.starred = true;
         if (filterArchived)
             params.archived = true;
+        if (filterSnoozed)
+            params.snoozed = true;
         if (filterAccount !== "")
             params.account = filterAccount;
         return params;
@@ -675,6 +681,51 @@ Singleton {
             if (resp.error)
                 log.warn("ops.snooze:", resp.error);
             refreshDebounce.restart();
+        });
+    }
+
+    function unsnooze(ids) {
+        _op("ops.unsnooze", ids);
+    }
+
+    function openAttachment(threadId, att, callback) {
+        sendRequest("attachments.open", {
+            "threadId": threadId,
+            "messageId": (att && att.messageId) ? att.messageId : "",
+            "attachmentId": (att && att.attachmentId) ? att.attachmentId : "",
+            "filename": (att && att.filename) ? att.filename : ""
+        }, resp => {
+            if (callback)
+                callback(resp);
+        });
+    }
+
+    function saveAttachmentAs(threadId, att, destDir, callback) {
+        sendRequest("attachments.saveAs", {
+            "threadId": threadId,
+            "messageId": (att && att.messageId) ? att.messageId : "",
+            "attachmentId": (att && att.attachmentId) ? att.attachmentId : "",
+            "filename": (att && att.filename) ? att.filename : "",
+            "destDir": destDir || ""
+        }, resp => {
+            if (callback)
+                callback(resp);
+        });
+    }
+
+    function resyncAccount(accountId, callback) {
+        const params = { "full": true };
+        if (accountId && accountId !== "")
+            params.account = accountId;
+        sendRequest("system.sync", params, resp => {
+            if (resp.error)
+                log.warn("system.sync (full):", resp.error);
+            resetArchiveHistory();
+            refreshAccounts();
+            refreshThreads();
+            reloadCurrentThread();
+            if (callback)
+                callback(resp);
         });
     }
 
@@ -851,8 +902,11 @@ Singleton {
 
     function refreshMicrosoftSetupSteps() {
         sendRequest("accounts.microsoft.setupGuide", null, resp => {
-            if (!resp.error && resp.result)
+            if (!resp.error && resp.result) {
                 microsoftSetupSteps = resp.result.steps || [];
+                microsoftDefaultClientId = resp.result.defaultClientId || "";
+                microsoftHasDefaultCreds = !!resp.result.hasDefaultCreds;
+            }
         });
         sendRequest("accounts.imap.presets", null, resp => {
             if (!resp.error && resp.result)
@@ -869,30 +923,32 @@ Singleton {
 
     // callback({state, authUrl}) or callback({error}). Pasting the whole
     // downloaded client_secret_*.json into the ID field also works: it
-    // is detected and forwarded for the daemon to parse.
+    // is detected and forwarded for the daemon to parse. Passing empty
+    // arguments uses the daemon's resolved reusable OAuth client.
     function startGmailFlow(clientId, clientSecret, jsonPath, callback) {
-        let params;
+        let params = {};
         if (jsonPath && jsonPath.trim() !== "") {
             params = {
                 "clientJsonPath": jsonPath.trim()
             };
-        } else if (clientId.trim().startsWith("{")) {
+        } else if (clientId && clientId.trim().startsWith("{")) {
             params = {
                 "clientJson": clientId
             };
-        } else {
+        } else if ((clientId && clientId.trim() !== "") || (clientSecret && clientSecret.trim() !== "")) {
             params = {
-                "clientId": clientId,
-                "clientSecret": clientSecret
+                "clientId": (clientId || "").trim(),
+                "clientSecret": (clientSecret || "").trim()
             };
         }
         sendRequest("accounts.gmail.start", params, resp => callback(resp.error ? resp : resp.result));
     }
 
     function startMicrosoftFlow(clientId, callback) {
-        sendRequest("accounts.microsoft.start", {
-            "clientId": clientId.trim()
-        }, resp => callback(resp.error ? resp : resp.result));
+        const params = {};
+        if (clientId && clientId.trim() !== "")
+            params.clientId = clientId.trim();
+        sendRequest("accounts.microsoft.start", params, resp => callback(resp.error ? resp : resp.result));
     }
 
     // Long-running: resolves when the user finishes (or the daemon times
@@ -900,7 +956,13 @@ Singleton {
     function completeGmailFlow(state, callback) {
         sendRequest("accounts.gmail.complete", {
             "state": state
-        }, resp => callback(resp.error ? resp : resp.result));
+        }, resp => {
+            if (!resp.error) {
+                refreshGmailSetupSteps();
+                refreshMicrosoftSetupSteps();
+            }
+            callback(resp.error ? resp : resp.result);
+        });
     }
 
     // Re-runs the OAuth consent for an existing Gmail account using the

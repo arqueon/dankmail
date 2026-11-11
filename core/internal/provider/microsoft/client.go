@@ -14,8 +14,7 @@ import (
 	"sync"
 	"time"
 
-	htmltomarkdown "github.com/JohannesKaufmann/html-to-markdown/v2"
-
+	"github.com/arqueon/dankmail/core/internal/mailtext"
 	"github.com/arqueon/dankmail/core/internal/provider"
 )
 
@@ -155,7 +154,7 @@ func (c *Client) do(ctx context.Context, method, u string, body any, out any) er
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
 	}
-	req.Header.Set("Prefer", `IdType="ImmutableId", outlook.body-content-type="text"`)
+	req.Header.Set("Prefer", `IdType="ImmutableId"`)
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		return err
@@ -268,15 +267,15 @@ func (c *Client) ListConversation(ctx context.Context, convID string) ([]*graphM
 	return out, nil
 }
 
-// fillAttachments fetches attachment METADATA only (name, type, size —
-// spec §1: content never leaves the provider).
+// fillAttachments fetches attachment metadata and IDs without downloading bytes.
 func (c *Client) fillAttachments(ctx context.Context, m *graphMessage) error {
 	if !m.HasAttachments {
 		return nil
 	}
-	u := fmt.Sprintf("%s/me/messages/%s/attachments?$select=name,contentType,size", graphBase, url.PathEscape(m.ID))
+	u := fmt.Sprintf("%s/me/messages/%s/attachments?$select=id,name,contentType,size", graphBase, url.PathEscape(m.ID))
 	var doc struct {
 		Value []struct {
+			ID          string `json:"id"`
 			Name        string `json:"name"`
 			ContentType string `json:"contentType"`
 			Size        int64  `json:"size"`
@@ -287,10 +286,66 @@ func (c *Client) fillAttachments(ctx context.Context, m *graphMessage) error {
 	}
 	for _, a := range doc.Value {
 		m.Attachments = append(m.Attachments, provider.AttachmentMeta{
-			Filename: a.Name, MimeType: a.ContentType, Size: a.Size,
+			AttachmentID: a.ID,
+			Filename:     a.Name,
+			MimeType:     a.ContentType,
+			Size:         a.Size,
 		})
 	}
 	return nil
+}
+
+// GetAttachment downloads raw bytes for one attachment on messageID.
+func (c *Client) GetAttachment(ctx context.Context, messageID, attachmentID, filename string) ([]byte, error) {
+	if attachmentID == "" {
+		u := fmt.Sprintf("%s/me/messages/%s/attachments?$select=id,name", graphBase, url.PathEscape(messageID))
+		var list struct {
+			Value []struct {
+				ID   string `json:"id"`
+				Name string `json:"name"`
+			} `json:"value"`
+		}
+		if err := c.do(ctx, http.MethodGet, u, nil, &list); err != nil {
+			return nil, err
+		}
+		for _, a := range list.Value {
+			if a.Name == filename || attachmentID == "" {
+				attachmentID = a.ID
+				if a.Name == filename {
+					break
+				}
+			}
+		}
+	}
+	if attachmentID == "" {
+		return nil, &graphError{Status: http.StatusNotFound, Msg: "attachment not found"}
+	}
+	var doc struct {
+		ContentBytes string `json:"contentBytes"`
+	}
+	u := fmt.Sprintf("%s/me/messages/%s/attachments/%s", graphBase, url.PathEscape(messageID), url.PathEscape(attachmentID))
+	if err := c.do(ctx, http.MethodGet, u, nil, &doc); err != nil {
+		return nil, err
+	}
+	if doc.ContentBytes != "" {
+		return base64.StdEncoding.DecodeString(doc.ContentBytes)
+	}
+	rawURL := u + "/$value"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Prefer", `IdType="ImmutableId"`)
+	resp, err := c.hc.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode >= 400 {
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return nil, &graphError{Status: resp.StatusCode, Msg: string(raw)}
+	}
+	return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 }
 
 func (c *Client) PatchMessage(ctx context.Context, id string, body map[string]any) error {
@@ -343,12 +398,5 @@ func (c *Client) FolderIDs(ctx context.Context) (map[string]string, error) {
 // htmlToText distills HTML to plain markdown-ish text (same degrade-to-
 // empty contract as the Gmail provider).
 func htmlToText(html string) string {
-	if html == "" {
-		return ""
-	}
-	text, err := htmltomarkdown.ConvertString(html)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(text)
+	return mailtext.HTMLToText(html)
 }

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import qs.Common
+import qs.Modals
 import qs.Services
 import qs.Widgets
 
@@ -37,6 +38,7 @@ FloatingWindow {
     property string microsoftClientId: ""
     property string pendingState: ""
     property string pendingAuthUrl: ""
+    property int oauthReturnStep: 0
 
     // IMAP form state.
     property string presetKey: ""
@@ -52,23 +54,25 @@ FloatingWindow {
     property string imapWebmail: ""
 
     readonly property bool onOAuth: selectedProvider === "gmail" || selectedProvider === "microsoft"
+    readonly property bool hasDefaultOAuthCreds: selectedProvider === "microsoft" ? DankMailService.microsoftHasDefaultCreds : DankMailService.gmailHasDefaultCreds
     readonly property var steps: selectedProvider === "microsoft" ? DankMailService.microsoftSetupSteps : DankMailService.gmailSetupSteps
     readonly property int guideCount: steps.length
-    readonly property int credsStep: guideCount
-    readonly property int browserStep: guideCount + 1
-    readonly property int oauthDoneStep: guideCount + 2
+    readonly property int credsStep: guideCount + 1
+    readonly property int browserStep: guideCount + 2
+    readonly property int oauthDoneStep: guideCount + 3
 
     readonly property bool onProviderSelect: selectedProvider === ""
-    readonly property bool onOAuthGuide: onOAuth && wizardStep < guideCount && guideCount > 0
+    readonly property bool onOAuthIntro: onOAuth && wizardStep === 0
+    readonly property bool onOAuthGuide: onOAuth && wizardStep >= 1 && wizardStep <= guideCount && guideCount > 0
     readonly property bool onOAuthCreds: onOAuth && wizardStep === credsStep
     readonly property bool onOAuthBrowser: onOAuth && wizardStep === browserStep
     readonly property bool onImapForm: selectedProvider === "imap" && wizardStep === 0
     readonly property bool onDone: (onOAuth && wizardStep === oauthDoneStep) || (selectedProvider === "imap" && wizardStep === 1)
 
     function show() {
-        resetState();
         DankMailService.refreshGmailSetupSteps();
         DankMailService.refreshMicrosoftSetupSteps();
+        resetState();
         visible = true;
     }
 
@@ -86,9 +90,10 @@ FloatingWindow {
         clientId = DankMailService.gmailDefaultClientId;
         clientSecret = "";
         clientJsonPath = "";
-        microsoftClientId = "";
+        microsoftClientId = DankMailService.microsoftDefaultClientId;
         pendingState = "";
         pendingAuthUrl = "";
+        oauthReturnStep = 0;
         presetKey = "";
         presetNote = "";
         presetNoteUrl = "";
@@ -131,7 +136,40 @@ FloatingWindow {
         imapWebmail = p.webmailUrl || "";
     }
 
+    function startDefaultOAuthFlow() {
+        oauthReturnStep = 0;
+        flowError = "";
+        flowInProgress = true;
+        const starter = selectedProvider === "microsoft"
+            ? cb => DankMailService.startMicrosoftFlow("", cb)
+            : cb => DankMailService.startGmailFlow("", "", "", cb);
+        starter(res => {
+            if (res.error) {
+                flowError = res.error;
+                flowInProgress = false;
+                return;
+            }
+            pendingState = res.state;
+            pendingAuthUrl = res.authUrl;
+            wizardStep = browserStep;
+            Qt.openUrlExternally(res.authUrl);
+            DankMailService.completeGmailFlow(res.state, done => {
+                flowInProgress = false;
+                if (done.error) {
+                    flowError = done.error;
+                    wizardStep = oauthReturnStep;
+                    pendingState = "";
+                    return;
+                }
+                completedEmail = done.email || "";
+                pendingState = "";
+                wizardStep = oauthDoneStep;
+            });
+        });
+    }
+
     function startGmailFlow() {
+        oauthReturnStep = credsStep;
         flowError = "";
         flowInProgress = true;
         DankMailService.startGmailFlow(clientId.trim(), clientSecret.trim(), clientJsonPath.trim(), res => {
@@ -148,7 +186,7 @@ FloatingWindow {
                 flowInProgress = false;
                 if (done.error) {
                     flowError = done.error;
-                    wizardStep = credsStep;
+                    wizardStep = oauthReturnStep;
                     pendingState = "";
                     return;
                 }
@@ -160,6 +198,7 @@ FloatingWindow {
     }
 
     function startMicrosoftFlow() {
+        oauthReturnStep = credsStep;
         flowError = "";
         flowInProgress = true;
         DankMailService.startMicrosoftFlow(microsoftClientId, res => {
@@ -176,7 +215,7 @@ FloatingWindow {
                 flowInProgress = false;
                 if (done.error) {
                     flowError = done.error;
-                    wizardStep = credsStep;
+                    wizardStep = oauthReturnStep;
                     pendingState = "";
                     return;
                 }
@@ -236,11 +275,16 @@ FloatingWindow {
                 text: {
                     if (modal.onProviderSelect)
                         return I18n.tr("Choose your mail provider", "account wizard");
+                    if (modal.onOAuthIntro) {
+                        return modal.selectedProvider === "microsoft"
+                            ? I18n.tr("Connect Microsoft account", "account wizard")
+                            : I18n.tr("Connect Google account", "account wizard");
+                    }
                     if (modal.onOAuthGuide) {
                         const heading = modal.selectedProvider === "microsoft"
                             ? I18n.tr("Set up your Microsoft OAuth client", "account wizard")
                             : I18n.tr("Set up your Google OAuth client", "account wizard");
-                        return heading + "  ·  " + (modal.wizardStep + 1) + "/" + modal.guideCount;
+                        return heading + "  ·  " + modal.wizardStep + "/" + modal.guideCount;
                     }
                     if (modal.onOAuthCreds)
                         return I18n.tr("Enter your client credentials", "account wizard");
@@ -295,7 +339,7 @@ FloatingWindow {
                             "key": "imap",
                             "icon": "dns",
                             "title": I18n.tr("Other provider (IMAP)", "provider chooser"),
-                            "desc": I18n.tr("iCloud, Yahoo, Fastmail, Proton Bridge or your own server. Stored and verified now; syncing arrives with the IMAP ring.", "provider chooser")
+                            "desc": I18n.tr("iCloud, Yahoo, Fastmail, Proton Bridge or your own server via IMAP and SMTP.", "provider chooser")
                         }
                     ]
 
@@ -360,6 +404,137 @@ FloatingWindow {
                 }
             }
 
+            // ---- oauth: step 0 one-click / intro -------------------------
+            ColumnLayout {
+                anchors.fill: parent
+                visible: modal.onOAuthIntro
+                spacing: Theme.spacingL
+
+                StyledText {
+                    Layout.fillWidth: true
+                    text: {
+                        if (modal.hasDefaultOAuthCreds) {
+                            return modal.selectedProvider === "microsoft"
+                                ? I18n.tr("Sign in with Microsoft in your browser and you're done — no setup needed. Dank Mail syncs your Outlook inbox, folders, and replies.", "account wizard")
+                                : I18n.tr("Sign in with Google in your browser and you're done — no setup needed. Dank Mail syncs your Gmail inbox, labels, and replies.", "account wizard");
+                        }
+                        return modal.selectedProvider === "microsoft"
+                            ? I18n.tr("Set up a reusable Microsoft OAuth client once or paste an existing Client ID. Future Microsoft accounts connect in one click.", "account wizard")
+                            : I18n.tr("Set up a reusable Google OAuth client once or import an existing client_secret.json. Future Google accounts connect in one click.", "account wizard");
+                    }
+                    color: Theme.surfaceText
+                    wrapMode: Text.WordWrap
+                }
+
+                StyledRect {
+                    Layout.fillWidth: true
+                    implicitHeight: securityCol.implicitHeight + Theme.spacingM * 2
+                    color: Theme.tertiaryContainer
+                    radius: Theme.cornerRadius
+
+                    ColumnLayout {
+                        id: securityCol
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingM
+                        spacing: Theme.spacingXS
+
+                        RowLayout {
+                            spacing: Theme.spacingS
+                            DankIcon {
+                                name: "lock"
+                                size: Theme.iconSizeSmall
+                                color: Theme.onTertiaryContainer
+                            }
+                            StyledText {
+                                text: I18n.tr("Credentials stay on this machine", "account wizard")
+                                font.weight: Font.Medium
+                                color: Theme.onTertiaryContainer
+                            }
+                        }
+
+                        StyledText {
+                            Layout.fillWidth: true
+                            text: I18n.tr("Your client ID, secret, and refresh token are stored in the system keyring (libsecret/kwallet) when available, or a protected local file.", "account wizard")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.onTertiaryContainer
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+
+                StyledText {
+                    visible: modal.flowError !== ""
+                    Layout.fillWidth: true
+                    text: modal.flowError
+                    color: Theme.error
+                    font.pixelSize: Theme.fontSizeSmall
+                    wrapMode: Text.WordWrap
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: Theme.spacingM
+
+                    DankButton {
+                        visible: modal.hasDefaultOAuthCreds
+                        text: modal.selectedProvider === "microsoft"
+                            ? I18n.tr("Connect Microsoft Account", "account wizard")
+                            : I18n.tr("Connect Google Account", "account wizard")
+                        iconName: "open_in_new"
+                        busy: modal.flowInProgress
+                        backgroundColor: Theme.primary
+                        textColor: Theme.primaryText
+                        enabled: !modal.flowInProgress
+                        onClicked: modal.startDefaultOAuthFlow()
+                    }
+
+                    DankButton {
+                        visible: modal.hasDefaultOAuthCreds
+                        text: I18n.tr("Use your own OAuth client", "account wizard")
+                        backgroundColor: "transparent"
+                        textColor: Theme.primary
+                        enabled: !modal.flowInProgress
+                        onClicked: {
+                            modal.flowError = "";
+                            modal.wizardStep = 1;
+                        }
+                    }
+
+                    DankButton {
+                        visible: !modal.hasDefaultOAuthCreds
+                        text: I18n.tr("Set up OAuth client", "account wizard")
+                        iconName: "arrow_forward"
+                        backgroundColor: Theme.primary
+                        textColor: Theme.primaryText
+                        enabled: !modal.flowInProgress
+                        onClicked: {
+                            modal.flowError = "";
+                            modal.wizardStep = 1;
+                        }
+                    }
+
+                    DankButton {
+                        visible: !modal.hasDefaultOAuthCreds
+                        text: I18n.tr("Enter existing credentials", "account wizard")
+                        backgroundColor: "transparent"
+                        textColor: Theme.primary
+                        enabled: !modal.flowInProgress
+                        onClicked: {
+                            modal.flowError = "";
+                            modal.wizardStep = modal.credsStep;
+                        }
+                    }
+
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                }
+
+                Item {
+                    Layout.fillHeight: true
+                }
+            }
+
             // ---- gmail: guide pages --------------------------------------
             ColumnLayout {
                 id: guidePage
@@ -367,7 +542,7 @@ FloatingWindow {
                 visible: modal.onOAuthGuide
                 spacing: Theme.spacingL
 
-                readonly property var step: (modal.wizardStep < modal.steps.length) ? modal.steps[modal.wizardStep] : null
+                readonly property var step: (modal.wizardStep >= 1 && modal.wizardStep <= modal.steps.length) ? modal.steps[modal.wizardStep - 1] : null
 
                 StyledText {
                     Layout.fillWidth: true
@@ -387,7 +562,7 @@ FloatingWindow {
                     visible: guidePage.step !== null && guidePage.step.note !== undefined && guidePage.step.note !== ""
                     Layout.fillWidth: true
                     implicitHeight: noteText.implicitHeight + Theme.spacingL
-                    color: Theme.primaryBackground
+                    color: Theme.tertiaryContainer
                     border.width: 1
                     border.color: Theme.outlineMedium
 
@@ -397,7 +572,7 @@ FloatingWindow {
                         anchors.margins: Theme.spacingM
                         text: (guidePage.step && guidePage.step.note) ? guidePage.step.note : ""
                         font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.primary
+                        color: Theme.onTertiaryContainer
                         wrapMode: Text.WordWrap
                     }
                 }
@@ -407,7 +582,7 @@ FloatingWindow {
                     width: linkRow.implicitWidth + Theme.spacingXL
                     height: 38
                     radius: 19
-                    color: Theme.primaryContainer
+                    color: Theme.primary
 
                     RowLayout {
                         id: linkRow
@@ -417,17 +592,18 @@ FloatingWindow {
                         DankIcon {
                             name: "open_in_new"
                             size: Theme.iconSizeSmall
-                            color: Theme.primary
+                            color: Theme.primaryText
                         }
 
                         StyledText {
                             text: (guidePage.step && guidePage.step.urlLabel) ? guidePage.step.urlLabel : ""
-                            color: Theme.primary
+                            color: Theme.primaryText
+                            font.weight: Font.Medium
                         }
                     }
 
                     StateLayer {
-                        stateColor: Theme.primary
+                        stateColor: Theme.primaryText
                         onClicked: {
                             if (guidePage.step && guidePage.step.url)
                                 Qt.openUrlExternally(guidePage.step.url);
@@ -499,11 +675,24 @@ FloatingWindow {
                         anchors.margins: Theme.spacingM
                         spacing: Theme.spacingS
 
-                        DankTextField {
+                        RowLayout {
                             Layout.fillWidth: true
-                            placeholderText: I18n.tr("Path to client_secret_*.json", "account wizard")
-                            text: modal.clientJsonPath
-                            onTextChanged: modal.clientJsonPath = text
+                            spacing: Theme.spacingS
+
+                            DankTextField {
+                                Layout.fillWidth: true
+                                placeholderText: I18n.tr("Path to client_secret_*.json", "account wizard")
+                                text: modal.clientJsonPath
+                                onTextChanged: modal.clientJsonPath = text
+                            }
+
+                            DankButton {
+                                text: I18n.tr("Import client_secret.json", "account wizard")
+                                iconName: "folder_open"
+                                backgroundColor: Theme.surfaceContainerHigh
+                                textColor: Theme.surfaceText
+                                onClicked: jsonFilePicker.openSingle([".json"])
+                            }
                         }
 
                         StyledText {
@@ -629,7 +818,7 @@ FloatingWindow {
                                     anchors.centerIn: parent
                                     text: parent.modelData.label
                                     font.pixelSize: Theme.fontSizeSmall
-                                    color: parent.active ? Theme.primary : Theme.surfaceText
+                                    color: parent.active ? Theme.onPrimaryContainer : Theme.surfaceText
                                 }
 
                                 StateLayer {
@@ -644,7 +833,7 @@ FloatingWindow {
                         visible: modal.presetNote !== ""
                         Layout.fillWidth: true
                         implicitHeight: presetNoteText.implicitHeight + Theme.spacingL
-                        color: Theme.primaryBackground
+                        color: Theme.tertiaryContainer
                         border.width: 1
                         border.color: Theme.outlineMedium
 
@@ -654,7 +843,7 @@ FloatingWindow {
                             anchors.margins: Theme.spacingM
                             text: modal.presetNote + (modal.presetNoteUrl !== "" ? "  ↗" : "")
                             font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.primary
+                            color: Theme.onTertiaryContainer
                             wrapMode: Text.WordWrap
                         }
 
@@ -725,7 +914,7 @@ FloatingWindow {
 
                         DankTextField {
                             Layout.fillWidth: true
-                            placeholderText: I18n.tr("SMTP server (for replies, next ring)", "account wizard")
+                            placeholderText: I18n.tr("SMTP server (for sending and replies)", "account wizard")
                             text: modal.imapSmtpHost
                             onTextChanged: modal.imapSmtpHost = text
                         }
@@ -778,7 +967,7 @@ FloatingWindow {
                     Layout.alignment: Qt.AlignHCenter
                     Layout.maximumWidth: parent.width - Theme.spacingXL * 2
                     horizontalAlignment: Text.AlignHCenter
-                    text: modal.selectedProvider === "imap" ? I18n.tr("Connection verified and account stored. IMAP syncing arrives with the next ring; the account stays parked until then.", "account wizard") : I18n.tr("Syncing has started. New mail will appear shortly.", "account wizard")
+                    text: I18n.tr("Syncing has started. New mail will appear shortly.", "account wizard")
                     color: Theme.surfaceTextMedium
                     wrapMode: Text.WordWrap
                 }
@@ -845,17 +1034,18 @@ FloatingWindow {
                 width: nextLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
-                color: Theme.primaryContainer
+                color: Theme.primary
 
                 StyledText {
                     id: nextLabel
                     anchors.centerIn: parent
                     text: I18n.tr("Next", "account wizard nav")
-                    color: Theme.primary
+                    color: Theme.primaryText
+                    font.weight: Font.Medium
                 }
 
                 StateLayer {
-                    stateColor: Theme.primary
+                    stateColor: Theme.primaryText
                     onClicked: modal.wizardStep = modal.wizardStep + 1
                 }
             }
@@ -866,19 +1056,20 @@ FloatingWindow {
                 width: authLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
-                color: ready ? Theme.primaryContainer : Theme.surfaceContainerHigh
+                color: ready ? Theme.primary : Theme.surfaceContainerHigh
                 opacity: ready ? 1 : 0.6
 
                 StyledText {
                     id: authLabel
                     anchors.centerIn: parent
                     text: I18n.tr("Authorize", "account wizard nav")
-                    color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                    color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
+                    font.weight: Font.Medium
                 }
 
                 StateLayer {
                     disabled: !parent.ready
-                    stateColor: Theme.primary
+                    stateColor: Theme.primaryText
                     onClicked: modal.selectedProvider === "microsoft" ? modal.startMicrosoftFlow() : modal.startGmailFlow()
                 }
             }
@@ -889,19 +1080,20 @@ FloatingWindow {
                 width: addLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
-                color: ready ? Theme.primaryContainer : Theme.surfaceContainerHigh
+                color: ready ? Theme.primary : Theme.surfaceContainerHigh
                 opacity: ready ? 1 : 0.6
 
                 StyledText {
                     id: addLabel
                     anchors.centerIn: parent
                     text: modal.flowInProgress ? I18n.tr("Testing connection…", "account wizard nav") : I18n.tr("Add account", "account wizard nav")
-                    color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                    color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
+                    font.weight: Font.Medium
                 }
 
                 StateLayer {
                     disabled: !parent.ready
-                    stateColor: Theme.primary
+                    stateColor: Theme.primaryText
                     onClicked: modal.submitImap()
                 }
             }
@@ -923,7 +1115,7 @@ FloatingWindow {
                     stateColor: Theme.error
                     onClicked: {
                         modal.cancelPendingFlow();
-                        modal.wizardStep = modal.credsStep;
+                        modal.wizardStep = modal.oauthReturnStep;
                     }
                 }
             }
@@ -933,20 +1125,29 @@ FloatingWindow {
                 width: doneLabel.implicitWidth + Theme.spacingXL
                 height: 36
                 radius: 18
-                color: Theme.primaryContainer
+                color: Theme.primary
 
                 StyledText {
                     id: doneLabel
                     anchors.centerIn: parent
                     text: I18n.tr("Done", "account wizard nav")
-                    color: Theme.primary
+                    color: Theme.primaryText
+                    font.weight: Font.Medium
                 }
 
                 StateLayer {
-                    stateColor: Theme.primary
+                    stateColor: Theme.primaryText
                     onClicked: modal.hide()
                 }
             }
+        }
+    }
+
+    FilePickerModal {
+        id: jsonFilePicker
+        onFilesSelected: paths => {
+            if (paths.length > 0)
+                modal.clientJsonPath = paths[0];
         }
     }
 }

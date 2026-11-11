@@ -150,7 +150,7 @@ FloatingWindow {
                                 anchors.centerIn: parent
                                 text: actionChip.modelData.label
                                 font.pixelSize: Theme.fontSizeSmall
-                                color: actionChip.active ? Theme.primary : Theme.surfaceTextMedium
+                                color: actionChip.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                             }
 
                             StateLayer {
@@ -219,7 +219,7 @@ FloatingWindow {
                                 anchors.centerIn: parent
                                 text: presetChip.modelData.label
                                 font.pixelSize: Theme.fontSizeSmall
-                                color: presetChip.active ? Theme.primary : Theme.surfaceTextMedium
+                                color: presetChip.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                             }
 
                             StateLayer {
@@ -379,7 +379,7 @@ FloatingWindow {
                                 anchors.centerIn: parent
                                 text: intervalChip.modelData.label
                                 font.pixelSize: Theme.fontSizeSmall
-                                color: intervalChip.active ? Theme.primary : Theme.surfaceTextMedium
+                                color: intervalChip.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                             }
 
                             StateLayer {
@@ -426,6 +426,7 @@ FloatingWindow {
                         id: acctRow
                         required property var modelData
                         property bool reauthPending: false
+                        property bool resyncPending: false
                         Layout.fillWidth: true
                         implicitHeight: accountContent.implicitHeight + Theme.spacingM * 2
                         color: Theme.surfaceContainer
@@ -478,6 +479,19 @@ FloatingWindow {
                                     font.pixelSize: Theme.fontSizeSmall
                                     color: Theme.warning
                                     wrapMode: Text.WrapAnywhere
+                                }
+                            }
+
+                            // Full resync: re-fetches message bodies and attachments metadata.
+                            DankActionButton {
+                                enabled: !acctRow.resyncPending
+                                iconName: acctRow.resyncPending ? "hourglass_top" : "sync"
+                                iconColor: acctRow.resyncPending ? Theme.primary : Theme.surfaceTextMedium
+                                onClicked: {
+                                    acctRow.resyncPending = true;
+                                    DankMailService.resyncAccount(acctRow.modelData.id, () => {
+                                        acctRow.resyncPending = false;
+                                    });
                                 }
                             }
 

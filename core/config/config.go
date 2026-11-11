@@ -19,6 +19,7 @@ type Config struct {
 	// desktop-app model, but tokens obtained with them are (→ keyring).
 	GoogleClientID     string `env:"DMAIL_GOOGLE_CLIENT_ID"`
 	GoogleClientSecret string `env:"DMAIL_GOOGLE_CLIENT_SECRET"`
+	MicrosoftClientID  string `env:"DMAIL_MICROSOFT_CLIENT_ID"`
 	DisableHTTP        bool   `env:"DMAIL_DISABLE_HTTP"`
 	DisableIPC         bool   `env:"DMAIL_DISABLE_IPC"`
 	LogLevel           string `env:"DMAIL_LOG_LEVEL" envDefault:"info"`

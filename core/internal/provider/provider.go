@@ -103,13 +103,13 @@ type ThreadDelta struct {
 	Messages []MessageDelta
 }
 
-// AttachmentMeta describes an attachment WITHOUT its content: dankmail
-// never downloads attachment bodies (spec §1); the metadata lets the UI
-// show what a message carries so the user can decide to open the webmail.
+// AttachmentMeta describes an attachment's metadata and provider identifier;
+// attachment bytes are only fetched on demand when opened or saved locally.
 type AttachmentMeta struct {
-	Filename string `json:"filename"`
-	MimeType string `json:"mimeType"`
-	Size     int64  `json:"size"` // bytes, provider-reported
+	AttachmentID string `json:"attachmentId,omitempty"`
+	Filename     string `json:"filename"`
+	MimeType     string `json:"mimeType"`
+	Size         int64  `json:"size"` // bytes, provider-reported
 }
 
 // MessageDelta is the remote state of one message. Unsent drafts must
@@ -292,4 +292,12 @@ type Provider interface {
 // SentPager reads recent sent conversations on demand, newest first, in small pages.
 type SentPager interface {
 	SentPage(ctx context.Context, pageToken string) (Changes, string, error)
+}
+
+// AttachmentFetcher downloads raw attachment bytes on demand when the user
+// opens or saves an attachment locally. When attachmentID is empty (for
+// threads cached before attachment IDs were stored), implementations fall
+// back to matching filename on the message when possible.
+type AttachmentFetcher interface {
+	FetchAttachment(ctx context.Context, messageID, attachmentID, filename string) ([]byte, error)
 }

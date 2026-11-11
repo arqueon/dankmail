@@ -188,7 +188,7 @@ func applyLocal(ctx context.Context, tx *ent.Tx, op *Op, rows []*ent.Thread) err
 		case OpArchive:
 			u.SetInInbox(false)
 		case OpUnarchive:
-			u.SetInInbox(true)
+			u.SetInInbox(true).ClearSnoozedUntil()
 		case OpTrash:
 			labels := []string{"TRASH"}
 			for _, label := range t.Labels {

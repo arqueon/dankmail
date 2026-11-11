@@ -3,13 +3,16 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
 	"github.com/arqueon/dankmail/core/config"
 	"github.com/arqueon/dankmail/core/ent"
+	entaccount "github.com/arqueon/dankmail/core/ent/account"
 	"github.com/arqueon/dankmail/core/internal/accounts"
 	"github.com/arqueon/dankmail/core/internal/i18n"
 	"github.com/arqueon/dankmail/core/internal/keyring"
@@ -88,12 +91,134 @@ func accountCmd() *cobra.Command {
 	addIMAP.Flags().Int("port", 0, "IMAP port (default 993)")
 	addIMAP.Flags().String("security", "", "tls|starttls (default tls)")
 	addIMAP.Flags().String("username", "", "login user if different from the email")
-	addIMAP.Flags().String("smtp-host", "", "SMTP host for sending (anillo 2)")
+	addIMAP.Flags().String("smtp-host", "", "SMTP host for sending")
 	addIMAP.Flags().Int("smtp-port", 0, "SMTP port (default 587)")
 	addIMAP.Flags().String("webmail", "", "webmail URL for deep links")
 
-	cmd.AddCommand(addGmail, addMicrosoft, addIMAP, list, remove, reauth)
+	// dcal-parity subcommand groups: `dmail account setup google|microsoft`
+	// and `dmail account add google|microsoft|imap`.
+	setup := &cobra.Command{
+		Use:   "setup",
+		Short: "Store reusable OAuth desktop client credentials",
+	}
+	setupGoogle := &cobra.Command{
+		Use:     "google",
+		Aliases: []string{"gmail"},
+		Short:   "Save a reusable Google OAuth desktop client (from client_secret_*.json, stdin, or flags)",
+		Args:    cobra.NoArgs,
+		RunE:    runAccountSetupGoogle,
+	}
+	setupGoogle.Flags().String("client-json", "", "path to client_secret_*.json downloaded from Google Console")
+	setupGoogle.Flags().Bool("stdin-json", false, "read client JSON from standard input")
+	setupGoogle.Flags().String("client-id", "", "OAuth desktop client ID")
+	setupGoogle.Flags().String("client-secret", "", "OAuth desktop client secret")
+
+	setupMicrosoft := &cobra.Command{
+		Use:   "microsoft",
+		Short: "Save a reusable Microsoft Azure public-client Application ID",
+		Args:  cobra.NoArgs,
+		RunE:  runAccountSetupMicrosoft,
+	}
+	setupMicrosoft.Flags().String("client-id", "", "Application (client) ID of your Azure public-client registration")
+	setup.AddCommand(setupGoogle, setupMicrosoft)
+
+	addGroup := &cobra.Command{
+		Use:   "add",
+		Short: "Add a mail account (google, microsoft, or imap)",
+	}
+	addGroupGoogle := &cobra.Command{
+		Use:     "google",
+		Aliases: []string{"gmail"},
+		Short:   addGmail.Short,
+		Args:    cobra.NoArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			jsonPath, _ := c.Flags().GetString("client-json")
+			return runAccountAddGmail(jsonPath)
+		},
+	}
+	addGroupGoogle.Flags().String("client-json", "", "optional path to client_secret_*.json (uses saved default when omitted)")
+
+	addGroupMicrosoft := &cobra.Command{
+		Use:   "microsoft",
+		Short: addMicrosoft.Short,
+		Args:  cobra.NoArgs,
+		RunE: func(c *cobra.Command, args []string) error {
+			clientID, _ := c.Flags().GetString("client-id")
+			return runAccountAddMicrosoft(clientID)
+		},
+	}
+	addGroupMicrosoft.Flags().String("client-id", "", "optional Azure Application (client) ID (uses saved default when omitted)")
+
+	addGroupIMAP := &cobra.Command{
+		Use:   "imap <email>",
+		Short: addIMAP.Short,
+		Args:  cobra.ExactArgs(1),
+		RunE:  func(c *cobra.Command, args []string) error { return runAccountAddIMAP(c, args[0]) },
+	}
+	addGroupIMAP.Flags().AddFlagSet(addIMAP.Flags())
+	addGroup.AddCommand(addGroupGoogle, addGroupMicrosoft, addGroupIMAP)
+
+	cmd.AddCommand(setup, addGroup, addGmail, addMicrosoft, addIMAP, list, remove, reauth)
 	return cmd
+}
+
+func runAccountSetupGoogle(c *cobra.Command, _ []string) error {
+	jsonPath, _ := c.Flags().GetString("client-json")
+	stdinJSON, _ := c.Flags().GetBool("stdin-json")
+	clientID, _ := c.Flags().GetString("client-id")
+	clientSecret, _ := c.Flags().GetString("client-secret")
+
+	var creds oauth.ClientCreds
+	switch {
+	case stdinJSON:
+		raw, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			return err
+		}
+		parsed, err := oauth.ParseClientJSON(raw)
+		if err != nil {
+			return err
+		}
+		creds = parsed
+	case jsonPath != "":
+		raw, err := readUserFile(jsonPath)
+		if err != nil {
+			return err
+		}
+		parsed, err := oauth.ParseClientJSON(raw)
+		if err != nil {
+			return err
+		}
+		creds = parsed
+	case strings.TrimSpace(clientID) != "" && strings.TrimSpace(clientSecret) != "":
+		creds = oauth.ClientCreds{
+			ClientID:     strings.TrimSpace(clientID),
+			ClientSecret: strings.TrimSpace(clientSecret),
+		}
+	default:
+		return fmt.Errorf("pass --client-json <file>, --stdin-json, or --client-id + --client-secret")
+	}
+
+	if err := oauth.SaveDefaultClientCreds("google", creds); err != nil {
+		return err
+	}
+	fmt.Println(i18n.T("Google OAuth client saved."))
+	notifyDaemonReload()
+	return nil
+}
+
+func runAccountSetupMicrosoft(c *cobra.Command, _ []string) error {
+	clientID, _ := c.Flags().GetString("client-id")
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return fmt.Errorf("pass --client-id <Application (client) ID from Azure>")
+	}
+	if err := oauth.SaveDefaultClientCreds("microsoft", oauth.ClientCreds{ClientID: clientID}); err != nil {
+		return err
+	}
+	fmt.Println(i18n.T("Microsoft OAuth client saved."))
+	notifyDaemonReload()
+	return nil
 }
 
 func runAccountAddIMAP(c *cobra.Command, email string) error {
@@ -150,7 +275,7 @@ func runAccountAddIMAP(c *cobra.Command, email string) error {
 			return err
 		}
 		if res.Created {
-			fmt.Printf(i18n.T("Account %s added (%s). IMAP syncing arrives with the next ring; the account stays parked until then.\n"), res.Email, res.AccountID)
+			fmt.Printf(i18n.T("Account %s added (%s).\n"), res.Email, res.AccountID)
 		} else {
 			fmt.Printf(i18n.T("Account %s updated (%s).\n"), res.Email, res.AccountID)
 		}
@@ -183,18 +308,22 @@ func runAccountAddMicrosoft(clientID string) error {
 	if err != nil {
 		return err
 	}
-	if clientID == "" {
-		return fmt.Errorf("pass --client-id <Application (client) ID from Azure>,\nor use the in-app wizard; see docs/design/microsoft-provider.md §8")
-	}
 	return withDB(func(ctx context.Context, db *ent.Client) error {
+		accts, _ := db.Account.Query().Where(entaccount.TypeEQ(entaccount.TypeMicrosoft)).All(ctx)
+		creds, err := oauth.ResolveMicrosoftClient(clientID, cfg.MicrosoftClientID, accountIDStringsByType(accts, entaccount.TypeMicrosoft)...)
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(clientID) != "" {
+			_ = oauth.SaveDefaultClientCreds("microsoft", creds)
+		}
 		fmt.Println(i18n.T("Opening the browser to authorize the account…"))
-		// Public client with PKCE — no secret exists or is stored.
-		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, clientID, "", cfg.OAuthBindAddr)
+		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", cfg.OAuthBindAddr)
 		tok, err := broker.Authorize(ctx)
 		if err != nil {
 			return err
 		}
-		res, err := accounts.FinishMicrosoft(ctx, db, oauth.ClientCreds{ClientID: clientID}, tok)
+		res, err := accounts.FinishMicrosoft(ctx, db, creds, tok)
 		if err != nil {
 			return err
 		}
@@ -213,23 +342,32 @@ func runAccountAddGmail(clientJSONPath string) error {
 	if err != nil {
 		return err
 	}
-	var creds oauth.ClientCreds
+	var explicit oauth.ClientCreds
 	if clientJSONPath != "" {
-		raw, err := os.ReadFile(clientJSONPath)
+		raw, err := readUserFile(clientJSONPath)
 		if err != nil {
 			return err
 		}
-		creds, err = oauth.ParseClientJSON(raw)
+		explicit, err = oauth.ParseClientJSON(raw)
 		if err != nil {
 			return err
 		}
-	} else if cfg.GoogleClientID != "" && cfg.GoogleClientSecret != "" {
-		creds = oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
-	} else {
-		return fmt.Errorf("pass --client-json <client_secret_*.json>, set DMAIL_GOOGLE_CLIENT_ID/SECRET,\nor use the in-app wizard (tray → Open Dank Mail → add account); see docs/gmail-setup.md")
 	}
 
 	return withDB(func(ctx context.Context, db *ent.Client) error {
+		accts, _ := db.Account.Query().Where(entaccount.TypeEQ(entaccount.TypeGmail)).All(ctx)
+		creds, err := oauth.ResolveGoogleClient(
+			explicit,
+			cfg.GoogleClientID,
+			cfg.GoogleClientSecret,
+			accountIDStringsByType(accts, entaccount.TypeGmail)...,
+		)
+		if err != nil {
+			return err
+		}
+		if explicit.ClientID != "" && explicit.ClientSecret != "" {
+			_ = oauth.SaveDefaultClientCreds("google", creds)
+		}
 		fmt.Println(i18n.T("Opening the browser to authorize the account…"))
 		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
 		tok, err := broker.Authorize(ctx)
@@ -282,26 +420,25 @@ func runAccountReauth(id string) error {
 		if err != nil {
 			return err
 		}
-		// Prefer the OAuth client stored with the account at add time.
-		creds, err := oauth.LoadClientCreds(id)
-		if err != nil {
-			creds = oauth.ClientCreds{}
-		}
+		explicit, _ := oauth.LoadClientCreds(id)
+		allAccts, _ := db.Account.Query().All(ctx)
+		var creds oauth.ClientCreds
 		var broker *oauth.Broker
 		switch acct.Type {
-		case "microsoft":
-			if creds.ClientID == "" {
-				return fmt.Errorf("no OAuth client for this account; re-add via dmail account add-microsoft")
+		case entaccount.TypeMicrosoft:
+			creds, err = oauth.ResolveMicrosoftClient(explicit.ClientID, cfg.MicrosoftClientID, accountIDStringsByType(allAccts, entaccount.TypeMicrosoft)...)
+			if err != nil {
+				return err
 			}
 			broker = oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", cfg.OAuthBindAddr)
-		default:
-			if creds.ClientID == "" {
-				creds = oauth.ClientCreds{ClientID: cfg.GoogleClientID, ClientSecret: cfg.GoogleClientSecret}
-			}
-			if creds.ClientID == "" || creds.ClientSecret == "" {
-				return fmt.Errorf("no OAuth client for this account; set DMAIL_GOOGLE_CLIENT_ID/SECRET or re-add via the wizard")
+		case entaccount.TypeGmail:
+			creds, err = oauth.ResolveGoogleClient(explicit, cfg.GoogleClientID, cfg.GoogleClientSecret, accountIDStringsByType(allAccts, entaccount.TypeGmail)...)
+			if err != nil {
+				return err
 			}
 			broker = oauth.NewBroker(creds.ClientID, creds.ClientSecret, cfg.OAuthBindAddr)
+		default:
+			return fmt.Errorf("re-authentication applies to OAuth accounts only; re-add the account to update an IMAP password")
 		}
 		tok, err := broker.Authorize(ctx)
 		if err != nil {

@@ -63,10 +63,11 @@ var overrides = map[string]map[string]string{
 		"Account authorized. You can close this tab and return to dankmail.": "Cuenta autorizada. Puedes cerrar esta pestaña y volver a dankmail.",
 
 		// cli: account management
-		"Note:":                        "Nota:",
-		"Password (or app password): ": "Contraseña (o app password): ",
-		"Testing the IMAP connection…": "Probando conexión IMAP…",
-		"Account %s added (%s). IMAP syncing arrives with the next ring; the account stays parked until then.\n": "Cuenta %s añadida (%s). La sincronización IMAP llega en el siguiente anillo; la cuenta queda en pausa.\n",
+		"Note:":                                               "Nota:",
+		"Password (or app password): ":                        "Contraseña (o app password): ",
+		"Testing the IMAP connection…":                        "Probando conexión IMAP…",
+		"Google OAuth client saved.":                          "Cliente OAuth de Google guardado.",
+		"Microsoft OAuth client saved.":                       "Cliente OAuth de Microsoft guardado.",
 		"Account %s updated (%s).\n":                          "Cuenta %s actualizada (%s).\n",
 		"Account %s added (%s).\n":                            "Cuenta %s añadida (%s).\n",
 		"Account %s re-authorized (%s).\n":                    "Cuenta %s re-autorizada (%s).\n",
@@ -96,10 +97,11 @@ var overrides = map[string]map[string]string{
 		"Account authorized. You can close this tab and return to dankmail.": "Conta autorizada. Você pode fechar esta aba e voltar ao dankmail.",
 
 		// cli: account management
-		"Note:":                        "Observação:",
-		"Password (or app password): ": "Senha (ou senha de app): ",
-		"Testing the IMAP connection…": "Testando a conexão IMAP…",
-		"Account %s added (%s). IMAP syncing arrives with the next ring; the account stays parked until then.\n": "Conta %s adicionada (%s). A sincronização IMAP chega no próximo anel; até lá a conta fica em espera.\n",
+		"Note:":                                               "Observação:",
+		"Password (or app password): ":                        "Senha (ou senha de app): ",
+		"Testing the IMAP connection…":                        "Testando a conexão IMAP…",
+		"Google OAuth client saved.":                          "Cliente OAuth do Google salvo.",
+		"Microsoft OAuth client saved.":                       "Cliente OAuth da Microsoft salvo.",
 		"Account %s updated (%s).\n":                          "Conta %s atualizada (%s).\n",
 		"Account %s added (%s).\n":                            "Conta %s adicionada (%s).\n",
 		"Account %s re-authorized (%s).\n":                    "Conta %s reautorizada (%s).\n",

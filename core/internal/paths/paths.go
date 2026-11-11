@@ -37,3 +37,10 @@ func SettingsPath() string { return filepath.Join(ConfigDir(), "settings.json") 
 
 // DraftsPath is the local drafts persistence file.
 func DraftsPath() string { return filepath.Join(DataDir(), "drafts.json") }
+
+// AttachmentsCacheDir holds on-demand downloaded message attachments opened via the OS.
+func AttachmentsCacheDir() string { return filepath.Join(CacheDir(), "attachments") }
+
+// OAuthClientsPath stores reusable desktop OAuth client IDs/secrets when the
+// desktop keyring is locked or unavailable (0600 permissions).
+func OAuthClientsPath() string { return filepath.Join(DataDir(), "oauth-clients.json") }

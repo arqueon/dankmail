@@ -76,19 +76,26 @@ func (r *flowRegistry) take(state string) (*pendingFlow, bool) {
 //	accounts.remove           → drop account + its keyring secrets
 func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 	srv.Register("accounts.gmail.setupGuide", func(ctx context.Context, _ map[string]any) (any, error) {
+		var accts []string
+		if d.db != nil {
+			rows, _ := d.db.Account.Query().Where(entaccount.TypeEQ(entaccount.TypeGmail)).All(ctx)
+			accts = accountIDStringsByType(rows, entaccount.TypeGmail)
+		}
+		resolved, err := oauth.ResolveGoogleClient(oauth.ClientCreds{}, d.cfg.GoogleClientID, d.cfg.GoogleClientSecret, accts...)
+		hasDefault := err == nil && resolved.ClientID != "" && resolved.ClientSecret != ""
 		return map[string]any{
 			"steps": accounts.GmailSetupSteps(),
-			// Pre-fill the creds form when the environment already
-			// carries a client (never expose the secret value itself).
-			"defaultClientId": d.cfg.GoogleClientID,
-			"hasDefaultCreds": d.cfg.GoogleClientID != "" && d.cfg.GoogleClientSecret != "",
+			// Pre-fill/enable 1-click consent when reusable credentials exist
+			// (never expose the secret value itself).
+			"defaultClientId": resolved.ClientID,
+			"hasDefaultCreds": hasDefault,
 		}, nil
 	})
 
 	srv.Register("accounts.gmail.start", func(ctx context.Context, p map[string]any) (any, error) {
-		creds := oauth.ClientCreds{}
-		creds.ClientID, _ = p["clientId"].(string)
-		creds.ClientSecret, _ = p["clientSecret"].(string)
+		explicit := oauth.ClientCreds{}
+		explicit.ClientID, _ = p["clientId"].(string)
+		explicit.ClientSecret, _ = p["clientSecret"].(string)
 		// The wizard may hand over the downloaded client_secret_*.json
 		// verbatim instead of the individual fields (dcal parity).
 		if raw, _ := p["clientJson"].(string); raw != "" {
@@ -96,7 +103,7 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 			if err != nil {
 				return nil, err
 			}
-			creds = parsed
+			explicit = parsed
 		}
 		// …or a path to that file (picked or dropped in the GUI).
 		if path, _ := p["clientJsonPath"].(string); path != "" {
@@ -108,16 +115,19 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 			if err != nil {
 				return nil, fmt.Errorf("%s: %w", path, err)
 			}
-			creds = parsed
+			explicit = parsed
 		}
-		if creds.ClientID == "" {
-			creds.ClientID = d.cfg.GoogleClientID
+		var accts []string
+		if d.db != nil {
+			rows, _ := d.db.Account.Query().Where(entaccount.TypeEQ(entaccount.TypeGmail)).All(ctx)
+			accts = accountIDStringsByType(rows, entaccount.TypeGmail)
 		}
-		if creds.ClientSecret == "" {
-			creds.ClientSecret = d.cfg.GoogleClientSecret
+		creds, err := oauth.ResolveGoogleClient(explicit, d.cfg.GoogleClientID, d.cfg.GoogleClientSecret, accts...)
+		if err != nil {
+			return nil, err
 		}
-		if creds.ClientID == "" || creds.ClientSecret == "" {
-			return nil, fmt.Errorf("client ID and secret are required (see the setup guide)")
+		if strings.TrimSpace(explicit.ClientID) != "" && strings.TrimSpace(explicit.ClientSecret) != "" {
+			_ = oauth.SaveDefaultClientCreds("google", creds)
 		}
 
 		broker := oauth.NewBroker(creds.ClientID, creds.ClientSecret, d.cfg.OAuthBindAddr)
@@ -133,21 +143,41 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 	})
 
 	srv.Register("accounts.microsoft.setupGuide", func(ctx context.Context, _ map[string]any) (any, error) {
-		return map[string]any{"steps": accounts.MicrosoftSetupSteps()}, nil
+		var accts []string
+		if d.db != nil {
+			rows, _ := d.db.Account.Query().Where(entaccount.TypeEQ(entaccount.TypeMicrosoft)).All(ctx)
+			accts = accountIDStringsByType(rows, entaccount.TypeMicrosoft)
+		}
+		resolved, err := oauth.ResolveMicrosoftClient("", d.cfg.MicrosoftClientID, accts...)
+		hasDefault := err == nil && resolved.ClientID != ""
+		return map[string]any{
+			"steps":           accounts.MicrosoftSetupSteps(),
+			"defaultClientId": resolved.ClientID,
+			"hasDefaultCreds": hasDefault,
+		}, nil
 	})
 
 	srv.Register("accounts.microsoft.start", func(ctx context.Context, p map[string]any) (any, error) {
-		clientID, _ := p["clientId"].(string)
-		if clientID == "" {
-			return nil, fmt.Errorf("client ID is required (see the setup guide)")
+		explicitID, _ := p["clientId"].(string)
+		var accts []string
+		if d.db != nil {
+			rows, _ := d.db.Account.Query().Where(entaccount.TypeEQ(entaccount.TypeMicrosoft)).All(ctx)
+			accts = accountIDStringsByType(rows, entaccount.TypeMicrosoft)
+		}
+		creds, err := oauth.ResolveMicrosoftClient(explicitID, d.cfg.MicrosoftClientID, accts...)
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(explicitID) != "" {
+			_ = oauth.SaveDefaultClientCreds("microsoft", creds)
 		}
 		// Public client: no secret, PKCE carries the proof.
-		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, clientID, "", d.cfg.OAuthBindAddr)
+		broker := oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", d.cfg.OAuthBindAddr)
 		flow, err := broker.StartFlow()
 		if err != nil {
 			return nil, err
 		}
-		d.flows.register(flow, oauth.ClientCreds{ClientID: clientID}, "microsoft")
+		d.flows.register(flow, creds, "microsoft")
 		return map[string]any{
 			"state":   flow.State(),
 			"authUrl": flow.AuthURL(),
@@ -198,27 +228,23 @@ func (d *daemon) registerAccountIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		// Prefer the OAuth client stored with the account at add time,
-		// falling back to env-provided creds (same order as the CLI).
-		creds, err := oauth.LoadClientCreds(idStr)
-		if err != nil {
-			creds = oauth.ClientCreds{}
-		}
+		explicit, _ := oauth.LoadClientCreds(idStr)
+		allAccts, _ := d.db.Account.Query().All(ctx)
+		var creds oauth.ClientCreds
 		var broker *oauth.Broker
 		var kind string
 		switch acct.Type {
 		case entaccount.TypeGmail:
-			if creds.ClientID == "" {
-				creds = oauth.ClientCreds{ClientID: d.cfg.GoogleClientID, ClientSecret: d.cfg.GoogleClientSecret}
-			}
-			if creds.ClientID == "" || creds.ClientSecret == "" {
-				return nil, fmt.Errorf("no OAuth client stored for this account; re-add it via the wizard")
+			creds, err = oauth.ResolveGoogleClient(explicit, d.cfg.GoogleClientID, d.cfg.GoogleClientSecret, accountIDStringsByType(allAccts, entaccount.TypeGmail)...)
+			if err != nil {
+				return nil, err
 			}
 			broker = oauth.NewBroker(creds.ClientID, creds.ClientSecret, d.cfg.OAuthBindAddr)
 			kind = "gmail"
 		case entaccount.TypeMicrosoft:
-			if creds.ClientID == "" {
-				return nil, fmt.Errorf("no OAuth client stored for this account; re-add it via the wizard")
+			creds, err = oauth.ResolveMicrosoftClient(explicit.ClientID, d.cfg.MicrosoftClientID, accountIDStringsByType(allAccts, entaccount.TypeMicrosoft)...)
+			if err != nil {
+				return nil, err
 			}
 			broker = oauth.NewBrokerFor(oauth.MicrosoftEndpoints, creds.ClientID, "", d.cfg.OAuthBindAddr)
 			kind = "microsoft"

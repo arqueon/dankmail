@@ -2,8 +2,10 @@ package accounts
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -71,6 +73,48 @@ func (c *IMAPConfig) toMap() map[string]any {
 	return m
 }
 
+// IsLoopbackHost reports whether host targets the local machine (e.g.
+// Proton Mail Bridge on 127.0.0.1 / ::1 / localhost), where self-signed
+// local TLS certificates are expected.
+func IsLoopbackHost(host string) bool {
+	h := strings.Trim(strings.TrimSpace(host), "[]")
+	if strings.EqualFold(h, "localhost") {
+		return true
+	}
+	if ip := net.ParseIP(h); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
+}
+
+// IMAPConfigFromMap decodes Account.Config back into an IMAPConfig.
+func IMAPConfigFromMap(m map[string]any, email string) (IMAPConfig, error) {
+	var cfg IMAPConfig
+	if m != nil {
+		cfg.Host, _ = m["host"].(string)
+		switch p := m["port"].(type) {
+		case float64:
+			cfg.Port = int(p)
+		case int:
+			cfg.Port = p
+		}
+		cfg.Security, _ = m["security"].(string)
+		cfg.Username, _ = m["username"].(string)
+		cfg.SMTPHost, _ = m["smtpHost"].(string)
+		switch p := m["smtpPort"].(type) {
+		case float64:
+			cfg.SMTPPort = int(p)
+		case int:
+			cfg.SMTPPort = p
+		}
+		cfg.WebmailURL, _ = m["webmailUrl"].(string)
+	}
+	if err := cfg.normalize(email); err != nil {
+		return IMAPConfig{}, err
+	}
+	return cfg, nil
+}
+
 // TestIMAP dials the server and logs in — the add path runs this before
 // anything is stored, so bad credentials fail fast with a clear error.
 func TestIMAP(ctx context.Context, cfg IMAPConfig, email, password string) error {
@@ -78,6 +122,13 @@ func TestIMAP(ctx context.Context, cfg IMAPConfig, email, password string) error
 		return err
 	}
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	opts := &imapclient.Options{
+		TLSConfig: &tls.Config{
+			ServerName:         cfg.Host,
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: IsLoopbackHost(cfg.Host),
+		},
+	}
 
 	type dialResult struct {
 		client *imapclient.Client
@@ -90,9 +141,9 @@ func TestIMAP(ctx context.Context, cfg IMAPConfig, email, password string) error
 			err error
 		)
 		if cfg.Security == "starttls" {
-			cli, err = imapclient.DialStartTLS(addr, nil)
+			cli, err = imapclient.DialStartTLS(addr, opts)
 		} else {
-			cli, err = imapclient.DialTLS(addr, nil)
+			cli, err = imapclient.DialTLS(addr, opts)
 		}
 		ch <- dialResult{cli, err}
 	}()

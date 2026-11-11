@@ -223,8 +223,8 @@ func fixtureThreads() map[string]*gmailv1.Thread {
 							"Subject", "Re: Hello",
 						),
 						Parts: []*gmailv1.MessagePart{
-							{MimeType: "text/html", Body: &gmailv1.MessagePartBody{Data: b64("<b>nope</b>")}},
-							{MimeType: "text/plain", Body: &gmailv1.MessagePartBody{Data: b64raw("plain wins")}},
+							{MimeType: "text/html", Body: &gmailv1.MessagePartBody{Data: b64("<p>rich <a href=\"https://example.org\">link</a></p>")}},
+							{MimeType: "text/plain", Body: &gmailv1.MessagePartBody{Data: b64raw("degraded plain")}},
 						},
 					},
 				},
@@ -355,8 +355,8 @@ func TestInitialSync(t *testing.T) {
 		t.Errorf("To = %v, want %v", m1.To, want)
 	}
 
-	if got := d.Messages[1].BodyText; got != "plain wins" {
-		t.Errorf("multipart BodyText = %q, want text/plain part", got)
+	if got := d.Messages[1].BodyText; got != "rich [link](https://example.org)" {
+		t.Errorf("multipart BodyText = %q, want distilled text/html part", got)
 	}
 
 	if d3 := changes.Upserted[2]; d3.ThreadID != "t3" || d3.InInbox {
@@ -877,12 +877,12 @@ func TestMessageDeltaHTMLFallbackAndAttachments(t *testing.T) {
 	if len(d.Attachments) != 2 {
 		t.Fatalf("attachments = %d, want 2", len(d.Attachments))
 	}
-	if d.Attachments[0].Filename != "informe.pdf" || d.Attachments[0].Size != 12345 || d.Attachments[0].MimeType != "application/pdf" {
+	if d.Attachments[0].Filename != "informe.pdf" || d.Attachments[0].Size != 12345 || d.Attachments[0].MimeType != "application/pdf" || d.Attachments[0].AttachmentID != "a1" {
 		t.Errorf("attachment[0] = %+v", d.Attachments[0])
 	}
 }
 
-func TestMessageDeltaPlainTextPreferredOverHTML(t *testing.T) {
+func TestMessageDeltaHTMLPreferredWithPlainFallback(t *testing.T) {
 	p := newTestProvider(&fakeAPI{}, Options{})
 	m := &gmailv1.Message{
 		Id: "m2",
@@ -890,12 +890,23 @@ func TestMessageDeltaPlainTextPreferredOverHTML(t *testing.T) {
 			MimeType: "multipart/alternative",
 			Parts: []*gmailv1.MessagePart{
 				{MimeType: "text/plain", Body: &gmailv1.MessagePartBody{Data: b64("texto plano")}},
-				{MimeType: "text/html", Body: &gmailv1.MessagePartBody{Data: b64("<p>html</p>")}},
+				{MimeType: "text/html", Body: &gmailv1.MessagePartBody{Data: b64("<p>Hola <a href=\"https://example.org\">portal</a></p>")}},
 			},
 		},
 	}
-	if d := p.messageDelta(m); d.BodyText != "texto plano" {
-		t.Errorf("body = %q, want the text/plain part untouched", d.BodyText)
+	if d := p.messageDelta(m); d.BodyText != "Hola [portal](https://example.org)" {
+		t.Errorf("body = %q, want distilled text/html part", d.BodyText)
+	}
+
+	plainOnly := &gmailv1.Message{
+		Id: "m3",
+		Payload: &gmailv1.MessagePart{
+			MimeType: "text/plain",
+			Body:     &gmailv1.MessagePartBody{Data: b64("solo texto plano")},
+		},
+	}
+	if d := p.messageDelta(plainOnly); d.BodyText != "solo texto plano" {
+		t.Errorf("plain fallback body = %q, want solo texto plano", d.BodyText)
 	}
 }
 

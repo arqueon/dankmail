@@ -415,7 +415,7 @@ FloatingWindow {
                         StyledText {
                             text: acctChip.modelData.email
                             font.pixelSize: Theme.fontSizeSmall
-                            color: acctChip.active ? Theme.primary : Theme.surfaceTextMedium
+                            color: acctChip.active ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                         }
                     }
 
@@ -502,7 +502,7 @@ FloatingWindow {
                     wrapMode: Text.NoWrap
                     elide: Text.ElideNone
                     font.pixelSize: Theme.fontSizeSmall
-                    color: modal.showCcBcc ? Theme.primary : Theme.surfaceTextMedium
+                    color: modal.showCcBcc ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                 }
 
                 StateLayer {
@@ -804,7 +804,7 @@ FloatingWindow {
                     wrapMode: Text.NoWrap
                     elide: Text.ElideNone
                     font.pixelSize: Theme.fontSizeSmall
-                    color: modal.previewMode ? Theme.primary : Theme.surfaceTextMedium
+                    color: modal.previewMode ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
                 }
 
                 StateLayer {
@@ -852,7 +852,7 @@ FloatingWindow {
                     Layout.preferredWidth: implicitWidth
                     Layout.preferredHeight: 32
                     radius: 16
-                    color: Theme.primaryContainer
+                    color: Theme.primary
 
                     StyledText {
                         id: insertLinkText
@@ -861,11 +861,11 @@ FloatingWindow {
                         wrapMode: Text.NoWrap
                         elide: Text.ElideNone
                         font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.primary
+                        color: Theme.primaryText
                     }
 
                     StateLayer {
-                        stateColor: Theme.primary
+                        stateColor: Theme.primaryText
                         onClicked: modal.insertMarkdownLink()
                     }
                 }
@@ -1074,7 +1074,7 @@ FloatingWindow {
                 Layout.preferredWidth: implicitWidth
                 Layout.preferredHeight: 36
                 radius: 18
-                color: ready ? Theme.primaryContainer : Theme.surfaceContainerHighest
+                color: ready ? Theme.primary : Theme.surfaceContainerHighest
                 opacity: ready ? 1 : 0.6
 
                 StyledText {
@@ -1084,12 +1084,13 @@ FloatingWindow {
                     wrapMode: Text.NoWrap
                     elide: Text.ElideNone
                     font.pixelSize: Theme.fontSizeSmall
-                    color: parent.ready ? Theme.primary : Theme.surfaceTextMedium
+                    font.weight: Font.DemiBold
+                    color: parent.ready ? Theme.primaryText : Theme.surfaceTextMedium
                 }
 
                 StateLayer {
                     disabled: !parent.ready
-                    stateColor: Theme.primary
+                    stateColor: Theme.primaryText
                     onClicked: modal.send()
                 }
             }

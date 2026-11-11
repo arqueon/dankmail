@@ -56,3 +56,9 @@ type gmailDraftsAPI interface {
 	UpdateDraft(ctx context.Context, draftID, threadID string, raw []byte) (*gmailv1.Draft, error)
 	DeleteDraft(ctx context.Context, draftID string) error
 }
+
+// gmailAttachmentsAPI is an optional extension of gmailAPI for fetching attachment bytes.
+type gmailAttachmentsAPI interface {
+	GetMessageFull(ctx context.Context, id string) (*gmailv1.Message, error)
+	GetAttachment(ctx context.Context, messageID, attachmentID string) ([]byte, error)
+}

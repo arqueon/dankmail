@@ -548,14 +548,14 @@ PluginComponent {
                         width: viewLabel.implicitWidth + Theme.spacingL
                         height: Theme.iconSize + Theme.spacingXS
                         radius: Theme.cornerRadius
-                        color: active ? Theme.primaryContainer : "transparent"
+                        color: active ? Theme.primary : "transparent"
 
                         StyledText {
                             id: viewLabel
                             anchors.centerIn: parent
                             text: parent.modelData.label
                             font.pixelSize: Theme.fontSizeSmall
-                            color: parent.active ? Theme.primary : Theme.surfaceVariantText
+                            color: parent.active ? Theme.primaryText : Theme.surfaceVariantText
                         }
 
                         TapHandler {
