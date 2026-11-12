@@ -15,7 +15,8 @@ All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dan
 - **Snoozed mailbox view & weekend preset**:
   - Added a **Snoozed** filter chip ordered by wake time (`SnoozedUntil ASC`), wake-time badges on snoozed threads, **Unsnooze** actions (`ops.unsnooze`), and a **This weekend** (Saturday 09:00) snooze preset, wrapping inline row snooze presets within the thread column margins so options never clip at the window edge.
 - **HTML-to-Markdown message distillation & full body resync**:
-  - Added `core/internal/mailtext` (`html-to-markdown/v2`) across Gmail, Microsoft Graph, and IMAP so HTML messages retain readable link labels, headings, lists, and multi-column data tables while unwrapping layout tables and stripping hidden preheaders, plus a per-account full resync button in `SettingsModal`.
+  - Added `core/internal/mailtext` (`html-to-markdown/v2`) across Gmail, Microsoft Graph, and IMAP so HTML messages retain readable link labels, headings, lists, and multi-column data tables while unwrapping layout tables, sanitizing `<img>` / linked-banner nodes, and stripping hidden preheaders and tracking pixels, plus a per-account full resync button in `SettingsModal`.
+  - Replaced regex-only Markdown link/image parsing in `BodyFormatter.js` with balanced token scanners so cached and incoming links/images with optional titles, parentheses or spaces in URLs, multi-line block wrappers, and `data:` URIs never leak raw `!` or `(...)` syntax.
 - **Selectable & copyable `Subject`**:
   - Replaced static subject labels in thread and draft previews with read-only mouse-selectable `TextEdit` controls and one-click clipboard copy buttons.
 

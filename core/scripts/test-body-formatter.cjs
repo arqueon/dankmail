@@ -64,3 +64,33 @@ test('gmail plain-text links, google redirects, wrapped lists and nested sublist
  assert.equal(links.length, 1);
  assert.equal(links[0].url, 'http://plataformas.udgplus.udg.mx');
 });
+
+test('markdown images and linked images with titles, parens, brackets, multiline blocks and data URIs never leak ! or ()', () => {
+ const sample = [
+  '![Banner UDG](https://udg.mx/assets/banner_(2026).png "Banner oficial")',
+  '![](https://tracker.example.org/open.gif?id=999 "pixel")',
+  '![\\[Aviso\\] Logo](https://cdn.example.org/logo.png)',
+  '![Firma](data:image/png;base64,' + 'A'.repeat(6000) + ')',
+  '[',
+  '',
+  '![Ver convocatoria](https://ci3.googleusercontent.com/meips/proxy_(1).png "Abrir")',
+  '',
+  '](https://udg.mx/convocatoria_(2026) "Convocatoria")',
+  '[ ![](https://cdn.example.org/icon.png) Abrir documento ](<https://udg.mx/docs/Circular 04.pdf>)',
+  '[![](https://cdn.example.org/fb.png)](https://facebook.com/udg)'
+ ].join('\n\n');
+ const html = format(sample, {linkLabel: 'Enlace'});
+ assert.ok(!html.includes('!['), html);
+ assert.ok(!html.includes(']('), html);
+ assert.ok(!html.includes('tracker.example.org'), html);
+ assert.ok(!html.includes('googleusercontent.com'), html);
+ assert.ok(!html.includes('data:image'), html);
+ assert.ok(html.includes('Banner UDG'), html);
+ assert.ok(html.includes('[Aviso] Logo'), html);
+ assert.ok(html.includes('href="https://udg.mx/convocatoria_(2026)"'), html);
+ assert.ok(html.includes('>Ver convocatoria<'), html);
+ assert.ok(html.includes('href="https://udg.mx/docs/Circular%2004.pdf"'), html);
+ assert.ok(html.includes('>Abrir documento<'), html);
+ assert.ok(html.includes('href="https://facebook.com/udg"'), html);
+ assert.ok(html.includes('>Enlace<'), html);
+});

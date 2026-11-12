@@ -6,6 +6,7 @@
 package mailtext
 
 import (
+	"net/url"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -21,6 +22,7 @@ import (
 var (
 	reInvisiblePadding = regexp.MustCompile(`[\x{00AD}\x{034F}\x{061C}\x{200B}-\x{200F}\x{202A}-\x{202E}\x{2060}-\x{206F}\x{FEFF}]+`)
 	reBlankLines       = regexp.MustCompile(`\n{3,}`)
+	rePlaceholderImg   = regexp.MustCompile(`(?i)^(?:spacer|pixel|1x1|blank|tracking|image\d*(?:\.[a-z0-9]+)?|img_\d+(?:\.[a-z0-9]+)?)$`)
 )
 
 // ExtractPreferredBody distills htmlBody when present and non-empty after
@@ -45,7 +47,7 @@ func HTMLToText(rawHTML string) string {
 	if err != nil {
 		return ""
 	}
-	sanitizeDOM(doc)
+	sanitizeDOM(doc, false)
 
 	conv := converter.NewConverter(
 		converter.WithPlugins(
@@ -96,7 +98,7 @@ func TruncateAtRune(s string, capBytes int) string {
 	return s[:cut]
 }
 
-func sanitizeDOM(n *html.Node) {
+func sanitizeDOM(n *html.Node, inAnchor bool) {
 	for c := n.FirstChild; c != nil; {
 		next := c.NextSibling
 		if shouldDropNode(c) {
@@ -104,12 +106,91 @@ func sanitizeDOM(n *html.Node) {
 			c = next
 			continue
 		}
-		sanitizeDOM(c)
-		if c.Type == html.ElementNode && strings.EqualFold(c.Data, "table") && isLayoutTable(c) {
-			unwrapTable(n, c)
+		if c.Type == html.ElementNode && strings.EqualFold(c.Data, "img") {
+			replaceOrDropImage(n, c, inAnchor)
+			c = next
+			continue
+		}
+		isAnchor := c.Type == html.ElementNode && strings.EqualFold(c.Data, "a")
+		sanitizeDOM(c, inAnchor || isAnchor)
+		if c.Type == html.ElementNode {
+			tag := strings.ToLower(c.Data)
+			if tag == "table" && isLayoutTable(c) {
+				unwrapTable(n, c)
+				c = next
+				continue
+			}
+			if inAnchor {
+				switch tag {
+				case "div", "p", "section", "article", "h1", "h2", "h3", "h4", "h5", "h6":
+					c.Data = "span"
+					n.InsertBefore(&html.Node{Type: html.TextNode, Data: " "}, c)
+					if next != nil {
+						n.InsertBefore(&html.Node{Type: html.TextNode, Data: " "}, next)
+					} else {
+						n.AppendChild(&html.Node{Type: html.TextNode, Data: " "})
+					}
+				}
+			}
+			if isAnchor && strings.TrimSpace(nodeText(c)) == "" {
+				label := strings.TrimSpace(attrVal(c, "title"))
+				if label == "" {
+					label = anchorFallbackLabel(attrVal(c, "href"))
+				}
+				if label != "" {
+					c.AppendChild(&html.Node{Type: html.TextNode, Data: label})
+				} else {
+					n.RemoveChild(c)
+				}
+			}
 		}
 		c = next
 	}
+}
+
+func replaceOrDropImage(parent, img *html.Node, inAnchor bool) {
+	w := strings.TrimSpace(attrVal(img, "width"))
+	h := strings.TrimSpace(attrVal(img, "height"))
+	if w == "0" || w == "1" || h == "0" || h == "1" {
+		parent.RemoveChild(img)
+		return
+	}
+	label := strings.TrimSpace(attrVal(img, "alt"))
+	if label == "" && inAnchor {
+		label = strings.TrimSpace(attrVal(img, "title"))
+	}
+	if label != "" && !rePlaceholderImg.MatchString(label) {
+		parent.InsertBefore(&html.Node{Type: html.TextNode, Data: " " + label + " "}, img)
+	}
+	parent.RemoveChild(img)
+}
+
+func attrVal(n *html.Node, key string) string {
+	for _, a := range n.Attr {
+		if strings.EqualFold(a.Key, key) {
+			return a.Val
+		}
+	}
+	return ""
+}
+
+func anchorFallbackLabel(rawHref string) string {
+	href := strings.TrimSpace(rawHref)
+	if href == "" {
+		return ""
+	}
+	u, err := url.Parse(href)
+	if err != nil {
+		return ""
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		host := strings.TrimPrefix(strings.ToLower(u.Hostname()), "www.")
+		return host
+	case "mailto":
+		return u.Opaque
+	}
+	return ""
 }
 
 func shouldDropNode(n *html.Node) bool {

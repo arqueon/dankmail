@@ -38,3 +38,26 @@ func TestExtractPreferredBodyFallsBackToPlain(t *testing.T) {
 		t.Fatalf("got %q, want %q", got, want)
 	}
 }
+
+func TestHTMLToTextSanitizesImagesAndLinkedBannersWithoutMarkdownImageSyntax(t *testing.T) {
+	htmlBody := `<html><body>
+		<img src="https://tracker.example.org/open.gif" width="1" height="1" alt="tracker">
+		<p><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==" alt="Universidad de Guadalajara"></p>
+		<a href="https://udg.mx/convocatoria_(2026)"><div><img src="https://cdn.udg.mx/banner.png" alt="Ver convocatoria"></div></a>
+		<p><a href="https://www.facebook.com/udg.mx"><img src="https://cdn.udg.mx/fb.png" alt=""></a></p>
+	</body></html>`
+
+	got := HTMLToText(htmlBody)
+	if strings.Contains(got, "![") || strings.Contains(got, "data:image") || strings.Contains(got, "tracker") {
+		t.Fatalf("expected zero markdown image syntax or tracking pixels, got:\n%s", got)
+	}
+	if !strings.Contains(got, "Universidad de Guadalajara") {
+		t.Fatalf("expected meaningful image alt text to remain, got:\n%s", got)
+	}
+	if !strings.Contains(got, "[Ver convocatoria](https://udg.mx/convocatoria_%282026%29)") {
+		t.Fatalf("expected linked image banner to become clean markdown link, got:\n%s", got)
+	}
+	if !strings.Contains(got, "[facebook.com](https://www.facebook.com/udg.mx)") {
+		t.Fatalf("expected icon-only link to fall back to domain label, got:\n%s", got)
+	}
+}

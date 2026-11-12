@@ -31,6 +31,174 @@ function unwrapUrl(value) {
     return s;
 }
 
+function readBracketed(str, openIdx, maxLen) {
+    if (str[openIdx] !== "[")
+        return null;
+    const limit = Math.min(str.length, openIdx + (maxLen || 2000));
+    let depth = 0;
+    for (let i = openIdx; i < limit; i++) {
+        const ch = str[i];
+        if (ch === "\\") {
+            i++;
+            continue;
+        }
+        if (ch === "[") {
+            depth++;
+        } else if (ch === "]") {
+            depth--;
+            if (depth === 0)
+                return { content: str.slice(openIdx + 1, i), endIdx: i };
+        }
+    }
+    return null;
+}
+
+function readParenDest(str, openIdx, isImage) {
+    if (str[openIdx] !== "(")
+        return null;
+    const limit = str.length;
+    let i = openIdx + 1;
+    while (i < limit && /[ \t\n]/.test(str[i]))
+        i++;
+    if (i >= limit)
+        return null;
+    if (str[i] === ")")
+        return { url: "", endIdx: i };
+
+    let rawUrl = "";
+    if (str[i] === "<") {
+        const closeAngle = str.indexOf(">", i + 1);
+        if (closeAngle === -1 || closeAngle >= limit)
+            return null;
+        rawUrl = str.slice(i + 1, closeAngle).trim().replace(/\s+/g, "%20");
+        i = closeAngle + 1;
+        while (i < limit && str[i] !== ")") {
+            if (str[i] === "\\")
+                i++;
+            i++;
+        }
+        if (i >= limit || str[i] !== ")")
+            return null;
+        return { url: rawUrl, endIdx: i };
+    }
+
+    // Scan up to matching ')' tracking nested parentheses and quotes.
+    let depth = 1;
+    let inQuote = "";
+    const contentStart = i;
+    while (i < limit && depth > 0) {
+        const ch = str[i];
+        if (ch === "\\") {
+            i += 2;
+            continue;
+        }
+        if (inQuote !== "") {
+            if (ch === inQuote)
+                inQuote = "";
+            i++;
+            continue;
+        }
+        if (ch === '"' || ch === "'") {
+            // Treat as a title quote only when preceded by whitespace.
+            if (i > contentStart && /\s/.test(str[i - 1])) {
+                inQuote = ch;
+                i++;
+                continue;
+            }
+        }
+        if (ch === "(") {
+            depth++;
+        } else if (ch === ")") {
+            depth--;
+            if (depth === 0)
+                break;
+        }
+        i++;
+    }
+    if (depth !== 0 || i >= limit)
+        return null;
+
+    const endIdx = i;
+    let inner = str.slice(contentStart, endIdx).trim();
+    // Strip optional trailing Markdown title: url "title" or url 'title'.
+    inner = inner.replace(/\s+(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*')\s*$/, "").trim();
+    if (isImage)
+        return { url: inner, endIdx: endIdx };
+
+    // Collapse line wraps inside URLs and percent-encode any residual spaces.
+    inner = inner.replace(/\s*\n\s*/g, "").replace(/ /g, "%20");
+    return { url: inner, endIdx: endIdx };
+}
+
+function stripNestedImages(label) {
+    let out = "";
+    let i = 0;
+    while (i < label.length) {
+        if (label[i] === "!" && label[i + 1] === "[") {
+            const br = readBracketed(label, i + 1, 1500);
+            if (br) {
+                let after = br.endIdx + 1;
+                if (label[after] === " " && label[after + 1] === "(")
+                    after++;
+                if (label[after] === "(") {
+                    const dest = readParenDest(label, after, true);
+                    if (dest) {
+                        const alt = br.content.replace(/\\([\[\]])/g, "$1").trim();
+                        if (alt !== "" && !/^(?:spacer|pixel|1x1|blank|image\d*\.[a-z0-9]+)$/i.test(alt))
+                            out += alt;
+                        i = dest.endIdx + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        out += label[i++];
+    }
+    return out;
+}
+
+function collapseMultilineMarkdownLinks(text) {
+    // Preserve fenced code blocks untouched while flattening multi-line
+    // ![alt](url) and [label](url) tokens so block splitting never breaks them.
+    const parts = text.split(/(^\s*```[\s\S]*?^\s*```)/m);
+    for (let p = 0; p < parts.length; p += 2) {
+        const seg = parts[p];
+        let out = "";
+        let i = 0;
+        while (i < seg.length) {
+            const isImg = seg[i] === "!" && seg[i + 1] === "[";
+            const brIdx = isImg ? i + 1 : (seg[i] === "[" ? i : -1);
+            if (brIdx !== -1) {
+                const br = readBracketed(seg, brIdx, 1500);
+                if (br && !br.content.includes("```")) {
+                    let after = br.endIdx + 1;
+                    while (after < seg.length && (seg[after] === " " || seg[after] === "\t"))
+                        after++;
+                    if (seg[after] === "(" && (after === br.endIdx + 1 || isImg || /^\(\s*<?(?:https?:|mailto:)/i.test(seg.slice(after, after + 24)))) {
+                        const dest = readParenDest(seg, after, isImg);
+                        if (dest && (br.content.includes("\n") || seg.slice(after, dest.endIdx + 1).includes("\n") || after > br.endIdx + 1)) {
+                            let cleanContent = br.content
+                                .replace(/^\s*#{1,6}\s+/gm, "**")
+                                .replace(/\s*\n+\s*/g, " ")
+                                .trim();
+                            // Close any '**' opened by heading-inside-link normalization.
+                            if ((cleanContent.match(/\*\*/g) || []).length % 2 === 1)
+                                cleanContent += "**";
+                            const cleanDest = seg.slice(after + 1, dest.endIdx).replace(/\s*\n+\s*/g, " ").trim();
+                            out += (isImg ? "![" : "[") + cleanContent + "](" + cleanDest + ")";
+                            i = dest.endIdx + 1;
+                            continue;
+                        }
+                    }
+                }
+            }
+            out += seg[i++];
+        }
+        parts[p] = out;
+    }
+    return parts.join("");
+}
+
 function normalizePlainEmail(text) {
     let s = String(text || "").replace(/\r\n?/g, "\n");
     // Join soft-wrapped Gmail plain-text "<https://...>" link lines to their label line (including inside > quotes).
@@ -47,7 +215,69 @@ function normalizePlainEmail(text) {
     // Convert angle-bracket email addresses "<user@domain>" into mailto links.
     s = s.replace(/<([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})>/g,
         "[$1](mailto:$1)");
-    return s;
+    return collapseMultilineMarkdownLinks(s);
+}
+
+function replaceMarkdownImagesAndLinks(s, anchor, put, linkLabel) {
+    let out = "";
+    let i = 0;
+    while (i < s.length) {
+        // Standalone Markdown image: ![alt](url "optional title")
+        if (s[i] === "!" && s[i + 1] === "[") {
+            const br = readBracketed(s, i + 1, 1500);
+            if (br) {
+                let after = br.endIdx + 1;
+                if (s[after] === " " && s[after + 1] === "(")
+                    after++;
+                if (s[after] === "(") {
+                    const dest = readParenDest(s, after, true);
+                    if (dest) {
+                        const alt = br.content.replace(/\\([\[\]])/g, "$1").trim();
+                        if (alt !== "" && !/^(?:spacer|pixel|1x1|blank|image\d*\.[a-z0-9]+)$/i.test(alt))
+                            out += put(escapeHtml(alt));
+                        i = dest.endIdx + 1;
+                        continue;
+                    }
+                }
+                // Reference-style image ![alt][ref] -> keep alt text only.
+                if (s[after] === "[") {
+                    const ref = readBracketed(s, after, 200);
+                    if (ref) {
+                        const alt = br.content.replace(/\\([\[\]])/g, "$1").trim();
+                        if (alt !== "")
+                            out += put(escapeHtml(alt));
+                        i = ref.endIdx + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        // Markdown link (including linked images [![alt](img)](url)): [label](url "title")
+        if (s[i] === "[") {
+            const br = readBracketed(s, i, 2000);
+            if (br) {
+                let after = br.endIdx + 1;
+                if (s[after] === " " && /^\(\s*<?(?:https?:|mailto:)/i.test(s.slice(after, after + 24)))
+                    after++;
+                if (s[after] === "(") {
+                    const dest = readParenDest(s, after, false);
+                    if (dest) {
+                        const cleanedLabel = stripNestedImages(br.content)
+                            .replace(/\\([\[\]])/g, "$1")
+                            .replace(/\s+/g, " ")
+                            .trim();
+                        const finalLabel = cleanedLabel !== "" ? cleanedLabel : (dest.url !== "" ? linkLabel : "");
+                        if (finalLabel !== "")
+                            out += put(anchor(dest.url, finalLabel));
+                        i = dest.endIdx + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        out += s[i++];
+    }
+    return out;
 }
 
 function inline(text, color, linkLabel) {
@@ -66,11 +296,9 @@ function inline(text, color, linkLabel) {
     };
     let s = text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "");
     s = s.replace(/`([^`\n]+)`/g, (m, code) => put('<code>' + escapeHtml(code) + '</code>'));
+    s = s.replace(/!\[([^\]]*)\]\(\s*data:[^)\s]*\)?/gi, (m, alt) => alt.trim() ? put(escapeHtml(alt.trim())) : "");
     s = s.replace(/\[image:\s*([^\]]+)\]/gi, (m, alt) => put('<code>[' + escapeHtml(alt.trim()) + ']</code>'));
-    s = s.replace(/\[!\[([^\]]*)\]\(([^\s()]+)\)\]\(([^\s()]+)\)/g,
-        (m, alt, image, url) => put(anchor(url, alt || linkLabel)));
-    s = s.replace(/!\[([^\]]*)\]\(([^\s()]+)\)/g, (m, alt) => put(escapeHtml(alt)));
-    s = s.replace(/\[([^\]]+)\]\(([^\s()]+)\)/g, (m, label, url) => put(anchor(url, label)));
+    s = replaceMarkdownImagesAndLinks(s, anchor, put, linkLabel);
     s = s.replace(/(?:https?:\/\/|mailto:)[^\s<>"'\x01]+/gi, rawUrl => {
         const cleanRaw = rawUrl.replace(/[.,;!?:)\]}*]+$/, "");
         const tail = rawUrl.substring(cleanRaw.length);
