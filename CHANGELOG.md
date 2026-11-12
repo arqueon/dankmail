@@ -2,7 +2,7 @@
 
 All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dankmailUnread` DankMaterialShell companion) are documented in this file.
 
-## [0.4.0] - 2026-11-11
+## [0.4.0] - 2026-11-12
 
 ### Added
 - **One-click OAuth (`dankcalendar` parity), CLI account setup & account filter tooltips**:
