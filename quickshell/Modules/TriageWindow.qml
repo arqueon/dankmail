@@ -954,7 +954,7 @@ FloatingWindow {
                         readonly property bool isHidden: window.temporarilyHiddenIds.indexOf(modelData.id) !== -1
 
                         width: threadList.width
-                        height: isHidden ? 0 : 76
+                        height: isHidden ? 0 : Math.max(76, (rowActions.visible && rowActions.snoozing) ? rowActions.height + Theme.spacingXS * 2 : 76)
                         visible: !isHidden
                         clip: true
                         color: selected ? Theme.surfaceSelected : "transparent"
@@ -1168,12 +1168,13 @@ FloatingWindow {
                         // clipped by the list's clip:true.
                         Rectangle {
                             id: rowActions
+                            readonly property real maxOverlayWidth: Math.max(180, row.width - Theme.spacingS * 2)
                             anchors.right: parent.right
                             anchors.rightMargin: Theme.spacingS
                             anchors.verticalCenter: parent.verticalCenter
                             visible: rowHover.hovered
-                            width: (snoozing ? snoozeRow.implicitWidth : actionRow.implicitWidth) + Theme.spacingS * 2
-                            height: 40
+                            width: snoozing ? maxOverlayWidth : Math.min(maxOverlayWidth, actionRow.implicitWidth + Theme.spacingS * 2)
+                            height: snoozing ? Math.max(40, Math.max(snoozeBackBtn.height, snoozeFlow.implicitHeight) + (Theme.spacingXS + 2) * 2) : 40
                             radius: Theme.cornerRadius
                             color: Theme.surfaceContainerHigh
                             border.width: 1
@@ -1255,62 +1256,79 @@ FloatingWindow {
                             }
 
                             // In-place snooze presets (no calendar — that lives
-                            // in the preview). Same 40px height, so nothing is
-                            // clipped by the list.
-                            RowLayout {
+                            // in the preview). Wraps cleanly within the row width
+                            // so presets never overflow past the window margin.
+                            Row {
                                 id: snoozeRow
-                                anchors.centerIn: parent
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                anchors.leftMargin: Theme.spacingXS + 2
+                                anchors.rightMargin: Theme.spacingXS + 2
                                 visible: rowActions.snoozing
                                 spacing: Theme.spacingXS
 
                                 DankActionButton {
-                                    buttonSize: 30
+                                    id: snoozeBackBtn
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    buttonSize: 28
+                                    iconSize: 16
                                     iconName: "arrow_back"
                                     onClicked: rowActions.snoozing = false
                                 }
 
-                                Repeater {
-                                    model: [
-                                        {
-                                            "key": "hour",
-                                            "label": I18n.tr("In 1 hour", "snooze")
-                                        },
-                                        {
-                                            "key": "evening",
-                                            "label": I18n.tr("This evening", "snooze")
-                                        },
-                                        {
-                                            "key": "tomorrow",
-                                            "label": I18n.tr("Tomorrow", "snooze")
-                                        },
-                                        {
-                                            "key": "weekend",
-                                            "label": I18n.tr("This weekend", "snooze")
-                                        },
-                                        {
-                                            "key": "nextweek",
-                                            "label": I18n.tr("Next week", "snooze")
-                                        }
-                                    ]
+                                Flow {
+                                    id: snoozeFlow
+                                    width: Math.max(120, rowActions.maxOverlayWidth - snoozeBackBtn.width - snoozeRow.spacing - (Theme.spacingXS + 2) * 2)
+                                    spacing: Theme.spacingXS
 
-                                    delegate: StyledRect {
-                                        id: rowSnoozeChip
-                                        required property var modelData
-                                        Layout.preferredWidth: rowSnoozeLabel.implicitWidth + Theme.spacingM
-                                        Layout.preferredHeight: 28
-                                        radius: 14
-                                        color: Theme.surfaceContainerHighest
+                                    Repeater {
+                                        model: [
+                                            {
+                                                "key": "hour",
+                                                "label": I18n.tr("In 1 hour", "snooze")
+                                            },
+                                            {
+                                                "key": "evening",
+                                                "label": I18n.tr("This evening", "snooze")
+                                            },
+                                            {
+                                                "key": "tomorrow",
+                                                "label": I18n.tr("Tomorrow", "snooze")
+                                            },
+                                            {
+                                                "key": "weekend",
+                                                "label": I18n.tr("This weekend", "snooze")
+                                            },
+                                            {
+                                                "key": "nextweek",
+                                                "label": I18n.tr("Next week", "snooze")
+                                            }
+                                        ]
 
-                                        StyledText {
-                                            id: rowSnoozeLabel
-                                            anchors.centerIn: parent
-                                            text: rowSnoozeChip.modelData.label
-                                            font.pixelSize: Theme.fontSizeSmall
-                                        }
+                                        delegate: StyledRect {
+                                            id: rowSnoozeChip
+                                            required property var modelData
+                                            width: Math.min(snoozeFlow.width, rowSnoozeLabel.implicitWidth + Theme.spacingM)
+                                            height: 26
+                                            radius: 13
+                                            color: Theme.surfaceContainerHighest
 
-                                        StateLayer {
-                                            stateColor: Theme.primary
-                                            onClicked: rowActions.doSnooze(rowSnoozeChip.modelData.key)
+                                            StyledText {
+                                                id: rowSnoozeLabel
+                                                anchors.centerIn: parent
+                                                width: Math.min(implicitWidth, rowSnoozeChip.width - Theme.spacingS * 2)
+                                                horizontalAlignment: Text.AlignHCenter
+                                                text: rowSnoozeChip.modelData.label
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                elide: Text.ElideRight
+                                                maximumLineCount: 1
+                                            }
+
+                                            StateLayer {
+                                                stateColor: Theme.primary
+                                                onClicked: rowActions.doSnooze(rowSnoozeChip.modelData.key)
+                                            }
                                         }
                                     }
                                 }
@@ -2179,14 +2197,14 @@ FloatingWindow {
                             snoozeMenu.visible = false;
                         }
 
-                        ColumnLayout {
+                        Column {
                             id: snoozeColumn
                             anchors.centerIn: parent
-                            width: parent.width - Theme.spacingL
+                            width: Math.max(160, snoozeMenu.width - Theme.spacingL)
                             spacing: Theme.spacingS
 
                             Flow {
-                                Layout.fillWidth: true
+                                width: snoozeColumn.width
                                 spacing: Theme.spacingS
 
                                 Repeater {
@@ -2262,7 +2280,7 @@ FloatingWindow {
                             // them on narrow panes instead of clipping.
                             Flow {
                                 visible: snoozeMenu.showCustom
-                                Layout.fillWidth: true
+                                width: snoozeColumn.width
                                 spacing: Theme.spacingS
 
                                 DankDatePicker {
