@@ -5,9 +5,9 @@ All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dan
 ## [0.4.0] - 2026-11-11
 
 ### Added
-- **One-click OAuth (`dankcalendar` parity) & CLI account setup**:
+- **One-click OAuth (`dankcalendar` parity), CLI account setup & account filter tooltips**:
   - Added Step 0 one-click sign-in (`Connect Google Account` / `Connect Microsoft Account`) with PKCE S256 in `AccountAddModal`, reusable OAuth client credential resolution (system keyring + `0600` local fallback + existing accounts + env + `-ldflags -X`), and a native `Import client_secret.json` file picker button.
-  - Added `dmail account setup google|microsoft` and `dmail account add google|microsoft|imap` CLI commands.
+  - Added `dmail account setup google|microsoft` and `dmail account add google|microsoft|imap` CLI commands, plus hover tooltips (`DankTooltip`) showing each account's email address and unread count on the header account filter dots.
 - **Full IMAP + SMTP provider**:
   - Added `core/internal/provider/imap` (`go-imap/v2` + `net/smtp` STARTTLS/TLS, with loopback self-signed TLS tolerance for Proton Mail Bridge) supporting sync, archive/sent pagination, flag/folder triage, replies, compose, and attachments, automatically un-parking previously stored IMAP accounts.
 - **OS-native attachment opening & Save as**:

@@ -501,21 +501,50 @@ FloatingWindow {
                         model: DankMailService.accounts
 
                         delegate: Rectangle {
+                            id: acctDot
                             required property var modelData
                             readonly property bool active: DankMailService.filterAccount === modelData.id
+                            readonly property color dotColor: DankMailService.accountColor(modelData.id)
+                            readonly property string tooltipLabel: {
+                                const email = modelData.email || modelData.displayName || "";
+                                if (!email)
+                                    return "";
+                                if (modelData.unread > 0)
+                                    return email + " · " + modelData.unread + " " + I18n.tr("unread", "tray tooltip");
+                                return email;
+                            }
+
+                            onTooltipLabelChanged: {
+                                if (dotState.containsMouse)
+                                    windowTooltip.show(acctDot, acctDot.tooltipLabel, "bottom");
+                            }
+
+                            Component.onDestruction: windowTooltip.hide(acctDot)
 
                             width: 22
                             height: 22
                             radius: 11
-                            color: active ? DankMailService.accountColor(modelData.id) : "transparent"
+                            color: active ? dotColor : "transparent"
                             border.width: 2
-                            border.color: DankMailService.accountColor(modelData.id)
+                            border.color: dotColor
+
+                            DankIcon {
+                                anchors.centerIn: parent
+                                visible: acctDot.active
+                                name: "check"
+                                size: 13
+                                color: Theme.ensureContrast(Theme.surface, acctDot.dotColor)
+                            }
 
                             StateLayer {
+                                id: dotState
                                 stateColor: Theme.primary
                                 cornerRadius: 11
+                                onEntered: windowTooltip.show(acctDot, acctDot.tooltipLabel, "bottom")
+                                onExited: windowTooltip.hide(acctDot)
                                 onClicked: {
-                                    DankMailService.filterAccount = parent.active ? "" : parent.modelData.id;
+                                    window.flushUndoAction();
+                                    DankMailService.filterAccount = acctDot.active ? "" : acctDot.modelData.id;
                                     DankMailService.refreshThreads();
                                 }
                             }
@@ -3303,5 +3332,9 @@ FloatingWindow {
                 }
             }
         }
+    }
+
+    DankTooltip {
+        id: windowTooltip
     }
 }
