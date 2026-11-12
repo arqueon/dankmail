@@ -718,11 +718,11 @@ PluginComponent {
                                 // followed by a focused quick-reply entry.
                                 DankActionButton {
                                     visible: root.mailboxView !== "drafts"
-                                    tooltipText: I18n.trFor("dankmailUnread", "Archive")
-                                    iconName: "archive"
+                                    tooltipText: mailRow.modelData.inInbox === false ? I18n.trFor("dankmailUnread", "Move to Inbox") : I18n.trFor("dankmailUnread", "Archive")
+                                    iconName: mailRow.modelData.inInbox === false ? "move_to_inbox" : "archive"
                                     buttonSize: 26
                                     iconSize: 15
-                                    onClicked: root.op("ops.archive", mailRow.modelData.id)
+                                    onClicked: root.op(mailRow.modelData.inInbox === false ? "ops.unarchive" : "ops.archive", mailRow.modelData.id)
                                 }
 
                                 DankActionButton {

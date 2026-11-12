@@ -21,9 +21,13 @@ FloatingWindow {
     // that into the loader so the next "show" recreates the window
     // instead of focusing a ghost.
     onVisibleChanged: {
-        if (!visible)
+        if (!visible) {
+            window.flushUndoAction();
             hideRequested();
+        }
     }
+
+    Component.onDestruction: window.flushUndoAction()
 
     title: "Dank Mail"
     implicitWidth: 980
@@ -191,6 +195,8 @@ FloatingWindow {
 
         if (type === "archive") {
             DankMailService.archive(ids);
+        } else if (type === "unarchive") {
+            DankMailService.unarchive(ids);
         } else if (type === "trash") {
             DankMailService.trash(ids);
         } else if (type === "unspam") {
@@ -203,6 +209,24 @@ FloatingWindow {
 
         window.undoAction = null;
         window.temporarilyHiddenIds = [];
+    }
+
+    function moveToInbox(ids) {
+        if (!ids || ids.length === 0)
+            return;
+        if (DankMailService.filterSnoozed) {
+            DankMailService.unsnooze(ids);
+            return;
+        }
+        if (DankMailService.filterArchived) {
+            window.queueUndoableAction("unarchive", ids);
+            return;
+        }
+        DankMailService.unarchive(ids);
+        window.copiedNotice = ids.length === 1
+            ? I18n.tr("1 thread moved to Inbox.", "undo banner")
+            : I18n.tr("%1 threads moved to Inbox.", "undo banner").arg(ids.length);
+        copiedNoticeTimer.restart();
     }
 
     function triggerUndo() {
@@ -676,6 +700,7 @@ FloatingWindow {
                     StateLayer {
                         stateColor: Theme.primary
                         onClicked: {
+                            window.flushUndoAction();
                             DankMailService.filterUnread = parent.modelData.key === "unread";
                             DankMailService.filterStarred = parent.modelData.key === "starred";
                             DankMailService.filterSnoozed = parent.modelData.key === "snoozed";
@@ -769,12 +794,35 @@ FloatingWindow {
                     }
                 }
 
-                // General bulk actions for Inbox, Unread, Starred, All
+                // General bulk actions for Inbox, Unread, Starred, Archived, Snoozed, All
                 Row {
+                    id: bulkGeneralRow
                     spacing: Theme.spacingXS
                     visible: DankMailService.filterLabel !== "SPAM"
 
+                    readonly property bool hasCheckedOutOfInbox: DankMailService.filterArchived || DankMailService.filterSnoozed || window.checkedIds.some(id => {
+                        const t = DankMailService.threads.find(x => x.id === id);
+                        return t && !t.inInbox;
+                    })
+                    readonly property bool hasCheckedInInbox: !DankMailService.filterArchived && !DankMailService.filterSnoozed && window.checkedIds.some(id => {
+                        const t = DankMailService.threads.find(x => x.id === id);
+                        return !t || t.inInbox;
+                    })
+
+                    DankButton {
+                        visible: bulkGeneralRow.hasCheckedOutOfInbox
+                        buttonHeight: 32
+                        horizontalPadding: Theme.spacingM
+                        text: I18n.tr("Move to Inbox", "thread action")
+                        iconName: "move_to_inbox"
+                        onClicked: {
+                            window.moveToInbox(window.checkedIds);
+                            window.checkedIds = [];
+                        }
+                    }
+
                     DankActionButton {
+                        visible: bulkGeneralRow.hasCheckedInInbox
                         buttonSize: 28
                         iconName: "archive"
                         onClicked: {
@@ -1205,10 +1253,18 @@ FloatingWindow {
                                 spacing: 0
 
                                 DankActionButton {
+                                    readonly property bool isSpamRow: (row.modelData.labels || []).indexOf("SPAM") !== -1
                                     buttonSize: 30
-                                    iconName: "archive"
+                                    iconName: (isSpamRow || !row.modelData.inInbox) ? "move_to_inbox" : "archive"
+                                    iconColor: (isSpamRow || !row.modelData.inInbox) ? Theme.primary : Theme.surfaceText
                                     onClicked: {
-                                        window.queueUndoableAction("archive", [row.modelData.id]);
+                                        if (isSpamRow) {
+                                            window.queueUndoableAction("unspam", [row.modelData.id]);
+                                        } else if (!row.modelData.inInbox) {
+                                            window.moveToInbox([row.modelData.id]);
+                                        } else {
+                                            window.queueUndoableAction("archive", [row.modelData.id]);
+                                        }
                                     }
                                 }
 
@@ -2059,6 +2115,19 @@ FloatingWindow {
                         DankButton {
                             buttonHeight: 32
                             horizontalPadding: Theme.spacingM
+                            text: I18n.tr("Move to Inbox", "thread action")
+                            iconName: "move_to_inbox"
+                            visible: !!DankMailService.currentThread && !DankMailService.currentThread.inInbox && !DankMailService.currentThread.snoozedUntil && (DankMailService.currentThread.labels || []).indexOf("SPAM") === -1
+                            onClicked: {
+                                const t = DankMailService.currentThread;
+                                if (t)
+                                    window.moveToInbox([t.id]);
+                            }
+                        }
+
+                        DankButton {
+                            buttonHeight: 32
+                            horizontalPadding: Theme.spacingM
                             text: I18n.tr("Not spam", "thread action")
                             iconName: "move_to_inbox"
                             visible: !!DankMailService.currentThread && (DankMailService.currentThread.labels || []).indexOf("SPAM") !== -1
@@ -2070,6 +2139,7 @@ FloatingWindow {
                         }
 
                         DankActionButton {
+                            visible: !DankMailService.currentThread || !!DankMailService.currentThread.inInbox
                             iconName: "archive"
                             onClicked: {
                                 const ids = window.selectedIds();
@@ -3198,7 +3268,7 @@ FloatingWindow {
                         return count === 1 ? I18n.tr("1 thread archived.", "undo banner") : I18n.tr("%1 threads archived.", "undo banner").arg(count);
                     } else if (type === "trash") {
                         return count === 1 ? I18n.tr("1 thread deleted.", "undo banner") : I18n.tr("%1 threads deleted.", "undo banner").arg(count);
-                    } else if (type === "unspam") {
+                    } else if (type === "unspam" || type === "unarchive") {
                         return count === 1 ? I18n.tr("1 thread moved to Inbox.", "undo banner") : I18n.tr("%1 threads moved to Inbox.", "undo banner").arg(count);
                     } else if (type === "spam") {
                         return count === 1 ? I18n.tr("1 thread marked as Spam.", "undo banner") : I18n.tr("%1 threads marked as Spam.", "undo banner").arg(count);

@@ -12,8 +12,9 @@ All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dan
   - Added `core/internal/provider/imap` (`go-imap/v2` + `net/smtp` STARTTLS/TLS, with loopback self-signed TLS tolerance for Proton Mail Bridge) supporting sync, archive/sent pagination, flag/folder triage, replies, compose, and attachments, automatically un-parking previously stored IMAP accounts.
 - **OS-native attachment opening & Save as**:
   - Clicking an attachment chip downloads the part on demand into `~/.cache/dankmail/attachments/` (`0600`) and opens it via `xdg-open` (`attachments.open`), with a secondary **Save as…** folder picker button (`attachments.saveAs`) and webmail fallback on error.
-- **Snoozed mailbox view & weekend preset**:
+- **Snoozed mailbox view, weekend preset & Move to Inbox**:
   - Added a **Snoozed** filter chip ordered by wake time (`SnoozedUntil ASC`), wake-time badges on snoozed threads, **Unsnooze** actions (`ops.unsnooze`), and a **This weekend** (Saturday 09:00) snooze preset, wrapping inline row snooze presets within the thread column margins so options never clip at the window edge.
+  - Added **Move to Inbox** (`ops.unarchive`) across the preview toolbar, thread row hover actions, bulk selection bar, and the `dankmailUnread` bar popout for archived and other non-inbox threads, flushing pending undoable actions immediately on filter switches or window close.
 - **HTML-to-Markdown message distillation & full body resync**:
   - Added `core/internal/mailtext` (`html-to-markdown/v2`) across Gmail, Microsoft Graph, and IMAP so HTML messages retain readable link labels, headings, lists, and multi-column data tables while unwrapping layout tables, sanitizing `<img>` / linked-banner nodes, and stripping hidden preheaders and tracking pixels, plus a per-account full resync button in `SettingsModal`.
   - Replaced regex-only Markdown link/image parsing in `BodyFormatter.js` with balanced token scanners so cached and incoming links/images with optional titles, parentheses or spaces in URLs, multi-line block wrappers, and `data:` URIs never leak raw `!` or `(...)` syntax.
