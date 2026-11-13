@@ -13,7 +13,7 @@ owned by the `dmail` daemon.
 
 ## Requirements
 
-- DankMaterialShell 1.6.0 or later.
+- Dux Shell (DankMaterialShell) 2.0.0 or later.
 - Dankmail installed and configured, including the `dmail` daemon.
 - At least one mail account configured in Dankmail.
 

@@ -58,3 +58,13 @@ test('the local installer carries plugin translations into a clean install', () 
         fs.rmSync(config, {recursive: true, force: true});
     }
 });
+test('plugin uses DCommon widgets and declares Dux Shell >=2.0.0 compatibility', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(plugin, 'plugin.json'), 'utf8'));
+    assert.equal(manifest.requires_dms, '>=2.0.0');
+    for (const file of fs.readdirSync(plugin).filter(f => f.endsWith('.qml'))) {
+        const text = fs.readFileSync(path.join(plugin, file), 'utf8');
+        assert.ok(text.includes('import qs.DCommon.Widgets'), `${file}: missing qs.DCommon.Widgets import`);
+        assert.ok(!text.includes('import qs.Widgets'), `${file}: deprecated qs.Widgets import`);
+        assert.equal((text.match(/\bDank(?:ActionButton|Flickable|Icon|Button|Toggle|TextField|ListView|Dropdown|Slider|Tooltip)\b/g) || []).length, 0, `${file}: uses deprecated Dank* widget`);
+    }
+});

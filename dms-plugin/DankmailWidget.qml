@@ -2,8 +2,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Common
+import qs.DCommon.Widgets
 import qs.Modules.Plugins
-import qs.Widgets
 
 // Unread badge for dankmail (https://github.com/arqueon/dankmail).
 // Live updates: subscribes to the dmail daemon's IPC socket (line-JSON
@@ -360,7 +360,7 @@ PluginComponent {
                     height: root.iconSize
                     anchors.verticalCenter: parent.verticalCenter
 
-                    DankIcon {
+                    DIcon {
                         anchors.fill: parent
                         name: root.syncing ? "sync" : (root.dnd ? "notifications_off" : "mail")
                         size: root.iconSize
@@ -451,7 +451,7 @@ PluginComponent {
                     anchors.rightMargin: Theme.spacingXS
                     anchors.verticalCenter: parent.verticalCenter
 
-                    DankActionButton {
+                    DActionButton {
                         tooltipText: I18n.trFor("dankmailUnread", "Compose")
                         iconName: "edit_square"
                         visible: root.daemonConnected
@@ -462,7 +462,7 @@ PluginComponent {
                         }
                     }
 
-                    DankActionButton {
+                    DActionButton {
                         tooltipText: I18n.trFor("dankmailUnread", "Sync now")
                         iconName: "sync"
                         iconColor: root.syncing ? Theme.primary : Theme.surfaceText
@@ -470,7 +470,7 @@ PluginComponent {
                         onClicked: root.syncNow()
                     }
 
-                    DankActionButton {
+                    DActionButton {
                         tooltipText: root.dnd ? I18n.trFor("dankmailUnread", "Disable do not disturb") : I18n.trFor("dankmailUnread", "Enable do not disturb")
                         iconName: root.dnd ? "notifications_off" : "notifications"
                         iconColor: root.dnd ? Theme.warning : Theme.surfaceText
@@ -478,7 +478,7 @@ PluginComponent {
                         onClicked: root.uiCall(root.dnd ? "dnd.off" : "dnd.on", {})
                     }
 
-                    DankActionButton {
+                    DActionButton {
                         tooltipText: I18n.trFor("dankmailUnread", "Close")
                         iconName: "close"
                         onClicked: {
@@ -502,7 +502,7 @@ PluginComponent {
                         width: parent.width
                         spacing: Theme.spacingS
 
-                        DankIcon {
+                        DIcon {
                             name: "account_circle"
                             size: Theme.iconSizeSmall
                             color: Theme.primary
@@ -577,7 +577,7 @@ PluginComponent {
                 readonly property real maxListHeight: root.accounts.length > 1 ? 350 : 430
                 implicitHeight: Math.min(threadColumn.implicitHeight + Theme.spacingM * 2, maxListHeight)
 
-                DankFlickable {
+                DFlickable {
                     anchors.fill: parent
                     anchors.margins: Theme.spacingS
                     contentHeight: threadColumn.implicitHeight
@@ -671,7 +671,7 @@ PluginComponent {
                                     }
                                 }
 
-                                DankIcon {
+                                DIcon {
                                     id: starMark
                                     visible: mailRow.modelData.starred === true
                                     name: "star"
@@ -699,7 +699,7 @@ PluginComponent {
                                 anchors.verticalCenter: parent.verticalCenter
                                 spacing: 0
 
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView === "drafts"
                                     tooltipText: I18n.trFor("dankmailUnread", "Edit draft")
                                     iconName: "edit"
@@ -716,7 +716,7 @@ PluginComponent {
 
                                 // Same order as dankmail's own triage row,
                                 // followed by a focused quick-reply entry.
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView !== "drafts"
                                     tooltipText: mailRow.modelData.inInbox === false ? I18n.trFor("dankmailUnread", "Move to Inbox") : I18n.trFor("dankmailUnread", "Archive")
                                     iconName: mailRow.modelData.inInbox === false ? "move_to_inbox" : "archive"
@@ -725,8 +725,8 @@ PluginComponent {
                                     onClicked: root.op(mailRow.modelData.inInbox === false ? "ops.unarchive" : "ops.archive", mailRow.modelData.id)
                                 }
 
-                                DankActionButton {
-                                        tooltipText: I18n.trFor("dankmailUnread", "Move to trash")
+                                DActionButton {
+                                    tooltipText: I18n.trFor("dankmailUnread", "Move to trash")
                                     iconName: "delete"
                                     buttonSize: 26
                                     iconSize: 15
@@ -739,7 +739,7 @@ PluginComponent {
                                     }
                                 }
 
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView !== "drafts"
                                     tooltipText: mailRow.modelData.unread ? I18n.trFor("dankmailUnread", "Mark as read") : I18n.trFor("dankmailUnread", "Mark as unread")
                                     iconName: mailRow.modelData.unread ? "drafts" : "mark_email_unread"
@@ -748,7 +748,7 @@ PluginComponent {
                                     onClicked: root.op(mailRow.modelData.unread ? "ops.markRead" : "ops.markUnread", mailRow.modelData.id)
                                 }
 
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView !== "drafts"
                                     tooltipText: mailRow.modelData.starred ? I18n.trFor("dankmailUnread", "Remove star") : I18n.trFor("dankmailUnread", "Star")
                                     iconName: "star"
@@ -758,7 +758,7 @@ PluginComponent {
                                     onClicked: root.op(mailRow.modelData.starred ? "ops.unstar" : "ops.star", mailRow.modelData.id)
                                 }
 
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView !== "drafts"
                                     tooltipText: I18n.trFor("dankmailUnread", "Snooze")
                                     iconName: "snooze"
@@ -767,7 +767,7 @@ PluginComponent {
                                     onClicked: root.op("ops.snoozePreset", mailRow.modelData.id)
                                 }
 
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView !== "drafts"
                                     tooltipText: I18n.trFor("dankmailUnread", "Open in webmail")
                                     iconName: "open_in_new"
@@ -778,7 +778,7 @@ PluginComponent {
                                     })
                                 }
 
-                                DankActionButton {
+                                DActionButton {
                                     visible: root.mailboxView !== "drafts"
                                     tooltipText: I18n.trFor("dankmailUnread", "Reply")
                                     iconName: "reply"
@@ -844,7 +844,7 @@ PluginComponent {
                 spacing: Theme.spacingXXS
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                DankIcon {
+                DIcon {
                     name: root.syncing ? "sync" : (root.dnd ? "notifications_off" : "mail")
                     size: root.iconSize
                     color: {

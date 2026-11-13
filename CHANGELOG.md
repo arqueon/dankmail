@@ -2,6 +2,13 @@
 
 All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dankmailUnread` DankMaterialShell companion) are documented in this file.
 
+## [0.4.1] - 2026-11-12
+
+### Fixed
+- **Dux Shell 2.0+ `DCommon` widget migration (`#14`)**:
+  - Migrated `dms-plugin/DankmailWidget.qml` and `dms-plugin/DankmailSettings.qml` from the deprecated `qs.Widgets` `Dank*` shims (`DankActionButton`, `DankFlickable`, `DankIcon`) to `DActionButton`, `DFlickable`, and `DIcon` from `qs.DCommon.Widgets`.
+  - Updated `dms-plugin/plugin.json` (`requires_dms: ">=2.0.0"`) and `dms-plugin/README.md` so DMS 1.x installations are not offered an incompatible companion update.
+
 ## [0.4.0] - 2026-11-12
 
 ### Added
