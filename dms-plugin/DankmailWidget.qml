@@ -23,12 +23,28 @@ PluginComponent {
     property var accounts: []
     property var threads: []
     property string mailboxView: "inbox"
+    property string filterAccount: ""
     property string requestError: ""
     property bool syncing: false
     property int _reqId: 0
     property int _statusReqId: -1
     property int _threadsReqId: -1
     property int _syncReqId: -1
+
+    readonly property var accountPalette: ["#7287fd", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#89dceb"]
+
+    function accountColor(accountId) {
+        for (let i = 0; i < accounts.length; i++) {
+            if (accounts[i].id === accountId)
+                return accountPalette[i % accountPalette.length];
+        }
+        return accountPalette[0];
+    }
+
+    function contrastOnDot(c) {
+        const q = Qt.color(c);
+        return (0.2126 * q.r + 0.7152 * q.g + 0.0722 * q.b) > 0.45 ? "#11111b" : "#ffffff";
+    }
 
     readonly property string socketPath: {
         const rt = Quickshell.env("XDG_RUNTIME_DIR");
@@ -67,22 +83,28 @@ PluginComponent {
         root._reqId++;
         root._threadsReqId = root._reqId;
         if (root.mailboxView === "drafts") {
+            const params = {
+                "remote": true
+            };
+            if (root.filterAccount !== "")
+                params.account = root.filterAccount;
             send(cmdSocket, {
                 "id": root._threadsReqId,
                 "method": "drafts.list",
-                "params": {
-                    "remote": true
-                }
+                "params": params
             });
         } else {
+            const params = {
+                "inbox": root.mailboxView === "inbox",
+                "starred": root.mailboxView === "starred",
+                "limit": 20
+            };
+            if (root.filterAccount !== "")
+                params.account = root.filterAccount;
             send(cmdSocket, {
                 "id": root._threadsReqId,
                 "method": "threads.list",
-                "params": {
-                    "inbox": root.mailboxView === "inbox",
-                    "starred": root.mailboxView === "starred",
-                    "limit": 20
-                }
+                "params": params
             });
         }
     }
@@ -179,6 +201,8 @@ PluginComponent {
             root.unread = msg.result.unread || 0;
             root.dnd = !!msg.result.dnd;
             root.accounts = msg.result.accounts || [];
+            if (root.filterAccount && !root.accounts.some(a => a.id === root.filterAccount))
+                root.filterAccount = "";
         } else if (msg.id === root._threadsReqId && Array.isArray(msg.result)) {
             root.threads = msg.result;
         }
@@ -403,6 +427,16 @@ PluginComponent {
         PopoutComponent {
             id: popout
 
+            Item {
+                id: popoutBody
+                width: parent.width
+                implicitHeight: popoutCol.implicitHeight
+
+                Column {
+                    id: popoutCol
+                    width: parent.width
+                    spacing: Theme.spacingS
+
             // Custom header (the built-in one hides with empty headerText):
             // the title itself opens the app, wherever the focus is.
             Item {
@@ -489,81 +523,112 @@ PluginComponent {
                 }
             }
 
-            Column {
+            Item {
                 width: parent.width
-                visible: root.daemonConnected && root.accounts.length > 1
-                spacing: 2
+                height: Math.max(tabsRow.implicitHeight, acctDotsRow.implicitHeight)
+                visible: root.daemonConnected
 
-                Repeater {
-                    model: root.accounts
+                Row {
+                    id: tabsRow
+                    anchors.left: parent.left
+                    anchors.leftMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.spacingXS
 
-                    delegate: Row {
-                        required property var modelData
-                        width: parent.width
-                        spacing: Theme.spacingS
+                    Repeater {
+                        model: [
+                            { "key": "inbox", "label": I18n.trFor("dankmailUnread", "Inbox") },
+                            { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") },
+                            { "key": "drafts", "label": I18n.trFor("dankmailUnread", "Drafts") }
+                        ]
 
-                        DIcon {
-                            name: "account_circle"
-                            size: Theme.iconSizeSmall
-                            color: Theme.primary
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool active: root.mailboxView === modelData.key
+                            width: viewLabel.implicitWidth + Theme.spacingL
+                            height: Theme.iconSize + Theme.spacingXS
+                            radius: Theme.cornerRadius
+                            color: active ? Theme.primary : "transparent"
 
-                        StyledText {
-                            width: parent.width - accountUnread.implicitWidth - Theme.iconSizeSmall - Theme.spacingS * 2
-                            text: parent.modelData.displayName || parent.modelData.email || I18n.trFor("dankmailUnread", "Account")
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: Theme.surfaceVariantText
-                            elide: Text.ElideRight
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
+                            StyledText {
+                                id: viewLabel
+                                anchors.centerIn: parent
+                                text: parent.modelData.label
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: parent.active ? Theme.primaryText : Theme.surfaceVariantText
+                            }
 
-                        StyledText {
-                            id: accountUnread
-                            text: I18n.trFor("dankmailUnread", "%1 unread").arg(parent.modelData.unread || 0)
-                            font.pixelSize: Theme.fontSizeSmall
-                            font.weight: Font.Medium
-                            color: parent.modelData.unread > 0 ? Theme.primary : Theme.surfaceVariantText
-                            anchors.verticalCenter: parent.verticalCenter
+                            TapHandler {
+                                onTapped: {
+                                    root.requestError = "";
+                                    root.threads = [];
+                                    root.mailboxView = parent.modelData.key;
+                                    root.refreshStatus();
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            Row {
-                visible: root.daemonConnected
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: Theme.spacingXS
+                // Compact account filter dots (matching the app's triage bar).
+                Row {
+                    id: acctDotsRow
+                    anchors.right: parent.right
+                    anchors.rightMargin: Theme.spacingS
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: Theme.spacingXS
+                    visible: root.accounts.length > 1
 
-                Repeater {
-                    model: [
-                        { "key": "inbox", "label": I18n.trFor("dankmailUnread", "Inbox") },
-                        { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") },
-                        { "key": "drafts", "label": I18n.trFor("dankmailUnread", "Drafts") }
-                    ]
+                    Repeater {
+                        model: root.accounts
 
-                    delegate: Rectangle {
-                        required property var modelData
-                        readonly property bool active: root.mailboxView === modelData.key
-                        width: viewLabel.implicitWidth + Theme.spacingL
-                        height: Theme.iconSize + Theme.spacingXS
-                        radius: Theme.cornerRadius
-                        color: active ? Theme.primary : "transparent"
+                        delegate: Rectangle {
+                            id: acctDot
+                            required property var modelData
+                            readonly property bool active: root.filterAccount === modelData.id
+                            readonly property color dotColor: root.accountColor(modelData.id)
+                            readonly property string tooltipLabel: {
+                                const email = modelData.email || modelData.displayName || I18n.trFor("dankmailUnread", "Account");
+                                if ((modelData.unread || 0) > 0)
+                                    return email + " · " + I18n.trFor("dankmailUnread", "%1 unread").arg(modelData.unread);
+                                return email;
+                            }
 
-                        StyledText {
-                            id: viewLabel
-                            anchors.centerIn: parent
-                            text: parent.modelData.label
-                            font.pixelSize: Theme.fontSizeSmall
-                            color: parent.active ? Theme.primaryText : Theme.surfaceVariantText
-                        }
+                            onTooltipLabelChanged: {
+                                if (dotMouse.containsMouse)
+                                    accountTooltip.show(acctDot, acctDot.tooltipLabel);
+                            }
 
-                        TapHandler {
-                            onTapped: {
-                                root.requestError = "";
-                                root.threads = [];
-                                root.mailboxView = parent.modelData.key;
-                                root.refreshStatus();
+                            Component.onDestruction: accountTooltip.hide(acctDot)
+
+                            width: 20
+                            height: 20
+                            radius: 10
+                            color: active ? dotColor : "transparent"
+                            border.width: 2
+                            border.color: dotColor
+
+                            DIcon {
+                                anchors.centerIn: parent
+                                visible: acctDot.active
+                                name: "check"
+                                size: 12
+                                color: root.contrastOnDot(acctDot.dotColor)
+                            }
+
+                            MouseArea {
+                                id: dotMouse
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onEntered: accountTooltip.show(acctDot, acctDot.tooltipLabel)
+                                onExited: accountTooltip.hide(acctDot)
+                                onClicked: {
+                                    root.requestError = "";
+                                    root.threads = [];
+                                    root.filterAccount = acctDot.active ? "" : acctDot.modelData.id;
+                                    root.refreshStatus();
+                                }
                             }
                         }
                     }
@@ -574,7 +639,7 @@ PluginComponent {
                 width: parent.width
                 // The list scrolls inside a fixed viewport when it grows
                 // beyond the popout.
-                readonly property real maxListHeight: root.accounts.length > 1 ? 350 : 430
+                readonly property real maxListHeight: 410
                 implicitHeight: Math.min(threadColumn.implicitHeight + Theme.spacingM * 2, maxListHeight)
 
                 DFlickable {
@@ -815,6 +880,82 @@ PluginComponent {
                             }
                         }
                     }
+                    }
+                }
+            }
+                }
+
+                Rectangle {
+                    id: accountTooltip
+                    property Item target: null
+                    property string text: ""
+                    readonly property real maxWidth: Math.max(160, popoutBody.width - Theme.spacingM * 2)
+
+                    enabled: false
+                    visible: opacity > 0 && text !== ""
+                    opacity: (target !== null && text !== "") ? 1 : 0
+                    z: 1000
+                    width: Math.min(maxWidth, accountTipLabel.implicitWidth + Theme.spacingM * 2)
+                    height: accountTipLabel.implicitHeight + Theme.spacingXS * 2 + 2
+                    radius: 6
+                    color: Theme.surfaceContainerHigh
+                    border.width: 1
+                    border.color: Theme.outline
+
+                    function show(item, tipText) {
+                        accountTipHideTimer.stop();
+                        target = item;
+                        text = tipText || "";
+                        reposition();
+                    }
+
+                    function hide(item) {
+                        if (item && target !== item)
+                            return;
+                        accountTipHideTimer.restart();
+                    }
+
+                    function reposition() {
+                        if (!target)
+                            return;
+                        const pt = target.mapToItem(popoutBody, target.width / 2, target.height);
+                        const rawX = pt.x - width / 2;
+                        const minX = Theme.spacingS;
+                        const maxX = Math.max(minX, popoutBody.width - width - Theme.spacingS);
+                        x = Math.round(Math.max(minX, Math.min(maxX, rawX)));
+                        y = Math.round(pt.y + 6);
+                    }
+
+                    onWidthChanged: reposition()
+                    onHeightChanged: reposition()
+
+                    Timer {
+                        id: accountTipHideTimer
+                        interval: 60
+                        repeat: false
+                        onTriggered: {
+                            accountTooltip.target = null;
+                            accountTooltip.text = "";
+                        }
+                    }
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: 100
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    StyledText {
+                        id: accountTipLabel
+                        anchors.centerIn: parent
+                        width: Math.min(implicitWidth, accountTooltip.maxWidth - Theme.spacingM * 2)
+                        text: accountTooltip.text
+                        color: Theme.surfaceText
+                        font.pixelSize: Theme.fontSizeSmall
+                        font.weight: Font.Medium
+                        elide: Text.ElideMiddle
+                        maximumLineCount: 1
                     }
                 }
             }
