@@ -4,7 +4,7 @@
 > A lightning-fast, keyboard-driven mail triage controller for Linux: unified multi-account inbox, local-first SQLite cache, distraction-free Markdown distiller, rich Markdown & HTML composition, and a built-in **Model Context Protocol (`dmail mcp`)** server. Ships as a **standalone desktop app** (`dmail` Go daemon + Quickshell UI) **and** an optional **Dux Shell / DankMaterialShell** bar plugin — powered by the same `dmail` daemon.
 
 <p align="center">
-  <img src="assets/screenshot.png" alt="Dux Mail triage window" width="550" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+  <img src="assets/screenshot.png" alt="Dux Mail triage window" width="820" style="border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
 </p>
 
 ---
@@ -171,8 +171,10 @@ make install-dms-plugin
 
 ## 🔑 Account Setup
 
-*   **Gmail**: Open Dux Mail → Add account → Gmail (or run `dmail account setup google` + `dmail account add google`). Requests only `gmail.modify`, `gmail.send`, `contacts.readonly`, and `contacts.other.readonly`—never the unrestricted `mail.google.com` scope. See [docs/gmail-setup.md](docs/gmail-setup.md).
-*   **Microsoft / Outlook 365**: Choose Add account → Outlook / Microsoft 365 (or `dmail account add-microsoft --client-id <azure-client-uuid>`). Uses Microsoft Graph OAuth 2.0 PKCE (`Mail.ReadWrite`, `Mail.Send`, `User.Read`, `offline_access`) with no stored password or client secret.
+Public source and AUR builds intentionally ship **without** pre-embedded Google/Microsoft OAuth client credentials (Google treats `gmail.modify` as a restricted scope with per-project quota and verification rules). Each user sets up their own free Desktop OAuth client **once per machine** using the guided in-app wizard or CLI; Dux Mail saves that reusable client in your system keyring so every additional account connects in one click:
+
+*   **Gmail**: Open Dux Mail → Add account → Gmail → follow the guided 5-minute Google Cloud Desktop OAuth setup (or import an existing `client_secret_*.json` / run `dmail account setup google --client-json client_secret.json` + `dmail account add google`). Requests only `gmail.modify`, `gmail.send`, `contacts.readonly`, and `contacts.other.readonly`—never the unrestricted `mail.google.com` scope. See [docs/gmail-setup.md](docs/gmail-setup.md).
+*   **Microsoft / Outlook 365**: Choose Add account → Outlook / Microsoft 365 → paste your public Desktop Application (client) ID once (or `dmail account setup microsoft --client-id <azure-client-uuid>` + `dmail account add microsoft`). Uses Microsoft Graph OAuth 2.0 PKCE (`Mail.ReadWrite`, `Mail.Send`, `User.Read`, `offline_access`) with no stored password or client secret.
 *   **Generic IMAP + SMTP**: Fastmail, iCloud, Yahoo, Proton Mail Bridge, or custom IMAP/SMTP servers (`dmail account add imap`), storing credentials in your system keyring.
 
 ---
