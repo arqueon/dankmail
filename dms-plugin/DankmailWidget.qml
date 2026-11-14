@@ -31,19 +31,21 @@ PluginComponent {
     property int _threadsReqId: -1
     property int _syncReqId: -1
 
-    readonly property var accountPalette: ["#7287fd", "#f38ba8", "#a6e3a1", "#fab387", "#cba6f7", "#94e2d5", "#f9e2af", "#89dceb"]
+    readonly property var accentSlots: ["blue", "red", "green", "orange", "purple", "teal", "yellow", "pink"]
 
-    function accountColor(accountId) {
+    function accountAccent(accountId) {
+        let slot = accentSlots[0];
         for (let i = 0; i < accounts.length; i++) {
-            if (accounts[i].id === accountId)
-                return accountPalette[i % accountPalette.length];
+            if (accounts[i].id === accountId) {
+                slot = accentSlots[i % accentSlots.length];
+                break;
+            }
         }
-        return accountPalette[0];
-    }
-
-    function contrastOnDot(c) {
-        const q = Qt.color(c);
-        return (0.2126 * q.r + 0.7152 * q.g + 0.0722 * q.b) > 0.45 ? "#11111b" : "#ffffff";
+        const pair = Theme.accents ? Theme.accents[slot] : null;
+        return {
+            "container": pair?.container ?? Theme.primary,
+            "onContainer": pair?.onContainer ?? Theme.onPrimary
+        };
     }
 
     readonly property string socketPath: {
@@ -369,7 +371,7 @@ PluginComponent {
                 anchors.fill: parent
                 // Cover BasePill's padding too — middle clicks on the
                 // capsule margin were falling through to the bar canvas.
-                anchors.margins: -10
+                anchors.margins: -Theme.spacingM
                 acceptedButtons: Qt.MiddleButton
                 onClicked: root.toggleApp()
             }
@@ -427,535 +429,449 @@ PluginComponent {
         PopoutComponent {
             id: popout
 
-            Item {
-                id: popoutBody
+            Column {
+                id: popoutCol
                 width: parent.width
-                implicitHeight: popoutCol.implicitHeight
+                spacing: Theme.spacingS
 
-                Column {
-                    id: popoutCol
+                // Custom header (the built-in one hides with empty headerText):
+                // the title itself opens the app, wherever the focus is.
+                Item {
+                    id: headerBar
                     width: parent.width
-                    spacing: Theme.spacingS
+                    height: Math.max(Theme.minimumTouchTargetSize, titleZone.implicitHeight + Theme.spacingS, headerActionsRow.implicitHeight)
 
-            // Custom header (the built-in one hides with empty headerText):
-            // the title itself opens the app, wherever the focus is.
-            Item {
-                width: parent.width
-                height: 48
-
-                // Clickable title zone.
-                Column {
-                    id: titleZone
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 0
-
-                    StyledText {
-                        text: I18n.trFor("dankmailUnread", "Dux Mail")
-                        font.pixelSize: Theme.fontSizeLarge
-                        font.weight: Font.Bold
-                        color: titleHover.hovered ? Theme.primary : Theme.surfaceText
-                    }
-
-                    StyledText {
-                        text: root.daemonConnected ? ((root.accounts.length > 1 ? I18n.trFor("dankmailUnread", "%1 accounts · ").arg(root.accounts.length) : "") + (root.unread > 0 ? I18n.trFor("dankmailUnread", "%1 unread").arg(root.unread) : I18n.trFor("dankmailUnread", "Inbox clear"))) : I18n.trFor("dankmailUnread", "Daemon stopped")
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceVariantText
-                    }
-
-                    HoverHandler {
-                        id: titleHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: {
-                            root.toggleApp();
-                            if (popout.closePopout)
-                                popout.closePopout();
-                        }
-                    }
-                }
-
-                // Action buttons sit above the title's tap zone.
-                Row {
-                    spacing: Theme.spacingXS
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingXS
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    DActionButton {
-                        tooltipText: I18n.trFor("dankmailUnread", "Compose")
-                        iconName: "edit_square"
-                        visible: root.daemonConnected
-                        onClicked: {
-                            root.uiCall("ui.compose", {});
-                            if (popout.closePopout)
-                                popout.closePopout();
-                        }
-                    }
-
-                    DActionButton {
-                        tooltipText: I18n.trFor("dankmailUnread", "Sync now")
-                        iconName: "sync"
-                        iconColor: root.syncing ? Theme.primary : Theme.surfaceText
-                        visible: root.daemonConnected
-                        onClicked: root.syncNow()
-                    }
-
-                    DActionButton {
-                        tooltipText: root.dnd ? I18n.trFor("dankmailUnread", "Disable do not disturb") : I18n.trFor("dankmailUnread", "Enable do not disturb")
-                        iconName: root.dnd ? "notifications_off" : "notifications"
-                        iconColor: root.dnd ? Theme.warning : Theme.surfaceText
-                        visible: root.daemonConnected
-                        onClicked: root.uiCall(root.dnd ? "dnd.off" : "dnd.on", {})
-                    }
-
-                    DActionButton {
-                        tooltipText: I18n.trFor("dankmailUnread", "Close")
-                        iconName: "close"
-                        onClicked: {
-                            if (popout.closePopout)
-                                popout.closePopout();
-                        }
-                    }
-                }
-            }
-
-            Item {
-                width: parent.width
-                height: Math.max(tabsRow.implicitHeight, acctDotsRow.implicitHeight)
-                visible: root.daemonConnected
-
-                Row {
-                    id: tabsRow
-                    anchors.left: parent.left
-                    anchors.leftMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.spacingXS
-
-                    Repeater {
-                        model: [
-                            { "key": "inbox", "label": I18n.trFor("dankmailUnread", "Inbox") },
-                            { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") },
-                            { "key": "drafts", "label": I18n.trFor("dankmailUnread", "Drafts") }
-                        ]
-
-                        delegate: Rectangle {
-                            required property var modelData
-                            readonly property bool active: root.mailboxView === modelData.key
-                            width: viewLabel.implicitWidth + Theme.spacingL
-                            height: Theme.iconSize + Theme.spacingXS
-                            radius: Theme.cornerRadius
-                            color: active ? Theme.primary : "transparent"
-
-                            StyledText {
-                                id: viewLabel
-                                anchors.centerIn: parent
-                                text: parent.modelData.label
-                                font.pixelSize: Theme.fontSizeSmall
-                                color: parent.active ? Theme.primaryText : Theme.surfaceVariantText
-                            }
-
-                            TapHandler {
-                                onTapped: {
-                                    root.requestError = "";
-                                    root.threads = [];
-                                    root.mailboxView = parent.modelData.key;
-                                    root.refreshStatus();
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Compact account filter dots (matching the app's triage bar).
-                Row {
-                    id: acctDotsRow
-                    anchors.right: parent.right
-                    anchors.rightMargin: Theme.spacingS
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.spacingXS
-                    visible: root.accounts.length > 1
-
-                    Repeater {
-                        model: root.accounts
-
-                        delegate: Rectangle {
-                            id: acctDot
-                            required property var modelData
-                            readonly property bool active: root.filterAccount === modelData.id
-                            readonly property color dotColor: root.accountColor(modelData.id)
-                            readonly property string tooltipLabel: {
-                                const email = modelData.email || modelData.displayName || I18n.trFor("dankmailUnread", "Account");
-                                if ((modelData.unread || 0) > 0)
-                                    return email + " · " + I18n.trFor("dankmailUnread", "%1 unread").arg(modelData.unread);
-                                return email;
-                            }
-
-                            onTooltipLabelChanged: {
-                                if (dotMouse.containsMouse)
-                                    accountTooltip.show(acctDot, acctDot.tooltipLabel);
-                            }
-
-                            Component.onDestruction: accountTooltip.hide(acctDot)
-
-                            width: 20
-                            height: 20
-                            radius: 10
-                            color: active ? dotColor : "transparent"
-                            border.width: 2
-                            border.color: dotColor
-
-                            DIcon {
-                                anchors.centerIn: parent
-                                visible: acctDot.active
-                                name: "check"
-                                size: 12
-                                color: root.contrastOnDot(acctDot.dotColor)
-                            }
-
-                            MouseArea {
-                                id: dotMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onEntered: accountTooltip.show(acctDot, acctDot.tooltipLabel)
-                                onExited: accountTooltip.hide(acctDot)
-                                onClicked: {
-                                    root.requestError = "";
-                                    root.threads = [];
-                                    root.filterAccount = acctDot.active ? "" : acctDot.modelData.id;
-                                    root.refreshStatus();
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Item {
-                width: parent.width
-                // The list scrolls inside a fixed viewport when it grows
-                // beyond the popout.
-                readonly property real maxListHeight: 410
-                implicitHeight: Math.min(threadColumn.implicitHeight + Theme.spacingM * 2, maxListHeight)
-
-                DFlickable {
-                    anchors.fill: parent
-                    anchors.margins: Theme.spacingS
-                    contentHeight: threadColumn.implicitHeight
-                    clip: true
-
+                    // Clickable title zone.
                     Column {
-                        id: threadColumn
-                        width: parent.width
-                        spacing: 2
+                        id: titleZone
+                        anchors.left: parent.left
+                        anchors.leftMargin: Theme.spacingS
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: 0
 
-                    StyledText {
-                        visible: !root.daemonConnected
-                        width: parent.width
-                        text: I18n.trFor("dankmailUnread", "Dux Mail is stopped. Click the title above to start it.")
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceVariantText
-                        wrapMode: Text.WordWrap
-                    }
+                        StyledText {
+                            text: I18n.trFor("dankmailUnread", "Dux Mail")
+                            font.pixelSize: Theme.fontSizeLarge
+                            font.weight: Font.Bold
+                            color: titleHover.hovered ? Theme.primary : Theme.surfaceText
+                        }
 
-                    StyledText {
-                        visible: root.daemonConnected && root.threads.length === 0 && root.requestError === ""
-                        width: parent.width
-                        text: root.mailboxView === "starred" ? I18n.trFor("dankmailUnread", "No starred mail.") : root.mailboxView === "drafts" ? I18n.trFor("dankmailUnread", "No drafts.") : I18n.trFor("dankmailUnread", "No mail in the inbox.")
-                        font.pixelSize: Theme.fontSizeSmall
-                        color: Theme.surfaceVariantText
-                    }
+                        StyledText {
+                            text: root.daemonConnected ? ((root.accounts.length > 1 ? I18n.trFor("dankmailUnread", "%1 accounts · ").arg(root.accounts.length) : "") + (root.unread > 0 ? I18n.trFor("dankmailUnread", "%1 unread").arg(root.unread) : I18n.trFor("dankmailUnread", "Inbox clear"))) : I18n.trFor("dankmailUnread", "Daemon stopped")
+                            font.pixelSize: Theme.fontSizeSmall
+                            color: Theme.surfaceVariantText
+                        }
 
-                    StyledText {
-                        visible: root.daemonConnected && root.requestError !== ""
-                        width: parent.width
-                        text: root.requestError
-                        color: Theme.error
-                        font.pixelSize: Theme.fontSizeSmall
-                        wrapMode: Text.WordWrap
-                    }
+                        HoverHandler {
+                            id: titleHover
+                            cursorShape: Qt.PointingHandCursor
+                        }
 
-                    Repeater {
-                        model: root.threads
-
-                        delegate: Rectangle {
-                            id: mailRow
-                            required property var modelData
-
-                            width: threadColumn.width
-                            height: Theme.iconSizeLarge + Theme.spacingL * 2
-                            radius: Theme.cornerRadius / 2
-                            color: rowHover.hovered ? Theme.surfaceContainerHigh : "transparent"
-
-                            HoverHandler {
-                                id: rowHover
+                        TapHandler {
+                            onTapped: {
+                                root.toggleApp();
+                                if (popout.closePopout)
+                                    popout.closePopout();
                             }
+                        }
+                    }
 
-                            // Row body: unread dot, sender/subject, star, time.
-                            Row {
-                                anchors.left: parent.left
-                                anchors.right: rowActions.visible ? rowActions.left : parent.right
-                                anchors.leftMargin: Theme.spacingS
-                                anchors.rightMargin: Theme.spacingS
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: Theme.spacingS
+                    // Action buttons sit above the title's tap zone.
+                    Row {
+                        id: headerActionsRow
+                        spacing: Theme.spacingXS
+                        anchors.right: parent.right
+                        anchors.rightMargin: Theme.spacingXS
+                        anchors.verticalCenter: parent.verticalCenter
 
-                                Rectangle {
-                                    width: Theme.spacingS
-                                    height: Theme.spacingS
-                                    radius: Theme.cornerRadius
-                                    color: mailRow.modelData.unread ? Theme.primary : "transparent"
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
+                        DActionButton {
+                            tooltipText: I18n.trFor("dankmailUnread", "Compose")
+                            iconName: "edit_square"
+                            visible: root.daemonConnected
+                            onClicked: {
+                                root.uiCall("ui.compose", {});
+                                if (popout.closePopout)
+                                    popout.closePopout();
+                            }
+                        }
 
-                                Column {
-                                    width: parent.width - Theme.spacingS * 3 - timeLabel.implicitWidth - (starMark.visible ? starMark.width + Theme.spacingS : 0)
-                                    spacing: 1
+                        DActionButton {
+                            tooltipText: I18n.trFor("dankmailUnread", "Sync now")
+                            iconName: "sync"
+                            iconColor: root.syncing ? Theme.primary : Theme.surfaceText
+                            visible: root.daemonConnected
+                            onClicked: root.syncNow()
+                        }
 
-                                    StyledText {
-                                        width: parent.width
-                                        text: root.senderOf(mailRow.modelData)
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        font.weight: mailRow.modelData.unread ? Font.Bold : Font.Normal
-                                        color: mailRow.modelData.unread ? Theme.surfaceText : Theme.surfaceVariantText
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                    }
+                        DActionButton {
+                            tooltipText: root.dnd ? I18n.trFor("dankmailUnread", "Disable do not disturb") : I18n.trFor("dankmailUnread", "Enable do not disturb")
+                            iconName: root.dnd ? "notifications_off" : "notifications"
+                            iconColor: root.dnd ? Theme.warning : Theme.surfaceText
+                            visible: root.daemonConnected
+                            onClicked: root.uiCall(root.dnd ? "dnd.off" : "dnd.on", {})
+                        }
 
-                                    StyledText {
-                                        width: parent.width
-                                        text: mailRow.modelData.subject || I18n.trFor("dankmailUnread", "(no subject)")
-                                        font.pixelSize: Theme.fontSizeSmall
-                                        color: mailRow.modelData.unread ? Theme.surfaceText : Theme.surfaceVariantText
-                                        elide: Text.ElideRight
-                                        maximumLineCount: 1
-                                    }
-                                }
+                        DActionButton {
+                            tooltipText: I18n.trFor("dankmailUnread", "Close")
+                            iconName: "close"
+                            onClicked: {
+                                if (popout.closePopout)
+                                    popout.closePopout();
+                            }
+                        }
+                    }
+                }
 
-                                DIcon {
-                                    id: starMark
-                                    visible: mailRow.modelData.starred === true
-                                    name: "star"
-                                    filled: true
-                                    size: Theme.iconSizeSmall
-                                    color: Theme.warning
-                                    anchors.verticalCenter: parent.verticalCenter
-                                }
+                Item {
+                    id: filterBar
+                    width: parent.width
+                    height: Math.max(tabsRow.implicitHeight, acctDotsRow.implicitHeight)
+                    visible: root.daemonConnected
+
+                    Row {
+                        id: tabsRow
+                        anchors.left: parent.left
+                        anchors.leftMargin: Theme.spacingS
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.spacingXS
+
+                        Repeater {
+                            model: [
+                                { "key": "inbox", "label": I18n.trFor("dankmailUnread", "Inbox") },
+                                { "key": "starred", "label": I18n.trFor("dankmailUnread", "Starred") },
+                                { "key": "drafts", "label": I18n.trFor("dankmailUnread", "Drafts") }
+                            ]
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                readonly property bool active: root.mailboxView === modelData.key
+                                width: viewLabel.implicitWidth + Theme.spacingL
+                                height: Theme.iconSize + Theme.spacingXS
+                                radius: Theme.cornerRadius
+                                color: active ? Theme.primary : "transparent"
 
                                 StyledText {
-                                    id: timeLabel
-                                    text: root.timeOf(mailRow.modelData.lastMessageAt || mailRow.modelData.updatedAt)
+                                    id: viewLabel
+                                    anchors.centerIn: parent
+                                    text: parent.modelData.label
                                     font.pixelSize: Theme.fontSizeSmall
-                                    color: Theme.surfaceVariantText
-                                    anchors.verticalCenter: parent.verticalCenter
+                                    color: parent.active ? Theme.primaryText : Theme.surfaceVariantText
                                 }
-                            }
 
-                            // Hover actions: the notification set, per row.
-                            Row {
-                                id: rowActions
-                                visible: rowHover.hovered
-                                anchors.right: parent.right
-                                anchors.rightMargin: Theme.spacingXS
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 0
-
-                                DActionButton {
-                                    visible: root.mailboxView === "drafts"
-                                    tooltipText: I18n.trFor("dankmailUnread", "Edit draft")
-                                    iconName: "edit"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    onClicked: {
-                                        root.uiCall("ui.editDraft", {
-                                            "id": mailRow.modelData.id
-                                        });
-                                        if (popout.closePopout)
-                                            popout.closePopout();
+                                TapHandler {
+                                    onTapped: {
+                                        root.requestError = "";
+                                        root.threads = [];
+                                        root.mailboxView = parent.modelData.key;
+                                        root.refreshStatus();
                                     }
-                                }
-
-                                // Same order as Dux Mail's own triage row,
-                                // followed by a focused quick-reply entry.
-                                DActionButton {
-                                    visible: root.mailboxView !== "drafts"
-                                    tooltipText: mailRow.modelData.inInbox === false ? I18n.trFor("dankmailUnread", "Move to Inbox") : I18n.trFor("dankmailUnread", "Archive")
-                                    iconName: mailRow.modelData.inInbox === false ? "move_to_inbox" : "archive"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    onClicked: root.op(mailRow.modelData.inInbox === false ? "ops.unarchive" : "ops.archive", mailRow.modelData.id)
-                                }
-
-                                DActionButton {
-                                    tooltipText: I18n.trFor("dankmailUnread", "Move to trash")
-                                    iconName: "delete"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    iconColor: Theme.error
-                                    onClicked: {
-                                        if (root.mailboxView === "drafts")
-                                            root.uiCall("drafts.delete", { "id": mailRow.modelData.id });
-                                        else
-                                            root.op("ops.trash", mailRow.modelData.id);
-                                    }
-                                }
-
-                                DActionButton {
-                                    visible: root.mailboxView !== "drafts"
-                                    tooltipText: mailRow.modelData.unread ? I18n.trFor("dankmailUnread", "Mark as read") : I18n.trFor("dankmailUnread", "Mark as unread")
-                                    iconName: mailRow.modelData.unread ? "drafts" : "mark_email_unread"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    onClicked: root.op(mailRow.modelData.unread ? "ops.markRead" : "ops.markUnread", mailRow.modelData.id)
-                                }
-
-                                DActionButton {
-                                    visible: root.mailboxView !== "drafts"
-                                    tooltipText: mailRow.modelData.starred ? I18n.trFor("dankmailUnread", "Remove star") : I18n.trFor("dankmailUnread", "Star")
-                                    iconName: "star"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    iconColor: mailRow.modelData.starred ? Theme.warning : Theme.surfaceText
-                                    onClicked: root.op(mailRow.modelData.starred ? "ops.unstar" : "ops.star", mailRow.modelData.id)
-                                }
-
-                                DActionButton {
-                                    visible: root.mailboxView !== "drafts"
-                                    tooltipText: I18n.trFor("dankmailUnread", "Snooze")
-                                    iconName: "snooze"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    onClicked: root.op("ops.snoozePreset", mailRow.modelData.id)
-                                }
-
-                                DActionButton {
-                                    visible: root.mailboxView !== "drafts"
-                                    tooltipText: I18n.trFor("dankmailUnread", "Open in webmail")
-                                    iconName: "open_in_new"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    onClicked: root.uiCall("ui.openLink", {
-                                        "id": mailRow.modelData.id
-                                    })
-                                }
-
-                                DActionButton {
-                                    visible: root.mailboxView !== "drafts"
-                                    tooltipText: I18n.trFor("dankmailUnread", "Reply")
-                                    iconName: "reply"
-                                    buttonSize: 26
-                                    iconSize: 15
-                                    onClicked: {
-                                        root.uiCall("ui.showThread", {
-                                            "id": mailRow.modelData.id,
-                                            "reply": true
-                                        });
-                                        if (popout.closePopout)
-                                            popout.closePopout();
-                                    }
-                                }
-                            }
-
-                            // Click on the row body → open in the triage
-                            // window (the action buttons' own MouseAreas
-                            // take precedence over this handler).
-                            TapHandler {
-                                onTapped: {
-                                    if (root.mailboxView === "drafts") {
-                                        root.uiCall("ui.editDraft", {
-                                            "id": mailRow.modelData.id
-                                        });
-                                    } else {
-                                        root.uiCall("ui.showThread", {
-                                            "id": mailRow.modelData.id
-                                        });
-                                    }
-                                    if (popout.closePopout)
-                                        popout.closePopout();
                                 }
                             }
                         }
                     }
+
+                    // Compact account filter dots (matching the app's triage bar).
+                    Row {
+                        id: acctDotsRow
+                        anchors.right: parent.right
+                        anchors.rightMargin: Theme.spacingS
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Theme.spacingXS
+                        visible: root.accounts.length > 1
+
+                        Repeater {
+                            model: root.accounts
+
+                            delegate: Rectangle {
+                                id: acctDot
+                                required property var modelData
+                                readonly property bool active: root.filterAccount === modelData.id
+                                readonly property var dotAccent: root.accountAccent(modelData.id)
+                                readonly property color ringColor: Theme.isLightMode ? dotAccent.onContainer : dotAccent.container
+                                readonly property string tooltipLabel: {
+                                    const email = modelData.email || modelData.displayName || I18n.trFor("dankmailUnread", "Account");
+                                    if ((modelData.unread || 0) > 0)
+                                        return email + " · " + I18n.trFor("dankmailUnread", "%1 unread").arg(modelData.unread);
+                                    return email;
+                                }
+
+                                width: Theme.iconSizeMedium
+                                height: Theme.iconSizeMedium
+                                radius: Theme.fullRadius(width, height)
+                                color: active ? dotAccent.container : "transparent"
+                                border.width: Theme.outlineWidthFocused
+                                border.color: ringColor
+
+                                DIcon {
+                                    anchors.centerIn: parent
+                                    visible: acctDot.active
+                                    name: "check"
+                                    size: Theme.iconSizeSmall - Theme.spacingXS
+                                    color: acctDot.dotAccent.onContainer
+                                }
+
+                                StateLayer {
+                                    cornerRadius: acctDot.radius
+                                    stateColor: acctDot.active ? acctDot.dotAccent.onContainer : acctDot.ringColor
+                                    tooltipText: acctDot.tooltipLabel
+                                    onClicked: {
+                                        root.requestError = "";
+                                        root.threads = [];
+                                        root.filterAccount = acctDot.active ? "" : acctDot.modelData.id;
+                                        root.refreshStatus();
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
-            }
-                }
 
-                Rectangle {
-                    id: accountTooltip
-                    property Item target: null
-                    property string text: ""
-                    readonly property real maxWidth: Math.max(160, popoutBody.width - Theme.spacingM * 2)
+                Item {
+                    width: parent.width
+                    // The list scrolls inside a viewport derived from popoutHeight
+                    // when it grows beyond the popout.
+                    readonly property real maxListHeight: Math.max(Theme.iconSizeLarge * 4, root.popoutHeight - headerBar.height - (filterBar.visible ? filterBar.height + popoutCol.spacing : 0) - popoutCol.spacing - Theme.spacingL * 2)
+                    implicitHeight: Math.min(threadColumn.implicitHeight + Theme.spacingM * 2, maxListHeight)
 
-                    enabled: false
-                    visible: opacity > 0 && text !== ""
-                    opacity: (target !== null && text !== "") ? 1 : 0
-                    z: 1000
-                    width: Math.min(maxWidth, accountTipLabel.implicitWidth + Theme.spacingM * 2)
-                    height: accountTipLabel.implicitHeight + Theme.spacingXS * 2 + 2
-                    radius: 6
-                    color: Theme.surfaceContainerHigh
-                    border.width: 1
-                    border.color: Theme.outline
+                    DFlickable {
+                        anchors.fill: parent
+                        anchors.margins: Theme.spacingS
+                        contentHeight: threadColumn.implicitHeight
+                        clip: true
 
-                    function show(item, tipText) {
-                        accountTipHideTimer.stop();
-                        target = item;
-                        text = tipText || "";
-                        reposition();
-                    }
+                        Column {
+                            id: threadColumn
+                            width: parent.width
+                            spacing: Theme.groupedListGap
 
-                    function hide(item) {
-                        if (item && target !== item)
-                            return;
-                        accountTipHideTimer.restart();
-                    }
+                            StyledText {
+                                visible: !root.daemonConnected
+                                width: parent.width
+                                text: I18n.trFor("dankmailUnread", "Dux Mail is stopped. Click the title above to start it.")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                                wrapMode: Text.WordWrap
+                            }
 
-                    function reposition() {
-                        if (!target)
-                            return;
-                        const pt = target.mapToItem(popoutBody, target.width / 2, target.height);
-                        const rawX = pt.x - width / 2;
-                        const minX = Theme.spacingS;
-                        const maxX = Math.max(minX, popoutBody.width - width - Theme.spacingS);
-                        x = Math.round(Math.max(minX, Math.min(maxX, rawX)));
-                        y = Math.round(pt.y + 6);
-                    }
+                            StyledText {
+                                visible: root.daemonConnected && root.threads.length === 0 && root.requestError === ""
+                                width: parent.width
+                                text: root.mailboxView === "starred" ? I18n.trFor("dankmailUnread", "No starred mail.") : root.mailboxView === "drafts" ? I18n.trFor("dankmailUnread", "No drafts.") : I18n.trFor("dankmailUnread", "No mail in the inbox.")
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.surfaceVariantText
+                            }
 
-                    onWidthChanged: reposition()
-                    onHeightChanged: reposition()
+                            StyledText {
+                                visible: root.daemonConnected && root.requestError !== ""
+                                width: parent.width
+                                text: root.requestError
+                                color: Theme.error
+                                font.pixelSize: Theme.fontSizeSmall
+                                wrapMode: Text.WordWrap
+                            }
 
-                    Timer {
-                        id: accountTipHideTimer
-                        interval: 60
-                        repeat: false
-                        onTriggered: {
-                            accountTooltip.target = null;
-                            accountTooltip.text = "";
+                            Repeater {
+                                model: root.threads
+
+                                delegate: Rectangle {
+                                    id: mailRow
+                                    required property var modelData
+
+                                    width: threadColumn.width
+                                    height: Theme.iconSizeLarge + Theme.spacingL * 2
+                                    radius: Theme.cornerRadiusSmall
+                                    color: rowHover.hovered ? Theme.surfaceContainerHigh : "transparent"
+
+                                    HoverHandler {
+                                        id: rowHover
+                                    }
+
+                                    // Row body: unread dot, sender/subject, star, time.
+                                    Row {
+                                        anchors.left: parent.left
+                                        anchors.right: rowActions.visible ? rowActions.left : parent.right
+                                        anchors.leftMargin: Theme.spacingS
+                                        anchors.rightMargin: Theme.spacingS
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: Theme.spacingS
+
+                                        Rectangle {
+                                            width: Theme.spacingS
+                                            height: Theme.spacingS
+                                            radius: Theme.cornerRadius
+                                            color: mailRow.modelData.unread ? Theme.primary : "transparent"
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+
+                                        Column {
+                                            width: parent.width - Theme.spacingS * 3 - timeLabel.implicitWidth - (starMark.visible ? starMark.width + Theme.spacingS : 0)
+                                            spacing: 0
+
+                                            StyledText {
+                                                width: parent.width
+                                                text: root.senderOf(mailRow.modelData)
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                font.weight: mailRow.modelData.unread ? Font.Bold : Font.Normal
+                                                color: mailRow.modelData.unread ? Theme.surfaceText : Theme.surfaceVariantText
+                                                elide: Text.ElideRight
+                                                maximumLineCount: 1
+                                            }
+
+                                            StyledText {
+                                                width: parent.width
+                                                text: mailRow.modelData.subject || I18n.trFor("dankmailUnread", "(no subject)")
+                                                font.pixelSize: Theme.fontSizeSmall
+                                                color: mailRow.modelData.unread ? Theme.surfaceText : Theme.surfaceVariantText
+                                                elide: Text.ElideRight
+                                                maximumLineCount: 1
+                                            }
+                                        }
+
+                                        DIcon {
+                                            id: starMark
+                                            visible: mailRow.modelData.starred === true
+                                            name: "star"
+                                            filled: true
+                                            size: Theme.iconSizeSmall
+                                            color: Theme.warning
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+
+                                        StyledText {
+                                            id: timeLabel
+                                            text: root.timeOf(mailRow.modelData.lastMessageAt || mailRow.modelData.updatedAt)
+                                            font.pixelSize: Theme.fontSizeSmall
+                                            color: Theme.surfaceVariantText
+                                            anchors.verticalCenter: parent.verticalCenter
+                                        }
+                                    }
+
+                                    // Hover actions: the notification set, per row.
+                                    Row {
+                                        id: rowActions
+                                        visible: rowHover.hovered
+                                        anchors.right: parent.right
+                                        anchors.rightMargin: Theme.spacingXS
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 0
+
+                                        DActionButton {
+                                            visible: root.mailboxView === "drafts"
+                                            tooltipText: I18n.trFor("dankmailUnread", "Edit draft")
+                                            iconName: "edit"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            onClicked: {
+                                                root.uiCall("ui.editDraft", {
+                                                    "id": mailRow.modelData.id
+                                                });
+                                                if (popout.closePopout)
+                                                    popout.closePopout();
+                                            }
+                                        }
+
+                                        // Same order as Dux Mail's own triage row,
+                                        // followed by a focused quick-reply entry.
+                                        DActionButton {
+                                            visible: root.mailboxView !== "drafts"
+                                            tooltipText: mailRow.modelData.inInbox === false ? I18n.trFor("dankmailUnread", "Move to Inbox") : I18n.trFor("dankmailUnread", "Archive")
+                                            iconName: mailRow.modelData.inInbox === false ? "move_to_inbox" : "archive"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            onClicked: root.op(mailRow.modelData.inInbox === false ? "ops.unarchive" : "ops.archive", mailRow.modelData.id)
+                                        }
+
+                                        DActionButton {
+                                            tooltipText: I18n.trFor("dankmailUnread", "Move to trash")
+                                            iconName: "delete"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            iconColor: Theme.error
+                                            onClicked: {
+                                                if (root.mailboxView === "drafts")
+                                                    root.uiCall("drafts.delete", { "id": mailRow.modelData.id });
+                                                else
+                                                    root.op("ops.trash", mailRow.modelData.id);
+                                            }
+                                        }
+
+                                        DActionButton {
+                                            visible: root.mailboxView !== "drafts"
+                                            tooltipText: mailRow.modelData.unread ? I18n.trFor("dankmailUnread", "Mark as read") : I18n.trFor("dankmailUnread", "Mark as unread")
+                                            iconName: mailRow.modelData.unread ? "drafts" : "mark_email_unread"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            onClicked: root.op(mailRow.modelData.unread ? "ops.markRead" : "ops.markUnread", mailRow.modelData.id)
+                                        }
+
+                                        DActionButton {
+                                            visible: root.mailboxView !== "drafts"
+                                            tooltipText: mailRow.modelData.starred ? I18n.trFor("dankmailUnread", "Remove star") : I18n.trFor("dankmailUnread", "Star")
+                                            iconName: "star"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            iconColor: mailRow.modelData.starred ? Theme.warning : Theme.surfaceText
+                                            onClicked: root.op(mailRow.modelData.starred ? "ops.unstar" : "ops.star", mailRow.modelData.id)
+                                        }
+
+                                        DActionButton {
+                                            visible: root.mailboxView !== "drafts"
+                                            tooltipText: I18n.trFor("dankmailUnread", "Snooze")
+                                            iconName: "snooze"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            onClicked: root.op("ops.snoozePreset", mailRow.modelData.id)
+                                        }
+
+                                        DActionButton {
+                                            visible: root.mailboxView !== "drafts"
+                                            tooltipText: I18n.trFor("dankmailUnread", "Open in webmail")
+                                            iconName: "open_in_new"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            onClicked: root.uiCall("ui.openLink", {
+                                                "id": mailRow.modelData.id
+                                            })
+                                        }
+
+                                        DActionButton {
+                                            visible: root.mailboxView !== "drafts"
+                                            tooltipText: I18n.trFor("dankmailUnread", "Reply")
+                                            iconName: "reply"
+                                            buttonSize: Theme.buttonHeightXXS
+                                            iconSize: Theme.iconSizeSmall
+                                            onClicked: {
+                                                root.uiCall("ui.showThread", {
+                                                    "id": mailRow.modelData.id,
+                                                    "reply": true
+                                                });
+                                                if (popout.closePopout)
+                                                    popout.closePopout();
+                                            }
+                                        }
+                                    }
+
+                                    // Click on the row body → open in the triage
+                                    // window (the action buttons' own MouseAreas
+                                    // take precedence over this handler).
+                                    TapHandler {
+                                        onTapped: {
+                                            if (root.mailboxView === "drafts") {
+                                                root.uiCall("ui.editDraft", {
+                                                    "id": mailRow.modelData.id
+                                                });
+                                            } else {
+                                                root.uiCall("ui.showThread", {
+                                                    "id": mailRow.modelData.id
+                                                });
+                                            }
+                                            if (popout.closePopout)
+                                                popout.closePopout();
+                                        }
+                                    }
+                                }
+                            }
                         }
-                    }
-
-                    Behavior on opacity {
-                        NumberAnimation {
-                            duration: 100
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    StyledText {
-                        id: accountTipLabel
-                        anchors.centerIn: parent
-                        width: Math.min(implicitWidth, accountTooltip.maxWidth - Theme.spacingM * 2)
-                        text: accountTooltip.text
-                        color: Theme.surfaceText
-                        font.pixelSize: Theme.fontSizeSmall
-                        font.weight: Font.Medium
-                        elide: Text.ElideMiddle
-                        maximumLineCount: 1
                     }
                 }
             }
@@ -975,7 +891,7 @@ PluginComponent {
                 anchors.fill: parent
                 // Cover BasePill's padding too — middle clicks on the
                 // capsule margin were falling through to the bar canvas.
-                anchors.margins: -10
+                anchors.margins: -Theme.spacingM
                 acceptedButtons: Qt.MiddleButton
                 onClicked: root.toggleApp()
             }

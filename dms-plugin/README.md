@@ -1,10 +1,7 @@
 # Dux Mail for Dux Shell (DankMaterialShell)
 
-This directory contains the **Dux Shell / DankMaterialShell companion for
-[Dux Mail](https://github.com/arqueon/dux-mail)** (formerly `dankmail`). The suite is composed of this
-DMS bar plugin (`dankmailUnread` / **Dux Mail Unread**) and additionally the Dux Mail desktop application, both powered
-by the `dmail` daemon; it is not a separate mail client or a second
-implementation.
+This directory contains the **Dux Shell / DankMaterialShell bar companion for
+[Dux Mail](https://github.com/arqueon/dux-mail)** (formerly `dankmail`). The Dux Mail desktop application and `dmail` daemon are installed separately (e.g., from the `dux-mail` package), while this plugin (`dankmailUnread` / **Dux Mail Unread**) provides the bar badge and triage popout powered by the same `dmail` daemon; it is not a standalone mail client or a second implementation.
 
 The plugin adds Dux Mail to the bar with live unread status, compact filterable
 per-account dots with unread tooltips, a popout with up to 20 recent Inbox, Starred, or Drafts entries, triage actions, compose and sync

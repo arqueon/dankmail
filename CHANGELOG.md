@@ -2,6 +2,15 @@
 
 All notable changes to **Dux Mail** (`dux-mail`, formerly **DankMail** — `dmail` daemon, `dmail mcp` server, Quickshell UI, and the `dankmailUnread` / **Dux Mail Unread** Dux Shell companion) are documented in this file.
 
+## [0.5.1] - 2026-11-13
+
+### Fixed
+- **Dux Shell companion theme tokens, native tooltips, and manifest clarity**:
+  - Replaced the hardcoded hex `accountPalette` and `contrastOnDot` in `dms-plugin/DankmailWidget.qml` with harmonized `Theme.accents` (`container` / `onContainer` pairs with `Theme.primary` / `Theme.onPrimary` fallback) so per-account filter dots follow the active Dux Shell theme in both dark and light modes.
+  - Replaced the custom `accountTooltip` `Rectangle` and timer in `dms-plugin/DankmailWidget.qml` with `StateLayer` (`qs.DCommon.Widgets`), using Dux Shell's built-in tooltip host and state/ripple feedback.
+  - Replaced remaining literal pixel sizes and margins in `dms-plugin/DankmailWidget.qml` with `Theme.*` tokens and `popoutHeight`-derived layout bounds.
+  - Updated `dms-plugin/plugin.json` and `dms-plugin/README.md` to clearly describe the bar badge, per-account filter, and triage popout while noting that the Dux Mail desktop app and `dmail` daemon are installed separately.
+
 ## [0.5.0] - 2026-11-13
 
 ### Added

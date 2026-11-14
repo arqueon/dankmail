@@ -1,8 +1,8 @@
 {
   "id": "dankmailUnread",
   "name": "Dux Mail Unread",
-  "description": "Composed of the DMS bar plugin and additionally the Dux Mail desktop app, powered by the dmail daemon.",
-  "version": "0.5.0",
+  "description": "Bar unread badge, per-account filter, and Inbox/Starred/Drafts triage popout for Dux Mail. Companion to the separate Dux Mail desktop app; requires its dmail daemon.",
+  "version": "0.5.1",
   "author": "arqueon",
   "type": "widget",
   "capabilities": [
