@@ -1,9 +1,10 @@
 # Dankmail for DankMaterialShell
 
 This directory contains the **DankMaterialShell companion for
-[Dankmail](https://github.com/arqueon/dankmail)**. It is part of the same
-project as the `dmail` daemon and the Dankmail desktop interface; it is not a
-separate mail client or a second implementation.
+[Dankmail](https://github.com/arqueon/dankmail)**. The suite is composed of this
+DMS bar plugin and additionally the Dankmail desktop application, both powered
+by the `dmail` daemon; it is not a separate mail client or a second
+implementation.
 
 The plugin adds Dankmail to DankBar with live unread status, truthful
 per-account counters, a popout with up to 20 recent Inbox, Starred, or Drafts entries, triage actions, compose and sync
