@@ -12,7 +12,7 @@ conflicts=('dms-shell-plugin-dankmail')
 replaces=('dms-shell-plugin-dankmail')
 install=dms-shell-plugin-dux-mail.install
 source=("dux-mail-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('ee95f331c3119fbd56f9bf2673ee916e2b11942227552cb3da9b9fc5bc492077')
 
 package() {
   cd "dux-mail-$pkgver"

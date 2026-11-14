@@ -14,7 +14,7 @@ conflicts=('dankmail')
 replaces=('dankmail')
 install=dux-mail.install
 source=("$pkgname-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('SKIP')
+sha256sums=('ee95f331c3119fbd56f9bf2673ee916e2b11942227552cb3da9b9fc5bc492077')
 
 build() {
   cd "$pkgname-$pkgver"
