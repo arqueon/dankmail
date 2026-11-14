@@ -160,18 +160,22 @@ type ReplyDraft struct {
 	// answered (normally the newest in the thread).
 	InReplyToMessageID string `json:"inReplyToMessageId,omitempty"`
 	Body               string `json:"body"`
+	HTMLBody           string `json:"htmlBody,omitempty"`
+	Format             string `json:"format,omitempty"`
 	// ReplyAll includes the original To/Cc recipients besides the sender.
 	ReplyAll    bool             `json:"replyAll,omitempty"`
 	Attachments []AttachmentFile `json:"attachments,omitempty"`
 }
 
-// ComposeDraft is a new outgoing message: recipients, subject, body, and optional attachments.
+// ComposeDraft is a new outgoing message: recipients, subject, body, optional HTML/format, and attachments.
 type ComposeDraft struct {
 	To          []string         `json:"to"`
 	Cc          []string         `json:"cc,omitempty"`
 	Bcc         []string         `json:"bcc,omitempty"`
 	Subject     string           `json:"subject"`
 	Body        string           `json:"body"`
+	HTMLBody    string           `json:"htmlBody,omitempty"`
+	Format      string           `json:"format,omitempty"`
 	Attachments []AttachmentFile `json:"attachments,omitempty"`
 }
 
@@ -186,6 +190,8 @@ type DraftItem struct {
 	Bcc               []string         `json:"bcc,omitempty"`
 	Subject           string           `json:"subject"`
 	Body              string           `json:"body"`
+	HTMLBody          string           `json:"htmlBody,omitempty"`
+	Format            string           `json:"format,omitempty"`
 	Snippet           string           `json:"snippet"`
 	UpdatedAt         int64            `json:"updatedAt"`
 	Attachments       []AttachmentFile `json:"attachments,omitempty"`
@@ -201,6 +207,8 @@ type DraftSave struct {
 	Bcc              []string         `json:"bcc,omitempty"`
 	Subject          string           `json:"subject"`
 	Body             string           `json:"body"`
+	HTMLBody         string           `json:"htmlBody,omitempty"`
+	Format           string           `json:"format,omitempty"`
 	Attachments      []AttachmentFile `json:"attachments,omitempty"`
 }
 

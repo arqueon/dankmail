@@ -6,13 +6,13 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/ent/message"
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/ent/thread"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent/message"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 // Reconciler applies provider.Changes to the local cache.

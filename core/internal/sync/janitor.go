@@ -5,9 +5,9 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/ent/thread"
 )
 
 // Janitor is the retention/cleanup job (spec §4): prune threads older

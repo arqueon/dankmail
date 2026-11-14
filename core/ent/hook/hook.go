@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/arqueon/dankmail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent"
 )
 
 // The AccountFunc type is an adapter to allow the use of ordinary

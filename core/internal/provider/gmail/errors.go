@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net"
 
-	"github.com/arqueon/dankmail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/errdefs"
 	"golang.org/x/oauth2"
 	"google.golang.org/api/googleapi"
 )

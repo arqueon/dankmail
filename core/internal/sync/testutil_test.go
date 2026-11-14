@@ -12,10 +12,10 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/provider"
-	"github.com/arqueon/dankmail/core/internal/rules"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/rules"
 
 	_ "modernc.org/sqlite"
 )

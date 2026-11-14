@@ -29,7 +29,7 @@ FloatingWindow {
 
     Component.onDestruction: window.flushUndoAction()
 
-    title: "Dank Mail"
+    title: "Dux Mail"
     implicitWidth: 980
     implicitHeight: 620
     minimumSize: Qt.size(720, 420)
@@ -467,7 +467,7 @@ FloatingWindow {
                 }
 
                 StyledText {
-                    text: "Dank Mail"
+                    text: "Dux Mail"
                     font.pixelSize: Theme.fontSizeLarge
                     font.weight: Font.DemiBold
                 }
@@ -2484,6 +2484,8 @@ FloatingWindow {
                         property bool sending: false
                         property bool savingDraft: false
                         property bool replyAll: false
+                        property bool previewMode: false
+                        property string formatMode: "markdown"
                         property var attachments: []
                         property string draftId: ""
                         property string error: ""
@@ -2493,10 +2495,55 @@ FloatingWindow {
                             sending = false;
                             savingDraft = false;
                             replyAll = false;
+                            previewMode = false;
+                            formatMode = "markdown";
                             attachments = [];
                             draftId = "";
                             error = "";
                             replyInput.text = "";
+                        }
+
+                        function wrapSelection(prefix, suffix, placeholder) {
+                            const start = replyInput.selectionStart;
+                            const end = replyInput.selectionEnd;
+                            const full = replyInput.text;
+                            const selected = start !== end ? full.substring(start, end) : placeholder;
+                            const replacement = prefix + selected + suffix;
+                            replyInput.text = full.substring(0, start) + replacement + full.substring(end);
+                            replyInput.cursorPosition = start + replacement.length;
+                            replyInput.forceActiveFocus();
+                        }
+
+                        function insertLinePrefix(prefix) {
+                            const pos = replyInput.cursorPosition;
+                            const full = replyInput.text;
+                            const lineStart = full.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
+                            replyInput.text = full.substring(0, lineStart) + prefix + full.substring(lineStart);
+                            replyInput.cursorPosition = pos + prefix.length;
+                            replyInput.forceActiveFocus();
+                        }
+
+                        function cycleHeading() {
+                            const pos = replyInput.cursorPosition;
+                            const full = replyInput.text;
+                            const lineStart = full.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
+                            let lineEnd = full.indexOf("\n", lineStart);
+                            if (lineEnd === -1)
+                                lineEnd = full.length;
+                            const line = full.substring(lineStart, lineEnd);
+                            let nextLine = line;
+                            if (line.startsWith("### "))
+                                nextLine = line.substring(4);
+                            else if (line.startsWith("## "))
+                                nextLine = "### " + line.substring(3);
+                            else if (line.startsWith("# "))
+                                nextLine = "## " + line.substring(2);
+                            else
+                                nextLine = "# " + line;
+                            const delta = nextLine.length - line.length;
+                            replyInput.text = full.substring(0, lineStart) + nextLine + full.substring(lineEnd);
+                            replyInput.cursorPosition = Math.max(lineStart, pos + delta);
+                            replyInput.forceActiveFocus();
                         }
 
                         function addAttachmentFiles(fileUrls) {
@@ -2541,6 +2588,7 @@ FloatingWindow {
                                 "cc": ccList,
                                 "subject": subj,
                                 "body": replyInput.text,
+                                "format": replyArea.formatMode === "plain" ? "plain" : "markdown",
                                 "attachments": attachments
                             }, resp => {
                                 replyArea.savingDraft = false;
@@ -2575,6 +2623,7 @@ FloatingWindow {
                                 "cc": ccList,
                                 "subject": subj,
                                 "body": replyInput.text,
+                                "format": replyArea.formatMode,
                                 "attachments": attachments
                             });
                             replyArea.reset();
@@ -2595,7 +2644,8 @@ FloatingWindow {
                                 replyArea.reset();
                             }, {
                                 "attachments": attachments,
-                                "draftId": draftId
+                                "draftId": draftId,
+                                "format": replyArea.formatMode === "plain" ? "plain" : "auto"
                             });
                         }
 
@@ -2719,6 +2769,137 @@ FloatingWindow {
                                 }
                             }
 
+                            // Compact Markdown formatting bar for inline replies & reply drafts.
+                            RowLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "title"
+                                    onClicked: replyArea.cycleHeading()
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "format_bold"
+                                    onClicked: replyArea.wrapSelection("**", "**", I18n.tr("bold", "compose"))
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "format_italic"
+                                    onClicked: replyArea.wrapSelection("*", "*", I18n.tr("italic", "compose"))
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "format_strikethrough"
+                                    onClicked: replyArea.wrapSelection("~~", "~~", I18n.tr("text", "compose"))
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "add_link"
+                                    onClicked: replyArea.wrapSelection("[", "](https://)", I18n.tr("Link text", "compose"))
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "format_list_bulleted"
+                                    onClicked: replyArea.insertLinePrefix("- ")
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "format_list_numbered"
+                                    onClicked: replyArea.insertLinePrefix("1. ")
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "format_quote"
+                                    onClicked: replyArea.insertLinePrefix("> ")
+                                }
+
+                                DankActionButton {
+                                    visible: replyArea.formatMode !== "plain"
+                                    buttonSize: 26
+                                    iconSize: 15
+                                    iconName: "code"
+                                    onClicked: replyArea.wrapSelection("`", "`", "code")
+                                }
+
+                                Item {
+                                    Layout.fillWidth: true
+                                }
+
+                                StyledRect {
+                                    implicitWidth: Math.ceil(replyFmtLabel.contentWidth) + Theme.spacingM * 2
+                                    implicitHeight: 24
+                                    Layout.preferredWidth: implicitWidth
+                                    Layout.preferredHeight: 24
+                                    radius: 12
+                                    color: replyArea.formatMode === "plain" ? Theme.surfaceContainerHighest : Theme.secondaryContainer
+
+                                    StyledText {
+                                        id: replyFmtLabel
+                                        anchors.centerIn: parent
+                                        text: replyArea.formatMode === "plain" ? I18n.tr("Plain text", "compose") : I18n.tr("Markdown", "compose")
+                                        font.pixelSize: Theme.fontSizeSmall - 1
+                                        color: replyArea.formatMode === "plain" ? Theme.surfaceTextMedium : Theme.onSecondaryContainer
+                                    }
+
+                                    StateLayer {
+                                        stateColor: Theme.primary
+                                        onClicked: {
+                                            replyArea.formatMode = replyArea.formatMode === "plain" ? "markdown" : "plain";
+                                            if (replyArea.formatMode === "plain")
+                                                replyArea.previewMode = false;
+                                        }
+                                    }
+                                }
+
+                                StyledRect {
+                                    visible: replyArea.formatMode !== "plain"
+                                    implicitWidth: Math.ceil(replyPreviewLabel.contentWidth) + Theme.spacingM * 2
+                                    implicitHeight: 24
+                                    Layout.preferredWidth: implicitWidth
+                                    Layout.preferredHeight: 24
+                                    radius: 12
+                                    color: replyArea.previewMode ? Theme.primaryContainer : Theme.surfaceContainerHighest
+
+                                    StyledText {
+                                        id: replyPreviewLabel
+                                        anchors.centerIn: parent
+                                        text: replyArea.previewMode ? I18n.tr("Edit text", "compose") : I18n.tr("Preview", "compose")
+                                        font.pixelSize: Theme.fontSizeSmall - 1
+                                        color: replyArea.previewMode ? Theme.onPrimaryContainer : Theme.surfaceTextMedium
+                                    }
+
+                                    StateLayer {
+                                        stateColor: Theme.primary
+                                        onClicked: replyArea.previewMode = !replyArea.previewMode
+                                    }
+                                }
+                            }
+
                             StyledRect {
                                 Layout.fillWidth: true
                                 implicitHeight: 96
@@ -2730,11 +2911,12 @@ FloatingWindow {
                                 DankFlickable {
                                     anchors.fill: parent
                                     anchors.margins: Theme.spacingS
-                                    contentHeight: replyInput.implicitHeight
+                                    contentHeight: replyArea.previewMode ? replyPreviewText.implicitHeight : replyInput.implicitHeight
                                     clip: true
 
                                     TextEdit {
                                         id: replyInput
+                                        visible: !replyArea.previewMode
                                         width: parent.width
                                         wrapMode: TextEdit.Wrap
                                         textFormat: TextEdit.PlainText
@@ -2747,6 +2929,15 @@ FloatingWindow {
                                             if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && (event.modifiers & Qt.ControlModifier)) {
                                                 event.accepted = true;
                                                 replyArea.send();
+                                            } else if (event.key === Qt.Key_B && (event.modifiers & Qt.ControlModifier) && replyArea.formatMode !== "plain") {
+                                                event.accepted = true;
+                                                replyArea.wrapSelection("**", "**", I18n.tr("bold", "compose"));
+                                            } else if (event.key === Qt.Key_I && (event.modifiers & Qt.ControlModifier) && replyArea.formatMode !== "plain") {
+                                                event.accepted = true;
+                                                replyArea.wrapSelection("*", "*", I18n.tr("italic", "compose"));
+                                            } else if (event.key === Qt.Key_S && (event.modifiers & Qt.ControlModifier)) {
+                                                event.accepted = true;
+                                                replyArea.saveAsDraft();
                                             }
                                         }
 
@@ -2755,6 +2946,27 @@ FloatingWindow {
                                             text: I18n.tr("Write your reply… Ctrl+Enter sends", "quick reply")
                                             color: Theme.surfaceTextAlpha
                                         }
+                                    }
+
+                                    TextEdit {
+                                        id: replyPreviewText
+                                        visible: replyArea.previewMode
+                                        width: parent.width
+                                        readOnly: true
+                                        selectByMouse: true
+                                        wrapMode: TextEdit.Wrap
+                                        textFormat: TextEdit.RichText
+                                        color: Theme.surfaceText
+                                        selectionColor: Theme.primarySelected
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSizeMedium
+                                        text: BodyFormatter.format(replyInput.text, {
+                                            linkColor: String(Theme.primary),
+                                            quoteColor: String(Theme.surfaceTextMedium),
+                                            linkLabel: I18n.tr("Link", "message body"),
+                                            markdownItalics: true
+                                        })
+                                        onLinkActivated: link => window.openBodyLink(link)
                                     }
                                 }
                             }
@@ -3100,6 +3312,31 @@ FloatingWindow {
                             }
                         }
 
+                        StyledRect {
+                            visible: !!DankMailService.currentDraft
+                            implicitWidth: Math.ceil(draftFmtChipText.contentWidth) + Theme.spacingM * 2
+                            implicitHeight: 24
+                            radius: 12
+                            color: Theme.secondaryContainer
+
+                            StyledText {
+                                id: draftFmtChipText
+                                anchors.centerIn: parent
+                                text: {
+                                    const d = DankMailService.currentDraft;
+                                    if (!d)
+                                        return "";
+                                    if (d.format === "html" || (d.htmlBody && d.htmlBody !== "" && (!d.body || d.body === "")))
+                                        return I18n.tr("HTML", "compose");
+                                    if (d.format === "plain")
+                                        return I18n.tr("Plain text", "compose");
+                                    return I18n.tr("Markdown", "compose");
+                                }
+                                font.pixelSize: Theme.fontSizeSmall
+                                color: Theme.onSecondaryContainer
+                            }
+                        }
+
                         DankButton {
                             buttonHeight: 34
                             horizontalPadding: Theme.spacingM
@@ -3108,6 +3345,39 @@ FloatingWindow {
                             onClicked: {
                                 if (DankMailService.currentDraft)
                                     composeModal.editDraft(DankMailService.currentDraft);
+                            }
+                        }
+
+                        DankButton {
+                            visible: {
+                                const d = DankMailService.currentDraft;
+                                if (!d)
+                                    return false;
+                                const rcpts = ((d.to || []).length + (d.cc || []).length + (d.bcc || []).length);
+                                const hasContent = ((d.body || "").trim() !== "" || (d.htmlBody || "").trim() !== "" || (d.attachments || []).length > 0);
+                                return rcpts > 0 && hasContent;
+                            }
+                            buttonHeight: 34
+                            horizontalPadding: Theme.spacingM
+                            text: I18n.tr("Send", "quick reply")
+                            iconName: "send"
+                            backgroundColor: Theme.primary
+                            textColor: Theme.primaryText
+                            onClicked: {
+                                const d = DankMailService.currentDraft;
+                                if (!d)
+                                    return;
+                                DankMailService.compose(d.accountId, d.to || [], d.subject || "", d.body || "", resp => {
+                                    if (resp && resp.error)
+                                        window.operationError = resp.error;
+                                }, {
+                                    "cc": d.cc || [],
+                                    "bcc": d.bcc || [],
+                                    "attachments": d.attachments || [],
+                                    "draftId": d.id,
+                                    "htmlBody": d.htmlBody || "",
+                                    "format": d.format || "auto"
+                                });
                             }
                         }
 
@@ -3233,7 +3503,21 @@ FloatingWindow {
                             selectionColor: Theme.primarySelected
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeMedium
-                            text: DankMailService.currentDraft ? window.formatBody(DankMailService.currentDraft.body || "") : ""
+                            text: {
+                                const d = DankMailService.currentDraft;
+                                if (!d)
+                                    return "";
+                                if (d.format === "html" || (d.htmlBody && d.htmlBody !== "" && (!d.body || d.body === "")))
+                                    return BodyFormatter.sanitizeDraftHtml(d.htmlBody || d.body || "");
+                                if (d.format === "plain")
+                                    return "<pre style=\"white-space:pre-wrap;font-family:inherit;\">" + BodyFormatter.escapeHtml(d.body || "") + "</pre>";
+                                return BodyFormatter.format(d.body || "", {
+                                    linkColor: String(Theme.primary),
+                                    quoteColor: String(Theme.surfaceTextMedium),
+                                    linkLabel: I18n.tr("Link", "message body"),
+                                    markdownItalics: true
+                                });
+                            }
                             onLinkActivated: link => window.openBodyLink(link)
 
                             HoverHandler {

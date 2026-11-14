@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/rules"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/rules"
 )
 
 type retryHint struct{ delay time.Duration }

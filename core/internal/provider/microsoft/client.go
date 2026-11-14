@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/arqueon/dankmail/core/internal/mailtext"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/mailtext"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 const graphBase = "https://graph.microsoft.com/v1.0"
@@ -155,6 +155,9 @@ func (c *Client) do(ctx context.Context, method, u string, body any, out any) er
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("Prefer", `IdType="ImmutableId"`)
+	if strings.Contains(u, "$search=") {
+		req.Header.Set("ConsistencyLevel", "eventual")
+	}
 	resp, err := c.hc.Do(req)
 	if err != nil {
 		return err

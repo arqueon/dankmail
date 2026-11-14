@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 // OpType mirrors the PendingOp op_type enum (ent/schema/pendingop.go).

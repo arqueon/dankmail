@@ -6,7 +6,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 // Message is one message inside a cached thread: metadata plus a truncated

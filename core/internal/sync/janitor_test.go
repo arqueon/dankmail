@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/internal/provider"
-	"github.com/arqueon/dankmail/core/internal/rules"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/rules"
 )
 
 func TestJanitorPrunesOldThreadsButKeepsPinned(t *testing.T) {

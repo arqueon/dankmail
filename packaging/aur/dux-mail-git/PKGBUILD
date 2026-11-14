@@ -1,34 +1,35 @@
 # Maintainer: arqueon <arqueonautis@gmail.com>
-pkgname=dankmail-git
-pkgver=r122.25c81b9
+pkgname=dux-mail-git
+pkgver=r130.0000000
 pkgrel=1
-pkgdesc="Mail notifier with triage for Linux — Go daemon + Quickshell UI (git version)"
+pkgdesc="Mail notifier, triage controller, and MCP server for Linux — Go daemon + Quickshell UI (git version)"
 arch=('x86_64' 'aarch64')
-url="https://github.com/arqueon/dankmail"
+url="https://github.com/arqueon/dux-mail"
 license=('GPL-3.0-or-later')
 depends=('quickshell' 'xdg-utils')
 makedepends=('go' 'git')
 optdepends=('gnome-keyring: Secret Service storage for tokens and passwords')
-provides=('dankmail')
-conflicts=('dankmail')
-install=dankmail.install
-source=("dankmail::git+$url.git")
+provides=('dux-mail' 'dankmail')
+conflicts=('dux-mail' 'dankmail' 'dankmail-git')
+replaces=('dankmail-git')
+install=dux-mail.install
+source=("dux-mail::git+$url.git")
 sha256sums=('SKIP')
 
 pkgver() {
-  cd dankmail
+  cd dux-mail
   printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 build() {
-  cd dankmail
+  cd dux-mail
   export CGO_ENABLED=0
   export GOFLAGS="-trimpath -mod=readonly -modcacherw"
   make -C core build
 }
 
 package() {
-  cd dankmail
+  cd dux-mail
   make install PREFIX=/usr DESTDIR="$pkgdir"
   install -Dm644 assets/systemd/dmail.service "$pkgdir/usr/lib/systemd/user/dmail.service"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"

@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/rules"
-	dsync "github.com/arqueon/dankmail/core/internal/sync"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/rules"
+	dsync "github.com/arqueon/dux-mail/core/internal/sync"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 func TestUnspamSelectionRoutesIdenticalProviderIDsToTheirOwners(t *testing.T) {

@@ -13,8 +13,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 	"golang.org/x/oauth2"
 	gmailv1 "google.golang.org/api/gmail/v1"
 	"google.golang.org/api/googleapi"

@@ -9,11 +9,11 @@ import (
 	gosync "sync"
 	"time"
 
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/accounts"
-	"github.com/arqueon/dankmail/core/internal/ipc"
-	"github.com/arqueon/dankmail/core/internal/keyring"
-	"github.com/arqueon/dankmail/core/internal/oauth"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/accounts"
+	"github.com/arqueon/dux-mail/core/internal/ipc"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/internal/oauth"
 )
 
 // flowRegistry tracks pending OAuth consents between the "start" and

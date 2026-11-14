@@ -5,9 +5,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/bus"
 )
 
 func TestSyncRetriesTransientAuthTransportFailure(t *testing.T) {

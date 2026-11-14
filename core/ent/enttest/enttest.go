@@ -5,12 +5,12 @@ package enttest
 import (
 	"context"
 
-	"github.com/arqueon/dankmail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent"
 	// required by schema hooks.
-	_ "github.com/arqueon/dankmail/core/ent/runtime"
+	_ "github.com/arqueon/dux-mail/core/ent/runtime"
 
 	"entgo.io/ent/dialect/sql/schema"
-	"github.com/arqueon/dankmail/core/ent/migrate"
+	"github.com/arqueon/dux-mail/core/ent/migrate"
 )
 
 type (

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 const syncCheckpointPrefix = "gmail-sync-v1:"

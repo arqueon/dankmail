@@ -11,9 +11,9 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/ent/predicate"
-	"github.com/arqueon/dankmail/core/ent/secret"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent/predicate"
+	"github.com/arqueon/dux-mail/core/ent/secret"
 	"github.com/google/uuid"
 )
 

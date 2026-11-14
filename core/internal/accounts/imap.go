@@ -11,9 +11,9 @@ import (
 
 	"github.com/emersion/go-imap/v2/imapclient"
 
-	"github.com/arqueon/dankmail/core/ent"
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/ent"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
 )
 
 // IMAPConfig is the non-secret connection config stored in

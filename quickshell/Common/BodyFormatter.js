@@ -280,14 +280,19 @@ function replaceMarkdownImagesAndLinks(s, anchor, put, linkLabel) {
     return out;
 }
 
-function inline(text, color, linkLabel) {
+function inline(text, color, linkLabel, markdownItalics) {
     const stash = [];
     const put = html => "\x01" + (stash.push(html) - 1) + "\x01";
+    const singleStarTag = markdownItalics ? "i" : "b";
     const emphasis = value => escapeHtml(value)
+        .replace(/\*\*\*([^*\n]+)\*\*\*/g, "<b><i>$1</i></b>")
         .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
-        .replace(/(^|[\s(«"'])\*([^*\n]+?)\s*\*(?=$|[\s.,!?:;)»"'])/g, "$1<b>$2</b>")
-        .replace(/(^|[\s(«"'])\*([^\s*][^*]*?)\s*\*(?=$|[\s.,!?:;)»"'])/g, "$1<b>$2</b>")
-        .replace(/(^|[\s(«"'])\*([^\s*][^*]*?)\s+\*(?=\S)/g, "$1<b>$2</b> ");
+        .replace(/(^|[\s(«"'])__([^_\n]+)__(?=$|[\s.,!?:;)»"'])/g, "$1<b>$2</b>")
+        .replace(/~~([^~\n]+)~~/g, "<s>$1</s>")
+        .replace(/(^|[\s(«"'])\*([^*\n]+?)\s*\*(?=$|[\s.,!?:;)»"'])/g, "$1<" + singleStarTag + ">$2</" + singleStarTag + ">")
+        .replace(/(^|[\s(«"'])\*([^\s*][^*]*?)\s*\*(?=$|[\s.,!?:;)»"'])/g, "$1<" + singleStarTag + ">$2</" + singleStarTag + ">")
+        .replace(/(^|[\s(«"'])\*([^\s*][^*]*?)\s+\*(?=\S)/g, "$1<" + singleStarTag + ">$2</" + singleStarTag + "> ")
+        .replace(/(^|[\s(«"'])_([^\s_][^_\n]*?)_(?=$|[\s.,!?:;)»"'])/g, "$1<i>$2</i>");
     const anchor = (rawUrl, label) => {
         const url = unwrapUrl(rawUrl);
         return safeUrl(url)
@@ -319,7 +324,7 @@ function format(text, options) {
     options = options || {};
     const color = /^#[0-9a-f]{3,8}$/i.test(String(options.linkColor)) ? String(options.linkColor) : "#517cbb";
     const quoteColor = /^#[0-9a-f]{3,8}$/i.test(String(options.quoteColor)) ? String(options.quoteColor) : color;
-    const render = value => inline(value, color, options.linkLabel || "Link");
+    const render = value => inline(value, color, options.linkLabel || "Link", !!options.markdownItalics);
     const lines = normalizePlainEmail(text).split("\n");
     const cells = line => line.trim().replace(/^\||\|$/g, "").split("|").map(value => value.trim());
     const tableSeparator = line => /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
@@ -381,7 +386,7 @@ function format(text, options) {
             // Bound nesting, even for hostile or malformed message text.
             const depth = options.depth || 0;
             html += '<blockquote style="margin-left:16px; margin-top:8px; margin-bottom:8px"><font color="' + quoteColor + '">' + (depth < 5
-                ? format(quoted.join("\n"), {linkColor: color, quoteColor: quoteColor, linkLabel: options.linkLabel, depth: depth + 1})
+                ? format(quoted.join("\n"), {linkColor: color, quoteColor: quoteColor, linkLabel: options.linkLabel, markdownItalics: options.markdownItalics, depth: depth + 1})
                 : quoted.map(render).join('<br>')) + '</font></blockquote>';
             continue;
         }
@@ -435,4 +440,18 @@ function extractLinks(text) {
         out.push({ url: url, label: label });
     }
     return out;
+}
+
+// sanitizeDraftHtml prepares author-written HTML drafts for Qt RichText preview
+// without loading remote images, scripts, or unsafe link schemes.
+function sanitizeDraftHtml(rawHtml) {
+    let s = String(rawHtml || "");
+    s = s.replace(/<\s*(script|style|iframe|object|embed|form)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "");
+    s = s.replace(/<\s*\/?\s*(script|style|iframe|object|embed|form|meta|link|base|img)\b[^>]*>/gi, "");
+    s = s.replace(/\s+on[a-z0-9_]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+    s = s.replace(/\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi, (m, q1, q2, q3) => {
+        const u = (q1 || q2 || q3 || "").trim();
+        return safeUrl(u) ? 'href="' + escapeHtml(u) + '"' : 'href="#"';
+    });
+    return s;
 }

@@ -9,12 +9,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/ent/thread"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/rules"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/rules"
 )
 
 // Queue is the single write path for user actions. Enqueue expands the op

@@ -1,18 +1,21 @@
 # Maintainer: arqueon <arqueonautis@gmail.com>
-pkgname=dms-shell-plugin-dankmail
-pkgver=0.4.1
+pkgname=dms-shell-plugin-dux-mail
+pkgver=0.5.0
 pkgrel=1
-pkgdesc="Dankmail Unread companion for DankMaterialShell (unread counts and mail triage)"
+pkgdesc="Dux Mail Unread companion for Dux Shell / DankMaterialShell (unread counts and mail triage)"
 arch=('any')
-url="https://github.com/arqueon/dankmail"
+url="https://github.com/arqueon/dux-mail"
 license=('GPL-3.0-or-later')
-depends=('dankmail' 'dms-shell')
-install=dms-shell-plugin-dankmail.install
-source=("dankmail-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
-sha256sums=('998e53045f7a542657baf4c6b94a45590cb7fee5612ffa72dce4cd7d42acc87b')
+depends=('dux-mail' 'dms-shell')
+provides=("dms-shell-plugin-dankmail=$pkgver")
+conflicts=('dms-shell-plugin-dankmail')
+replaces=('dms-shell-plugin-dankmail')
+install=dms-shell-plugin-dux-mail.install
+source=("dux-mail-$pkgver.tar.gz::$url/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('SKIP')
 
 package() {
-  cd "dankmail-$pkgver"
+  cd "dux-mail-$pkgver"
   # DMS discovers packaged plugins here, separately from user-managed copies.
   local plugin_dir=/etc/xdg/quickshell/dms-plugins/dankmailUnread
   install -Dm644 dms-plugin/plugin.json "$pkgdir$plugin_dir/plugin.json"

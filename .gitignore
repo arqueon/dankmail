@@ -9,3 +9,5 @@ core/coverage.out
 
 # graphify (generated knowledge graph)
 graphify-out/
+
+core/dmail

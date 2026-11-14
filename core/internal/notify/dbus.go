@@ -9,8 +9,8 @@ import (
 const (
 	dbusDest = "org.freedesktop.Notifications"
 	dbusPath = "/org/freedesktop/Notifications"
-	appName  = "Dank Mail"
-	appIcon  = "dankmail"
+	appName  = "Dux Mail"
+	appIcon  = "duxmail"
 )
 
 // DBusNotifier talks to org.freedesktop.Notifications directly, with
@@ -78,7 +78,7 @@ func (n *DBusNotifier) Send(nn Notification) (uint32, error) {
 	}
 	hints := map[string]dbus.Variant{
 		"urgency":       dbus.MakeVariant(byte(nn.Urgency)),
-		"desktop-entry": dbus.MakeVariant("org.arqueon.dankmail"),
+		"desktop-entry": dbus.MakeVariant("org.arqueon.duxmail"),
 	}
 	switch nn.Sound {
 	case "":

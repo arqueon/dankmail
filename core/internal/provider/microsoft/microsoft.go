@@ -7,9 +7,9 @@ import (
 	"strings"
 	gosync "sync"
 
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/mailmime"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/mailmime"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 const defaultBodyCap = 32 * 1024

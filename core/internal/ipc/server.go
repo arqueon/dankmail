@@ -8,9 +8,10 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
 	"sync"
 
-	"github.com/arqueon/dankmail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/bus"
 )
 
 // Handler processes one IPC method call.
@@ -33,12 +34,20 @@ var ErrAlreadyRunning = errors.New("ipc: daemon already running on socket")
 //	subscribe
 type Server struct {
 	socketPath string
+	aliasPath  string
 	handlers   map[string]Handler
 	bus        *bus.Bus
 }
 
 func NewServer(socketPath string, b *bus.Bus) *Server {
 	return &Server{socketPath: socketPath, handlers: map[string]Handler{}, bus: b}
+}
+
+// WithAlias exposes a compatibility symlink (e.g. dankmail.sock -> duxmail.sock)
+// alongside the primary socket so older widgets and scripts keep working.
+func (s *Server) WithAlias(aliasPath string) *Server {
+	s.aliasPath = aliasPath
+	return s
 }
 
 // Register adds a method handler. Panics on duplicate registration —
@@ -57,16 +66,36 @@ func (s *Server) Serve(ctx context.Context) error {
 		_ = conn.Close()
 		return ErrAlreadyRunning
 	}
+	if s.aliasPath != "" && s.aliasPath != s.socketPath {
+		if conn, err := net.Dial("unix", s.aliasPath); err == nil {
+			_ = conn.Close()
+			return ErrAlreadyRunning
+		}
+	}
 	_ = os.Remove(s.socketPath)
 
 	ln, err := net.Listen("unix", s.socketPath)
 	if err != nil {
 		return err
 	}
+	aliasCreated := false
+	if s.aliasPath != "" && s.aliasPath != s.socketPath {
+		_ = os.Remove(s.aliasPath)
+		target := s.socketPath
+		if filepath.Dir(s.aliasPath) == filepath.Dir(s.socketPath) {
+			target = filepath.Base(s.socketPath)
+		}
+		if err := os.Symlink(target, s.aliasPath); err == nil {
+			aliasCreated = true
+		}
+	}
 	go func() {
 		<-ctx.Done()
 		_ = ln.Close()
 		_ = os.Remove(s.socketPath)
+		if aliasCreated {
+			_ = os.Remove(s.aliasPath)
+		}
 	}()
 
 	for {

@@ -1,8 +1,10 @@
 [Unit]
-Description=Dank Mail
-Documentation=https://github.com/arqueon/dankmail
+Description=Dux Mail
+Documentation=https://github.com/arqueon/dux-mail
 After=graphical-session.target
 PartOf=graphical-session.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple

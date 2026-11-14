@@ -1,4 +1,4 @@
-module github.com/arqueon/dankmail/core
+module github.com/arqueon/dux-mail/core
 
 go 1.26.4
 

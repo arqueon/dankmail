@@ -1,6 +1,7 @@
 // Package keyring stores account secrets (OAuth token JSON, IMAP/SMTP
 // passwords) in the system keyring via the Secret Service API, with
-// fallback to the database Secret table if the keyring is unavailable.
+// transparent fallback to legacy "dankmail" keyring entries and the
+// database Secret table if the keyring is unavailable.
 package keyring
 
 import (
@@ -11,12 +12,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/zalando/go-keyring"
 
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/account"
-	entsecret "github.com/arqueon/dankmail/core/ent/secret"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	entsecret "github.com/arqueon/dux-mail/core/ent/secret"
 )
 
-const service = "dankmail"
+const (
+	service       = "duxmail"
+	legacyService = "dankmail"
+)
 
 // Well-known secret keys per account.
 const (
@@ -41,9 +45,15 @@ func SetFallbackDB(db *ent.Client) {
 
 func key(accountID, name string) string { return accountID + "/" + name }
 
+func goKeyringMockInit()                        { keyring.MockInit() }
+func setRawService(svc, k, secret string) error { return keyring.Set(svc, k, secret) }
+
 func Set(accountID, name, secret string) error {
-	err := keyring.Set(service, key(accountID, name), secret)
+	k := key(accountID, name)
+	err := keyring.Set(service, k, secret)
 	if err == nil {
+		// Best-effort cleanup of stale legacy entry once migrated to "duxmail".
+		_ = keyring.Delete(legacyService, k)
 		deleteFallback(accountID, name)
 		return nil
 	}
@@ -56,9 +66,13 @@ func Set(accountID, name, secret string) error {
 }
 
 func Get(accountID, name string) (string, error) {
-	val, err := keyring.Get(service, key(accountID, name))
+	k := key(accountID, name)
+	val, err := keyring.Get(service, k)
 	if err == nil {
 		return val, nil
+	}
+	if lval, lerr := keyring.Get(legacyService, k); lerr == nil {
+		return lval, nil
 	}
 
 	// Check fallback DB
@@ -68,15 +82,22 @@ func Get(accountID, name string) (string, error) {
 	return "", err
 }
 
-// Delete removes one secret from both keyring and fallback DB; ErrNotFound is not an error for callers
-// cleaning up an account.
+// Delete removes one secret from keyring (both current and legacy service
+// names) and fallback DB; ErrNotFound is not an error for callers cleaning up
+// an account.
 func Delete(accountID, name string) error {
+	k := key(accountID, name)
 	deleteFallback(accountID, name)
-	err := keyring.Delete(service, key(accountID, name))
-	if err == nil || errors.Is(err, keyring.ErrNotFound) {
+	err1 := keyring.Delete(service, k)
+	err2 := keyring.Delete(legacyService, k)
+	if (err1 == nil || errors.Is(err1, keyring.ErrNotFound)) &&
+		(err2 == nil || errors.Is(err2, keyring.ErrNotFound)) {
 		return nil
 	}
-	return err
+	if err1 != nil && !errors.Is(err1, keyring.ErrNotFound) {
+		return err1
+	}
+	return err2
 }
 
 func setFallback(accountID, name, secret string) error {

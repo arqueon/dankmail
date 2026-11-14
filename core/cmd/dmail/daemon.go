@@ -12,21 +12,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/arqueon/dankmail/core/api/server"
-	"github.com/arqueon/dankmail/core/config"
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/contacts"
-	"github.com/arqueon/dankmail/core/internal/drafts"
-	"github.com/arqueon/dankmail/core/internal/i18n"
-	"github.com/arqueon/dankmail/core/internal/ipc"
-	"github.com/arqueon/dankmail/core/internal/keyring"
-	"github.com/arqueon/dankmail/core/internal/notify"
-	"github.com/arqueon/dankmail/core/internal/paths"
-	"github.com/arqueon/dankmail/core/internal/rules"
-	"github.com/arqueon/dankmail/core/internal/settings"
-	dsync "github.com/arqueon/dankmail/core/internal/sync"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/api/server"
+	"github.com/arqueon/dux-mail/core/config"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/contacts"
+	"github.com/arqueon/dux-mail/core/internal/drafts"
+	"github.com/arqueon/dux-mail/core/internal/i18n"
+	"github.com/arqueon/dux-mail/core/internal/ipc"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/internal/notify"
+	"github.com/arqueon/dux-mail/core/internal/paths"
+	"github.com/arqueon/dux-mail/core/internal/rules"
+	"github.com/arqueon/dux-mail/core/internal/settings"
+	dsync "github.com/arqueon/dux-mail/core/internal/sync"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 // daemon bundles every long-lived component. One instance per process.
@@ -107,7 +107,7 @@ func runDaemon(shellDir string, hidden bool) error {
 	var wg gosync.WaitGroup
 
 	// IPC server (fails fast if another daemon owns the socket).
-	srv := ipc.NewServer(paths.SocketPath(), d.bus)
+	srv := ipc.NewServer(paths.SocketPath(), d.bus).WithAlias(paths.LegacySocketPath())
 	d.registerIPC(srv)
 	d.registerAccountIPC(srv)
 	ipcErr := make(chan error, 1)
@@ -183,7 +183,7 @@ func runDaemon(shellDir string, hidden bool) error {
 		d.startUI(hidden)
 	}
 
-	slog.Info("dankmail daemon running", "version", Version, "db", dbPath, "socket", paths.SocketPath())
+	slog.Info("dux-mail daemon running", "version", Version, "db", dbPath, "socket", paths.SocketPath())
 	<-rootCtx.Done()
 	wg.Wait()
 	select {
@@ -320,6 +320,10 @@ func (d *daemon) startUI(hidden bool) {
 	if d.shellDir == "" || d.uiProc != nil {
 		return
 	}
+	if os.Getenv("WAYLAND_DISPLAY") == "" && os.Getenv("DISPLAY") == "" {
+		slog.Info("no graphical display detected; skipping quickshell UI (daemon stays active headless)")
+		return
+	}
 	cmd := exec.CommandContext(d.rootCtx, "qs", "-p", d.shellDir)
 	cmd.Env = os.Environ()
 	if hidden {
@@ -411,13 +415,13 @@ func (d *daemon) handleEvent(ctx context.Context, ev bus.Event) {
 		}
 	case "op.failed":
 		_, _ = d.notifier.Send(notify.Notification{
-			Summary: i18n.T("dankmail: operation failed"),
+			Summary: i18n.T("Dux Mail: operation failed"),
 			Body:    fmt.Sprintf("%s: %s", str("opType"), str("error")),
 			Urgency: notify.UrgencyCritical,
 		})
 	case "account.auth":
 		_, _ = d.notifier.Send(notify.Notification{
-			Summary: i18n.T("dankmail: account needs re-authentication"),
+			Summary: i18n.T("Dux Mail: account needs re-authentication"),
 			Body:    i18n.T("Use the key button in Settings → Accounts, or run: dmail account reauth"),
 			Urgency: notify.UrgencyCritical,
 		})

@@ -28,11 +28,11 @@ import (
 	"github.com/emersion/go-message/charset"
 	gomail "github.com/emersion/go-message/mail"
 
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/accounts"
-	"github.com/arqueon/dankmail/core/internal/mailmime"
-	"github.com/arqueon/dankmail/core/internal/mailtext"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/accounts"
+	"github.com/arqueon/dux-mail/core/internal/mailmime"
+	"github.com/arqueon/dux-mail/core/internal/mailtext"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 const (

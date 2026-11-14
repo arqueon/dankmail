@@ -12,8 +12,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
-	"github.com/arqueon/dankmail/core/models"
+	"github.com/arqueon/dux-mail/core/internal/mailtext"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/models"
 )
 
 // Store persists drafts locally on disk and merges remote provider drafts.
@@ -143,7 +144,11 @@ func (s *Store) Save(d models.DraftView) (models.DraftView, error) {
 		}
 	}
 	d.Attachments = NormalizeAttachments(d.Attachments)
-	d.Snippet = makeSnippet(d.Body)
+	snippetSrc := d.Body
+	if strings.TrimSpace(snippetSrc) == "" && strings.TrimSpace(d.HTMLBody) != "" {
+		snippetSrc = mailtext.HTMLToText(d.HTMLBody)
+	}
+	d.Snippet = makeSnippet(snippetSrc)
 	if d.UpdatedAt.IsZero() {
 		d.UpdatedAt = time.Now().UTC()
 	}
@@ -233,8 +238,19 @@ func (s *Store) MergeRemote(accountID string, remote []provider.DraftItem) {
 			}
 		}
 		body := r.Body
-		if exists && prev.Body != "" && r.Body == "" {
-			body = prev.Body
+		remoteTime := time.Unix(r.UpdatedAt, 0).UTC()
+		if exists && prev.Body != "" {
+			if r.Body == "" || ((prev.Format == "markdown" || prev.HTMLBody != "") && !remoteTime.After(prev.UpdatedAt.Add(5*time.Second))) {
+				body = prev.Body
+			}
+		}
+		htmlBody := r.HTMLBody
+		if htmlBody == "" && exists {
+			htmlBody = prev.HTMLBody
+		}
+		format := r.Format
+		if format == "" && exists {
+			format = prev.Format
 		}
 		snippet := r.Snippet
 		if snippet == "" {
@@ -253,6 +269,8 @@ func (s *Store) MergeRemote(accountID string, remote []provider.DraftItem) {
 			Bcc:               r.Bcc,
 			Subject:           r.Subject,
 			Body:              body,
+			HTMLBody:          htmlBody,
+			Format:            format,
 			Snippet:           snippet,
 			UpdatedAt:         updated,
 			Attachments:       atts,

@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 const checkpointPrefix = "graph-sync-v1:"

@@ -9,7 +9,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: I18n.trFor("dankmailUnread", "Dankmail Unread")
+        text: I18n.trFor("dankmailUnread", "Dux Mail Unread")
         font.pixelSize: Theme.fontSizeLarge
         font.weight: Font.Medium
         color: Theme.surfaceText
@@ -17,7 +17,7 @@ PluginSettings {
 
     StyledText {
         width: parent.width
-        text: I18n.trFor("dankmailUnread", "Live unread badge and triage popout for Dankmail. Left click opens the popout, middle click toggles the app, and right click syncs.")
+        text: I18n.trFor("dankmailUnread", "Live unread badge and triage popout for Dux Mail. Left click opens the popout, middle click toggles the app, and right click syncs.")
         font.pixelSize: Theme.fontSizeSmall
         color: Theme.surfaceVariantText
         wrapMode: Text.WordWrap
@@ -33,7 +33,7 @@ PluginSettings {
     ToggleSetting {
         settingKey: "showDndDot"
         label: I18n.trFor("dankmailUnread", "Do-not-disturb indicator")
-        description: I18n.trFor("dankmailUnread", "Show a small dot while Dankmail's DND mode is active")
+        description: I18n.trFor("dankmailUnread", "Show a small dot while Dux Mail's DND mode is active")
         defaultValue: true
     }
 }

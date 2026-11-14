@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arqueon/dankmail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent"
 )
 
 func TestArchivedFilter(t *testing.T) {

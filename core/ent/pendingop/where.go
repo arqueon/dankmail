@@ -7,7 +7,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"github.com/arqueon/dankmail/core/ent/predicate"
+	"github.com/arqueon/dux-mail/core/ent/predicate"
 )
 
 // ID filters vertices based on their ID field.

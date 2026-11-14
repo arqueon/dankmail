@@ -10,15 +10,15 @@ import (
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 
-	"github.com/arqueon/dankmail/core/config"
-	"github.com/arqueon/dankmail/core/ent"
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/accounts"
-	"github.com/arqueon/dankmail/core/internal/i18n"
-	"github.com/arqueon/dankmail/core/internal/keyring"
-	"github.com/arqueon/dankmail/core/internal/oauth"
-	"github.com/arqueon/dankmail/core/internal/paths"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/config"
+	"github.com/arqueon/dux-mail/core/ent"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/accounts"
+	"github.com/arqueon/dux-mail/core/internal/i18n"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/internal/oauth"
+	"github.com/arqueon/dux-mail/core/internal/paths"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 // accountCmd manages accounts directly against the database + keyring.

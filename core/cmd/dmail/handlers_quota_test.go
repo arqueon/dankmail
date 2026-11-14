@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/provider"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 type searchProvider struct {

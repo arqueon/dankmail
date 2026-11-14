@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '../../quickshell/Common/BodyFormatter.js'), 'utf8');
-const {format, safeUrl, unwrapUrl, extractLinks} = vm.runInNewContext(source.replace(/^\.pragma library\s*/, '') + '\n({format, safeUrl, unwrapUrl, extractLinks})');
+const {format, safeUrl, unwrapUrl, extractLinks, sanitizeDraftHtml} = vm.runInNewContext(source.replace(/^\.pragma library\s*/, '') + '\n({format, safeUrl, unwrapUrl, extractLinks, sanitizeDraftHtml})');
 test('distilled headings, paragraphs, lists, quotes, code and tables retain structure', () => {
  const html = format('# Heading\r\n\r\nFirst line\r\nsecond line\n\n- one\n- two\n\n2. second\n3. third\n\n> quoted\n>> nested\n\n```js\n<a> & code\n```\n\n| A | B |\n| --- | --- |\n| **bold** | value |');
  for (const term of ['<b>Heading</b>', 'First line<br>second line', '<ul><li>one</li><li>two</li></ul>', '<ol start="2">', '<blockquote', '&lt;a&gt; &amp; code', '<table', '<th>A</th>', '<td><b>bold</b></td>']) assert.ok(html.includes(term), term);
@@ -93,4 +93,20 @@ test('markdown images and linked images with titles, parens, brackets, multiline
  assert.ok(html.includes('>Abrir documento<'), html);
  assert.ok(html.includes('href="https://facebook.com/udg"'), html);
  assert.ok(html.includes('>Enlace<'), html);
+});
+
+test('markdownItalics and sanitizeDraftHtml support rich draft authoring safely', () => {
+ const md = format('**bold** *italic* _under_ ~~strike~~ ***both***', {markdownItalics: true});
+ assert.ok(md.includes('<b>bold</b>'), md);
+ assert.ok(md.includes('<i>italic</i>'), md);
+ assert.ok(md.includes('<i>under</i>'), md);
+ assert.ok(md.includes('<s>strike</s>'), md);
+ assert.ok(md.includes('<b><i>both</i></b>'), md);
+ const clean = sanitizeDraftHtml('<h2>Title</h2><script>evil()</script><img src="https://tracker.test/p"><a href="javascript:bad" onclick="x()">x</a><a href="https://example.org">ok</a>');
+ assert.ok(clean.includes('<h2>Title</h2>'));
+ assert.ok(!clean.includes('<script'));
+ assert.ok(!clean.includes('<img'));
+ assert.ok(!clean.includes('javascript:'));
+ assert.ok(!clean.includes('onclick'));
+ assert.ok(clean.includes('href="https://example.org"'));
 });

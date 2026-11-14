@@ -16,11 +16,11 @@ import (
 	"google.golang.org/api/option"
 	peoplev1 "google.golang.org/api/people/v1"
 
-	"github.com/arqueon/dankmail/core/ent"
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/ent/contact"
-	"github.com/arqueon/dankmail/core/ent/message"
-	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/ent"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent/contact"
+	"github.com/arqueon/dux-mail/core/ent/message"
+	"github.com/arqueon/dux-mail/core/ent/thread"
 )
 
 // entry is an aggregation bucket during mail indexing.

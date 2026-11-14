@@ -15,8 +15,8 @@ import (
 	"golang.org/x/oauth2/google"
 	"golang.org/x/oauth2/microsoft"
 
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
 )
 
 // Endpoints selects the identity provider a Broker talks to. The flow

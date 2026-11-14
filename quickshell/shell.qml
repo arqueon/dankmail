@@ -2,7 +2,7 @@
 //@ pragma Env QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 //@ pragma Env QT_QUICK_CONTROLS_STYLE=Material
 //@ pragma UseQApplication
-//@ pragma AppId org.arqueon.dankmail
+//@ pragma AppId org.arqueon.duxmail
 
 import QtQuick
 import Quickshell
@@ -11,7 +11,7 @@ import qs.Common
 import qs.Modules
 import qs.Services
 
-// dankmail Quickshell entrypoint (structure mirrors dankcalendar's).
+// Dux Mail Quickshell entrypoint (structure mirrors dux-calendar's).
 // The window is a view over the dmail daemon: closing it only hides it;
 // sync and notifications keep running.
 ShellRoot {
@@ -24,7 +24,7 @@ ShellRoot {
         if (!toplevels || !toplevels.values)
             return;
         for (const t of toplevels.values) {
-            if (t.appId === "org.arqueon.dankmail") {
+            if (t.appId === "org.arqueon.duxmail" || t.appId === "org.arqueon.dankmail") {
                 t.activate();
                 return;
             }

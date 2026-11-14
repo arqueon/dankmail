@@ -5,7 +5,7 @@ import qs.Common
 import qs.DCommon.Widgets
 import qs.Modules.Plugins
 
-// Unread badge for dankmail (https://github.com/arqueon/dankmail).
+// Unread badge for Dux Mail (https://github.com/arqueon/dux-mail).
 // Live updates: subscribes to the dmail daemon's IPC socket (line-JSON
 // protocol) with a safety poll. Left click opens the popout, middle
 // click toggles the app, and right click syncs.
@@ -48,7 +48,7 @@ PluginComponent {
 
     readonly property string socketPath: {
         const rt = Quickshell.env("XDG_RUNTIME_DIR");
-        return (rt && rt !== "" ? rt : "/tmp") + "/dankmail.sock";
+        return (rt && rt !== "" ? rt : "/tmp") + "/duxmail.sock";
     }
 
     readonly property bool pillHidden: hideWhenZero && daemonConnected && unread === 0
@@ -194,7 +194,7 @@ PluginComponent {
             syncGuard.stop();
         }
         if (msg.error) {
-            root.requestError = I18n.trFor("dankmailUnread", "The request failed. Open Dankmail to check the account and retry.");
+            root.requestError = I18n.trFor("dankmailUnread", "The request failed. Open Dux Mail to check the account and retry.");
             return;
         }
         if (msg.id === root._statusReqId && msg.result) {
@@ -452,7 +452,7 @@ PluginComponent {
                     spacing: 0
 
                     StyledText {
-                        text: I18n.trFor("dankmailUnread", "Dank Mail")
+                        text: I18n.trFor("dankmailUnread", "Dux Mail")
                         font.pixelSize: Theme.fontSizeLarge
                         font.weight: Font.Bold
                         color: titleHover.hovered ? Theme.primary : Theme.surfaceText
@@ -656,7 +656,7 @@ PluginComponent {
                     StyledText {
                         visible: !root.daemonConnected
                         width: parent.width
-                        text: I18n.trFor("dankmailUnread", "Dankmail is stopped. Click the title above to start it.")
+                        text: I18n.trFor("dankmailUnread", "Dux Mail is stopped. Click the title above to start it.")
                         font.pixelSize: Theme.fontSizeSmall
                         color: Theme.surfaceVariantText
                         wrapMode: Text.WordWrap
@@ -779,7 +779,7 @@ PluginComponent {
                                     }
                                 }
 
-                                // Same order as dankmail's own triage row,
+                                // Same order as Dux Mail's own triage row,
                                 // followed by a focused quick-reply entry.
                                 DActionButton {
                                     visible: root.mailboxView !== "drafts"

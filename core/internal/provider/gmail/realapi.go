@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"net/http"
 
-	"github.com/arqueon/dankmail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/errdefs"
 	gmailv1 "google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 )

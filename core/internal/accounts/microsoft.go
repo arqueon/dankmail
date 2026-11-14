@@ -6,10 +6,10 @@ import (
 
 	"golang.org/x/oauth2"
 
-	"github.com/arqueon/dankmail/core/ent"
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/oauth"
-	"github.com/arqueon/dankmail/core/internal/provider/microsoft"
+	"github.com/arqueon/dux-mail/core/ent"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/oauth"
+	"github.com/arqueon/dux-mail/core/internal/provider/microsoft"
 )
 
 // FinishMicrosoft resolves the authorized mailbox address (Graph /me),
@@ -72,7 +72,7 @@ func MicrosoftSetupSteps() []SetupStep {
 	return []SetupStep{
 		{
 			Title:       "Create an Azure app registration",
-			Description: "On the App registrations page click \"New registration\". Name: anything (e.g. \"dankmail\"). Supported account types: \"Personal Microsoft accounts and work/school accounts\" — required for hotmail.com/outlook.com/live.com mailboxes. Personal accounts need no paid Azure subscription.",
+			Description: "On the App registrations page click \"New registration\". Name: anything (e.g. \"dux-mail\"). Supported account types: \"Personal Microsoft accounts and work/school accounts\" — required for hotmail.com/outlook.com/live.com mailboxes. Personal accounts need no paid Azure subscription.",
 			URL:         "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
 			URLLabel:    "Open App registrations",
 		},
@@ -81,14 +81,14 @@ func MicrosoftSetupSteps() []SetupStep {
 			Description: "In your new app: Authentication → \"Add a platform\" → \"Mobile and desktop applications\" → custom redirect URI: http://localhost/callback — then set \"Allow public client flows\" to Yes and save.",
 			URL:         "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
 			URLLabel:    "Open App registrations",
-			Note:        "No client secret is created: dankmail is a public client and the PKCE exchange carries the proof. The only mail permissions ever requested are Mail.ReadWrite and Mail.Send (plus User.Read for the address).",
+			Note:        "No client secret is created: Dux Mail is a public client and the PKCE exchange carries the proof. The only mail permissions ever requested are Mail.ReadWrite and Mail.Send (plus User.Read for the address).",
 		},
 		{
 			Title:       "Add delegated Microsoft Graph permissions",
 			Description: "Open API permissions → Add a permission → Microsoft Graph → Delegated permissions. Add Mail.ReadWrite, Mail.Send, User.Read and offline_access. Do not choose Application permissions or any *.Shared permission.",
 			URL:         "https://portal.azure.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade",
 			URLLabel:    "Open App registrations",
-			Note:        "Delegated permissions limit dankmail to the signed-in mailbox. Mail.ReadWrite does not include sending, so Mail.Send is required separately; offline_access keeps background sync authorized.",
+			Note:        "Delegated permissions limit Dux Mail to the signed-in mailbox. Mail.ReadWrite does not include sending, so Mail.Send is required separately; offline_access keeps background sync authorized.",
 		},
 		{
 			Title:       "Copy the Application (client) ID",

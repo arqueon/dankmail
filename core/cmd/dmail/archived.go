@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
-	dsync "github.com/arqueon/dankmail/core/internal/sync"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	dsync "github.com/arqueon/dux-mail/core/internal/sync"
 )
 
 // Each account advances independently: failed pages retain their token for a

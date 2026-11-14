@@ -10,8 +10,8 @@ import (
 	entsql "entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/ent"
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
 
 	_ "modernc.org/sqlite"
 )
@@ -73,5 +73,37 @@ func TestFallbackSecretStore(t *testing.T) {
 	deleteFallback(id, KeyOAuthToken)
 	if _, err := getFallback(id, KeyOAuthToken); err == nil {
 		t.Fatal("expected error after deleteFallback, got nil")
+	}
+}
+
+
+func TestLegacyServiceFallbackAndMigration(t *testing.T) {
+	// MockInit provides an in-memory keyring without touching the host Secret Service.
+	goKeyringMockInit()
+
+	acctID := uuid.NewString()
+	k := key(acctID, KeyOAuthToken)
+	if err := setRawService(legacyService, k, "legacy-token"); err != nil {
+		t.Fatalf("seed legacy keyring: %v", err)
+	}
+
+	got, err := Get(acctID, KeyOAuthToken)
+	if err != nil || got != "legacy-token" {
+		t.Fatalf("Get() from legacy service = %q, %v; want legacy-token", got, err)
+	}
+
+	if err := Set(acctID, KeyOAuthToken, "new-duxmail-token"); err != nil {
+		t.Fatalf("Set() failed: %v", err)
+	}
+	got, err = Get(acctID, KeyOAuthToken)
+	if err != nil || got != "new-duxmail-token" {
+		t.Fatalf("Get() after Set = %q, %v; want new-duxmail-token", got, err)
+	}
+
+	if err := Delete(acctID, KeyOAuthToken); err != nil {
+		t.Fatalf("Delete() failed: %v", err)
+	}
+	if _, err := Get(acctID, KeyOAuthToken); err == nil {
+		t.Fatal("expected error after Delete(), got nil")
 	}
 }

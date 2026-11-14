@@ -8,8 +8,8 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
-	"github.com/arqueon/dankmail/core/ent/contact"
-	"github.com/arqueon/dankmail/core/ent/predicate"
+	"github.com/arqueon/dux-mail/core/ent/contact"
+	"github.com/arqueon/dux-mail/core/ent/predicate"
 )
 
 // ContactDelete is the builder for deleting a Contact entity.

@@ -1,12 +1,12 @@
 # Gmail account setup
 
-dankmail talks to Gmail through the official API with **your own OAuth
+Dux Mail (`dux-mail`) talks to Gmail through the official API with **your own OAuth
 client**. You create a (free) client ID in Google Cloud Console once.
 The app starts in testing mode with you as the only test user; the last
 step publishes it to production **without** submitting it for Google
 verification — for personal use none is needed.
 
-**The easiest path is the in-app wizard** (tray → Open Dank Mail → the
+**The easiest path is the in-app wizard** (tray → Open Dux Mail → the
 person-add button, or the "Add a Gmail account" button when no account
 exists): it walks you through the exact steps below with direct links,
 takes the Client ID/Secret, and runs the OAuth consent — no environment

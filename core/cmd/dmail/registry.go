@@ -10,16 +10,16 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/config"
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/accounts"
-	"github.com/arqueon/dankmail/core/internal/keyring"
-	"github.com/arqueon/dankmail/core/internal/oauth"
-	"github.com/arqueon/dankmail/core/internal/provider"
-	"github.com/arqueon/dankmail/core/internal/provider/gmail"
-	"github.com/arqueon/dankmail/core/internal/provider/imap"
-	"github.com/arqueon/dankmail/core/internal/provider/microsoft"
+	"github.com/arqueon/dux-mail/core/config"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/accounts"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/internal/oauth"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider/gmail"
+	"github.com/arqueon/dux-mail/core/internal/provider/imap"
+	"github.com/arqueon/dux-mail/core/internal/provider/microsoft"
 )
 
 // registry builds and caches one provider instance per account. rebuild

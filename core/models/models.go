@@ -59,6 +59,8 @@ type DraftView struct {
 	Bcc               []string         `json:"bcc,omitempty"`
 	Subject           string           `json:"subject"`
 	Body              string           `json:"body"`
+	HTMLBody          string           `json:"htmlBody,omitempty"`
+	Format            string           `json:"format,omitempty"`
 	Snippet           string           `json:"snippet"`
 	UpdatedAt         time.Time        `json:"updatedAt"`
 	Attachments       []AttachmentView `json:"attachments,omitempty"`

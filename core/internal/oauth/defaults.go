@@ -9,8 +9,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/arqueon/dankmail/core/internal/keyring"
-	"github.com/arqueon/dankmail/core/internal/paths"
+	"github.com/arqueon/dux-mail/core/internal/keyring"
+	"github.com/arqueon/dux-mail/core/internal/paths"
 )
 
 // Compile-time OAuth client defaults, optionally injected via -ldflags -X

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 // fakeAPI implements graphAPI over in-memory fixtures.

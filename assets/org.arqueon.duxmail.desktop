@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Dux Mail
+Comment=Mail notifier, triage, and MCP server for your desktop
+Exec=dmail show
+Icon=duxmail
+StartupWMClass=org.arqueon.duxmail
+Terminal=false
+Categories=Network;Email;
+StartupNotify=false

@@ -8,8 +8,8 @@ import (
 
 	goimap "github.com/emersion/go-imap/v2"
 
-	"github.com/arqueon/dankmail/core/internal/accounts"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/accounts"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 type fakeBackend struct {
@@ -150,5 +150,81 @@ func TestIMAPSyncThreadingHTMLAndAttachmentFetch(t *testing.T) {
 		To: []string{"alice@example.org"}, Subject: "Hello", Body: "Test",
 	}); err != nil || len(fb.sentSMTP) != 1 {
 		t.Fatalf("Compose failed: err=%v sent=%d", err, len(fb.sentSMTP))
+	}
+}
+
+
+func (f *fakeBackend) SearchMessages(_ context.Context, mailboxes []string, criteria *goimap.SearchCriteria, _ int) ([]rawMessage, error) {
+	var out []rawMessage
+	for _, box := range mailboxes {
+		for _, m := range f.boxes[box] {
+			rawLower := strings.ToLower(string(m.Raw))
+			matched := true
+			for _, h := range criteria.Header {
+				needle := strings.ToLower(h.Key + ":")
+				if !strings.Contains(rawLower, needle) || !strings.Contains(rawLower, strings.ToLower(h.Value)) {
+					matched = false
+					break
+				}
+			}
+			for _, term := range criteria.Text {
+				if !strings.Contains(rawLower, strings.ToLower(term)) {
+					matched = false
+					break
+				}
+			}
+			if matched {
+				out = append(out, m)
+			}
+		}
+	}
+	return out, nil
+}
+
+func TestIMAPSearchRemoteAcrossMailboxes(t *testing.T) {
+	archivedRaw := strings.Join([]string{
+		"From: Billing <billing@acme.example>",
+		"To: User <user@example.org>",
+		"Subject: Invoice INV-2025-99",
+		"Message-ID: <inv-99@acme.example>",
+		"Date: Tue, 14 Jan 2025 10:00:00 +0000",
+		"Content-Type: text/plain; charset=utf-8",
+		"",
+		"Attached is your annual invoice INV-2025-99.",
+		"",
+	}, "\r\n")
+
+	fb := &fakeBackend{
+		folders: specialFolders{Inbox: "INBOX", Archive: "Archive", Sent: "Sent"},
+		boxes: map[string][]rawMessage{
+			"Archive": {
+				{
+					Mailbox:      "Archive",
+					UIDValidity:  1,
+					UID:          77,
+					Flags:        []goimap.Flag{goimap.FlagSeen},
+					InternalDate: time.Date(2025, 1, 14, 10, 0, 0, 0, time.UTC),
+					Raw:          []byte(archivedRaw),
+				},
+			},
+		},
+	}
+
+	p := newWithBackend("acct-imap", "user@example.org", accounts.IMAPConfig{Host: "imap.example.org"}, 0, fb)
+	changes, err := p.SearchRemote(context.Background(), `from:billing "INV-2025-99"`, 20)
+	if err != nil {
+		t.Fatalf("SearchRemote failed: %v", err)
+	}
+	if !changes.Backfill {
+		t.Fatal("expected Backfill=true")
+	}
+	if len(changes.Upserted) != 1 {
+		t.Fatalf("got %d threads, want 1", len(changes.Upserted))
+	}
+	if changes.Upserted[0].InInbox {
+		t.Fatal("archived search hit must have InInbox=false")
+	}
+	if changes.Upserted[0].Subject != "Invoice INV-2025-99" {
+		t.Fatalf("got subject %q", changes.Upserted[0].Subject)
 	}
 }

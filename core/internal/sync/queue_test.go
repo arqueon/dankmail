@@ -5,8 +5,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/internal/rules"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/internal/rules"
 )
 
 func TestEnqueueAppliesOptimisticallyAndSnapshotsPrev(t *testing.T) {

@@ -1,5 +1,5 @@
 // Package mailtext distills rich HTML email bodies into clean, bounded
-// Markdown-like text suitable for dankmail's non-WebEngine preview.
+// Markdown-like text suitable for Dux Mail's non-WebEngine preview.
 // Hidden preheader padding, tracking styles, scripts, and single-column
 // layout tables are stripped or unwrapped while preserving links, lists,
 // headings, inline emphasis, code blocks, and genuine multi-column tables.

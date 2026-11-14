@@ -53,14 +53,14 @@ var overrides = map[string]map[string]string{
 		"Open in web": "Abrir en web",
 
 		// daemon: notification texts
-		"dankmail: operation failed":                                              "dankmail: operación fallida",
-		"dankmail: account needs re-authentication":                               "dankmail: cuenta requiere re-autenticación",
+		"Dux Mail: operation failed":                                              "Dux Mail: operación fallida",
+		"Dux Mail: account needs re-authentication":                               "Dux Mail: cuenta requiere re-autenticación",
 		"Use the key button in Settings → Accounts, or run: dmail account reauth": "Usa el botón de llave en Ajustes → Cuentas, o ejecuta: dmail account reauth",
 		"Snoozed thread woke up":                                                  "Pospuesto despertó",
 
 		// oauth: browser callback page
 		"Authorization denied. You can close this tab.":                      "Autorización denegada. Puedes cerrar esta pestaña.",
-		"Account authorized. You can close this tab and return to dankmail.": "Cuenta autorizada. Puedes cerrar esta pestaña y volver a dankmail.",
+		"Account authorized. You can close this tab and return to Dux Mail.": "Cuenta autorizada. Puedes cerrar esta pestaña y volver a Dux Mail.",
 
 		// cli: account management
 		"Note:":                                               "Nota:",
@@ -87,14 +87,14 @@ var overrides = map[string]map[string]string{
 		"Open in web": "Abrir na web",
 
 		// daemon: notification texts
-		"dankmail: operation failed":                                              "dankmail: falha na operação",
-		"dankmail: account needs re-authentication":                               "dankmail: a conta precisa ser reautenticada",
+		"Dux Mail: operation failed":                                              "Dux Mail: falha na operação",
+		"Dux Mail: account needs re-authentication":                               "Dux Mail: a conta precisa ser reautenticada",
 		"Use the key button in Settings → Accounts, or run: dmail account reauth": "Use o botão de chave em Configurações → Contas, ou execute: dmail account reauth",
 		"Snoozed thread woke up":                                                  "Conversa adiada voltou",
 
 		// oauth: browser callback page
 		"Authorization denied. You can close this tab.":                      "Autorização negada. Você pode fechar esta aba.",
-		"Account authorized. You can close this tab and return to dankmail.": "Conta autorizada. Você pode fechar esta aba e voltar ao dankmail.",
+		"Account authorized. You can close this tab and return to Dux Mail.": "Conta autorizada. Você pode fechar esta aba e voltar ao Dux Mail.",
 
 		// cli: account management
 		"Note:":                                               "Observação:",

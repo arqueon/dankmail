@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/arqueon/dankmail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/errdefs"
 )
 
 type recordingAPI struct {

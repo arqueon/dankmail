@@ -3,7 +3,7 @@ package sync
 import (
 	"time"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 func timeFromUnix(sec int64) time.Time {

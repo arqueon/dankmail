@@ -16,10 +16,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/arqueon/dankmail/core/errdefs"
-	"github.com/arqueon/dankmail/core/internal/mailmime"
-	"github.com/arqueon/dankmail/core/internal/mailtext"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/internal/mailmime"
+	"github.com/arqueon/dux-mail/core/internal/mailtext"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 	gmailv1 "google.golang.org/api/gmail/v1"
 )
 

@@ -13,10 +13,10 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/message"
-	"github.com/arqueon/dankmail/core/ent/thread"
-	"github.com/arqueon/dankmail/core/models"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/message"
+	"github.com/arqueon/dux-mail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/models"
 )
 
 func searchDB(t testing.TB) *ent.Client {

@@ -5,15 +5,16 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/arqueon/dankmail/core/internal/i18n"
-	"github.com/arqueon/dankmail/core/internal/ipc"
-	"github.com/arqueon/dankmail/core/internal/paths"
-	"github.com/arqueon/dankmail/core/models"
+	"github.com/arqueon/dux-mail/core/internal/i18n"
+	"github.com/arqueon/dux-mail/core/internal/ipc"
+	"github.com/arqueon/dux-mail/core/internal/paths"
+	"github.com/arqueon/dux-mail/core/models"
 )
 
 var (
@@ -24,9 +25,9 @@ var (
 
 var rootCmd = &cobra.Command{
 	Use:   "dmail",
-	Short: "Multi-account mail notifier and triage daemon",
-	Long: "dankmail: a lightweight mail aggregator daemon with a Quickshell UI.\n" +
-		"Triage, not management — anything complex opens the webmail.",
+	Short: "Multi-account mail notifier, triage daemon, and MCP server",
+	Long: "Dux Mail (dmail): a lightweight multi-account mail aggregator daemon with a Quickshell UI,\n" +
+		"Dux Shell bar companion, and native MCP server for AI agents.",
 	SilenceUsage: true,
 	// Default action: focus/open the window (like `dcal`).
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -36,7 +37,7 @@ var rootCmd = &cobra.Command{
 
 // dial connects to the running daemon or fails with a friendly hint.
 func dial() (*ipc.Client, error) {
-	c, err := ipc.Dial(paths.SocketPath())
+	c, err := ipc.Dial(paths.DialSocketPath())
 	if err != nil {
 		return nil, fmt.Errorf("daemon not running (start it with 'dmail daemon' or systemctl --user start dmail): %w", err)
 	}
@@ -74,7 +75,7 @@ func init() {
 		},
 	}
 	runCmd.Flags().BoolVar(&flagHidden, "hidden", false, "start with the window hidden")
-	runCmd.Flags().StringVarP(&flagShell, "shell-config", "c", "", "quickshell config directory (default: installed dankmail shell)")
+	runCmd.Flags().StringVarP(&flagShell, "shell-config", "c", "", "quickshell config directory (default: installed duxmail shell)")
 
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -129,6 +130,8 @@ func init() {
 			}},
 		accountCmd(),
 		configCmd(),
+		sendCmd(),
+		mcpCmd(),
 		&cobra.Command{Use: "version", Short: "Print version information",
 			Run: func(cmd *cobra.Command, args []string) {
 				fmt.Printf("dmail %s (commit %s, built %s)\n", Version, Commit, BuildTime)
@@ -137,7 +140,7 @@ func init() {
 }
 
 // configCmd exposes the daemon settings (applied live, persisted to
-// ~/.config/dankmail/settings.json).
+// ~/.config/duxmail/settings.json).
 func configCmd() *cobra.Command {
 	cmd := &cobra.Command{Use: "config", Short: "Show or change daemon settings"}
 
@@ -230,6 +233,15 @@ func configCmd() *cobra.Command {
 }
 
 func defaultShellDir() string {
+	if exe, err := os.Executable(); err == nil {
+		if realExe, err := filepath.EvalSymlinks(exe); err == nil {
+			exe = realExe
+		}
+		adj := filepath.Join(filepath.Dir(exe), "quickshell")
+		if _, err := os.Stat(filepath.Join(adj, "shell.qml")); err == nil {
+			return adj
+		}
+	}
 	dataHome := os.Getenv("XDG_DATA_HOME")
 	if dataHome == "" {
 		if home, err := os.UserHomeDir(); err == nil {
@@ -237,6 +249,9 @@ func defaultShellDir() string {
 		}
 	}
 	candidates := []string{
+		dataHome + "/quickshell/duxmail",
+		"/usr/local/share/quickshell/duxmail",
+		"/usr/share/quickshell/duxmail",
 		dataHome + "/quickshell/dankmail",
 		"/usr/local/share/quickshell/dankmail",
 		"/usr/share/quickshell/dankmail",
@@ -293,7 +308,7 @@ func runStatus(cmd *cobra.Command, args []string) error {
 	if err := json.Unmarshal(raw, &st); err != nil {
 		return err
 	}
-	fmt.Printf("dankmail %s — %d unread", st.Version, st.Unread)
+	fmt.Printf("Dux Mail %s — %d unread", st.Version, st.Unread)
 	if st.DND {
 		fmt.Print(" [DND]")
 	}
@@ -376,4 +391,100 @@ func runList(cmd *cobra.Command, args []string) error {
 			mark, star, t.ID, t.LastMessageAt.Local().Format("Jan 02 15:04"), from, t.Subject)
 	}
 	return nil
+}
+
+func sendCmd() *cobra.Command {
+	var (
+		account     string
+		to, cc, bcc []string
+		subject     string
+		body        string
+		bodyFile    string
+		htmlBody    string
+		htmlFile    string
+		format      string
+		attachments []string
+	)
+	cmd := &cobra.Command{
+		Use:   "send",
+		Short: "Compose and queue an outgoing message (plain text, Markdown, or HTML)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if bodyFile != "" {
+				raw, err := os.ReadFile(bodyFile)
+				if err != nil {
+					return err
+				}
+				body = string(raw)
+			}
+			if htmlFile != "" {
+				raw, err := os.ReadFile(htmlFile)
+				if err != nil {
+					return err
+				}
+				htmlBody = string(raw)
+			}
+			if len(to) == 0 && len(cc) == 0 && len(bcc) == 0 {
+				return fmt.Errorf("at least one --to, --cc, or --bcc recipient is required")
+			}
+			if strings.TrimSpace(body) == "" && strings.TrimSpace(htmlBody) == "" && len(attachments) == 0 {
+				return fmt.Errorf("provide --body, --body-file, --html, --html-file, or --attach")
+			}
+
+			c, err := dial()
+			if err != nil {
+				return err
+			}
+			defer c.Close()
+
+			acctID := strings.TrimSpace(account)
+			if acctID == "" || strings.Contains(acctID, "@") {
+				rawAccts, err := c.Call("accounts.list", nil)
+				if err != nil {
+					return err
+				}
+				var accts []models.AccountView
+				if err := json.Unmarshal(rawAccts, &accts); err != nil {
+					return err
+				}
+				if acctID == "" {
+					if len(accts) != 1 {
+						return fmt.Errorf("--account is required when %d accounts are configured", len(accts))
+					}
+					acctID = accts[0].ID
+				} else {
+					for _, a := range accts {
+						if strings.EqualFold(a.Email, acctID) {
+							acctID = a.ID
+							break
+						}
+					}
+				}
+			}
+
+			_, err = c.Call("ops.compose", map[string]any{
+				"account":     acctID,
+				"to":          to,
+				"cc":          cc,
+				"bcc":         bcc,
+				"subject":     subject,
+				"body":        body,
+				"htmlBody":    htmlBody,
+				"format":      format,
+				"attachments": attachments,
+			})
+			return err
+		},
+	}
+	cmd.Flags().StringVar(&account, "account", "", "sending account email or UUID")
+	cmd.Flags().StringSliceVar(&to, "to", nil, "primary recipient(s)")
+	cmd.Flags().StringSliceVar(&cc, "cc", nil, "CC recipient(s)")
+	cmd.Flags().StringSliceVar(&bcc, "bcc", nil, "BCC recipient(s)")
+	cmd.Flags().StringVar(&subject, "subject", "", "subject line")
+	cmd.Flags().StringVar(&body, "body", "", "plain-text or Markdown body")
+	cmd.Flags().StringVar(&bodyFile, "body-file", "", "read plain-text or Markdown body from file")
+	cmd.Flags().StringVar(&htmlBody, "html", "", "explicit HTML body (paired with plain-text fallback)")
+	cmd.Flags().StringVar(&htmlFile, "html-file", "", "read explicit HTML body from file")
+	cmd.Flags().StringVar(&format, "format", "auto", "body format: auto, markdown, plain, or html")
+	cmd.Flags().StringSliceVar(&attachments, "attach", nil, "file path(s) to attach")
+	return cmd
 }

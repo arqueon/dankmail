@@ -1,4 +1,4 @@
-# Go core build for dankmail (dmail).
+# Go core build for Dux Mail (dmail).
 BINARY_NAME=dmail
 BUILD_DIR=bin
 

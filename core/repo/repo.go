@@ -11,7 +11,7 @@ import (
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
 
-	"github.com/arqueon/dankmail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent"
 
 	_ "modernc.org/sqlite"
 )

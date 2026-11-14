@@ -15,8 +15,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/models"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/models"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 // Deps are the read-side dependencies the routes need.
@@ -31,7 +31,7 @@ type Deps struct {
 // The returned listener's address is what the UI must be told.
 func New(addr string, deps Deps) (*http.Server, net.Listener, error) {
 	r := chi.NewRouter()
-	api := humachi.New(r, huma.DefaultConfig("dankmail", deps.Version))
+	api := humachi.New(r, huma.DefaultConfig("dux-mail", deps.Version))
 
 	registerRoutes(api, deps)
 

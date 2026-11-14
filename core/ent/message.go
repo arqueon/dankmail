@@ -10,9 +10,9 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
-	"github.com/arqueon/dankmail/core/ent/message"
-	"github.com/arqueon/dankmail/core/ent/thread"
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/ent/message"
+	"github.com/arqueon/dux-mail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 // Message is the model entity for the Message schema.

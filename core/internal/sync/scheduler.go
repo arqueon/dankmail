@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/arqueon/dankmail/core/ent"
-	"github.com/arqueon/dankmail/core/ent/thread"
-	"github.com/arqueon/dankmail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/ent"
+	"github.com/arqueon/dux-mail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/internal/bus"
 )
 
 // Scheduler wakes snoozed threads. It holds no in-memory timers: every

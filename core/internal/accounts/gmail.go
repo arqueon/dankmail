@@ -10,9 +10,9 @@ import (
 	gmailapi "google.golang.org/api/gmail/v1"
 	"google.golang.org/api/option"
 
-	"github.com/arqueon/dankmail/core/ent"
-	entaccount "github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/oauth"
+	"github.com/arqueon/dux-mail/core/ent"
+	entaccount "github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/oauth"
 )
 
 // Result of a completed account addition.

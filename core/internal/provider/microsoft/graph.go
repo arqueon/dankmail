@@ -8,7 +8,7 @@ package microsoft
 import (
 	"context"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 // graphMessage is the provider-internal view of one Graph message —

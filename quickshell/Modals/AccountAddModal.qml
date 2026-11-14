@@ -415,8 +415,8 @@ FloatingWindow {
                     text: {
                         if (modal.hasDefaultOAuthCreds) {
                             return modal.selectedProvider === "microsoft"
-                                ? I18n.tr("Sign in with Microsoft in your browser and you're done — no setup needed. Dank Mail syncs your Outlook inbox, folders, and replies.", "account wizard")
-                                : I18n.tr("Sign in with Google in your browser and you're done — no setup needed. Dank Mail syncs your Gmail inbox, labels, and replies.", "account wizard");
+                                ? I18n.tr("Sign in with Microsoft in your browser and you're done — no setup needed. Dux Mail syncs your Outlook inbox, folders, and replies.", "account wizard")
+                                : I18n.tr("Sign in with Google in your browser and you're done — no setup needed. Dux Mail syncs your Gmail inbox, labels, and replies.", "account wizard");
                         }
                         return modal.selectedProvider === "microsoft"
                             ? I18n.tr("Set up a reusable Microsoft OAuth client once or paste an existing Client ID. Future Microsoft accounts connect in one click.", "account wizard")
@@ -746,7 +746,7 @@ FloatingWindow {
 
                 StyledText {
                     Layout.alignment: Qt.AlignHCenter
-                    text: I18n.tr("Waiting for you to authorize dankmail in the browser…", "account wizard")
+                    text: I18n.tr("Waiting for you to authorize Dux Mail in the browser…", "account wizard")
                     color: Theme.surfaceTextMedium
                 }
 

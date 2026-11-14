@@ -10,14 +10,14 @@ import (
 	"github.com/google/uuid"
 	zkeyring "github.com/zalando/go-keyring"
 
-	"github.com/arqueon/dankmail/core/config"
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/internal/bus"
-	"github.com/arqueon/dankmail/core/internal/oauth"
-	"github.com/arqueon/dankmail/core/internal/provider"
-	"github.com/arqueon/dankmail/core/internal/rules"
-	dsync "github.com/arqueon/dankmail/core/internal/sync"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/config"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/internal/bus"
+	"github.com/arqueon/dux-mail/core/internal/oauth"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/rules"
+	dsync "github.com/arqueon/dux-mail/core/internal/sync"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 type fakeAttProvider struct {

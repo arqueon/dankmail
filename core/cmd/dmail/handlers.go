@@ -6,6 +6,9 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"html"
+	"mime"
+	"net/http"
 	"net/url"
 	"os"
 	"os/exec"
@@ -16,16 +19,17 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/arqueon/dankmail/core/api/server"
-	"github.com/arqueon/dankmail/core/ent/thread"
-	"github.com/arqueon/dankmail/core/internal/contacts"
-	"github.com/arqueon/dankmail/core/internal/drafts"
-	"github.com/arqueon/dankmail/core/internal/ipc"
-	"github.com/arqueon/dankmail/core/internal/paths"
-	"github.com/arqueon/dankmail/core/internal/provider"
-	dsync "github.com/arqueon/dankmail/core/internal/sync"
-	"github.com/arqueon/dankmail/core/models"
-	"github.com/arqueon/dankmail/core/repo"
+	"github.com/arqueon/dux-mail/core/api/server"
+	"github.com/arqueon/dux-mail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/internal/contacts"
+	"github.com/arqueon/dux-mail/core/internal/drafts"
+	"github.com/arqueon/dux-mail/core/internal/ipc"
+	"github.com/arqueon/dux-mail/core/internal/mailmime"
+	"github.com/arqueon/dux-mail/core/internal/paths"
+	"github.com/arqueon/dux-mail/core/internal/provider"
+	dsync "github.com/arqueon/dux-mail/core/internal/sync"
+	"github.com/arqueon/dux-mail/core/models"
+	"github.com/arqueon/dux-mail/core/repo"
 )
 
 func parseUUID(s string) (uuid.UUID, error) { return uuid.Parse(s) }
@@ -138,7 +142,10 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			return nil, err
 		}
 		body, _ := p["body"].(string)
-		if body == "" {
+		htmlBody, _ := p["htmlBody"].(string)
+		format, _ := p["format"].(string)
+		provAtts, _ := parseAttachments(p["attachments"])
+		if body == "" && htmlBody == "" && len(provAtts) == 0 {
 			return nil, fmt.Errorf("empty reply body")
 		}
 		replyAll, _ := p["replyAll"].(bool)
@@ -155,13 +162,14 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		if err != nil {
 			return nil, err
 		}
-		provAtts, _ := parseAttachments(p["attachments"])
 		err = d.queue.Enqueue(ctx, dsync.Op{
 			AccountID: accountID, Type: dsync.OpSendReply,
 			ThreadIDs: []string{detail.ProviderThreadID},
 			Payload: dsync.OpPayload{Reply: &provider.ReplyDraft{
 				InReplyToMessageID: last.ProviderMessageID,
 				Body:               body,
+				HTMLBody:           htmlBody,
+				Format:             format,
 				ReplyAll:           replyAll,
 				Attachments:        provAtts,
 			}},
@@ -184,6 +192,8 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		draft := provider.ComposeDraft{}
 		draft.Subject, _ = p["subject"].(string)
 		draft.Body, _ = p["body"].(string)
+		draft.HTMLBody, _ = p["htmlBody"].(string)
+		draft.Format, _ = p["format"].(string)
 		draft.To = parseStringSlice(p["to"])
 		draft.Cc = parseStringSlice(p["cc"])
 		draft.Bcc = parseStringSlice(p["bcc"])
@@ -226,6 +236,8 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		id, _ := p["id"].(string)
 		subject, _ := p["subject"].(string)
 		body, _ := p["body"].(string)
+		htmlBody, _ := p["htmlBody"].(string)
+		format, _ := p["format"].(string)
 		to := parseStringSlice(p["to"])
 		cc := parseStringSlice(p["cc"])
 		bcc := parseStringSlice(p["bcc"])
@@ -247,6 +259,11 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 				}
 				if threadID == 0 {
 					threadID = existing.ThreadID
+				}
+				if format == "" {
+					if _, hasFmt := p["format"]; !hasFmt {
+						format = existing.Format
+					}
 				}
 			}
 		}
@@ -272,6 +289,8 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 						Bcc:              bcc,
 						Subject:          subject,
 						Body:             body,
+						HTMLBody:         htmlBody,
+						Format:           format,
 						Attachments:      provAtts,
 					}); err == nil && rItem.ProviderDraftID != "" {
 						providerDraftID = rItem.ProviderDraftID
@@ -295,6 +314,8 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			Bcc:              bcc,
 			Subject:          subject,
 			Body:             body,
+			HTMLBody:         htmlBody,
+			Format:           format,
 			UpdatedAt:        time.Now().UTC(),
 			Attachments:      viewAtts,
 		})
@@ -346,6 +367,14 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		dirPath, _ := p["path"].(string)
 		showHidden, _ := p["showHidden"].(bool)
 		return listDirectory(dirPath, showHidden)
+	})
+
+	srv.Register("attachments.fetch", func(ctx context.Context, p map[string]any) (any, error) {
+		att, err := d.fetchAttachmentDetails(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		return att, nil
 	})
 
 	srv.Register("attachments.open", func(ctx context.Context, p map[string]any) (any, error) {
@@ -408,6 +437,8 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			return nil, fmt.Errorf("no recipients")
 		}
 		note, _ := p["body"].(string)
+		noteHTML, _ := p["htmlBody"].(string)
+		format, _ := p["format"].(string)
 
 		detail, err := d.repo.GetThread(ctx, id)
 		if err != nil {
@@ -441,7 +472,34 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 		b.WriteString("\n")
 		b.WriteString(last.BodyText)
 
-		draft := provider.ComposeDraft{To: to, Subject: subject, Body: b.String()}
+		var fullHTML string
+		fmtLower := strings.ToLower(strings.TrimSpace(format))
+		if strings.TrimSpace(noteHTML) != "" || (fmtLower != "plain" && (fmtLower == "markdown" || fmtLower == "html" || mailmime.HasMarkdownFormatting(note))) {
+			var hb strings.Builder
+			if strings.TrimSpace(noteHTML) != "" {
+				hb.WriteString(noteHTML)
+			} else if fmtLower == "html" {
+				hb.WriteString(note)
+			} else if strings.TrimSpace(note) != "" {
+				hb.WriteString(mailmime.RenderMarkdownHTML(note))
+			}
+			hb.WriteString(`<hr style="border:none;border-top:1px solid #d0d7de;margin:16px 0;">`)
+			hb.WriteString(`<div style="color:#57606a;font-size:13px;">`)
+			hb.WriteString("<strong>Forwarded message</strong><br>")
+			hb.WriteString("From: " + html.EscapeString(last.From) + "<br>")
+			hb.WriteString("Date: " + html.EscapeString(last.Date.Format("Mon, 2 Jan 2006 15:04")) + "<br>")
+			hb.WriteString("Subject: " + html.EscapeString(detail.Subject) + "<br>")
+			if len(last.To) > 0 {
+				hb.WriteString("To: " + html.EscapeString(strings.Join(last.To, ", ")) + "<br>")
+			}
+			hb.WriteString("</div>")
+			hb.WriteString(`<blockquote style="margin:10px 0;padding:4px 12px;border-left:3px solid #d0d7de;">`)
+			hb.WriteString(mailmime.RenderMarkdownHTML(last.BodyText))
+			hb.WriteString(`</blockquote>`)
+			fullHTML = hb.String()
+		}
+
+		draft := provider.ComposeDraft{To: to, Subject: subject, Body: b.String(), HTMLBody: fullHTML, Format: format}
 		return "ok", d.queue.Enqueue(ctx, dsync.Op{
 			AccountID: accountID, Type: dsync.OpCompose,
 			Payload: dsync.OpPayload{Compose: &draft},
@@ -555,7 +613,11 @@ func (d *daemon) registerIPC(srv *ipc.Server) {
 			}
 			accountID = &id
 		}
-		suggestions, err := contacts.Search(ctx, d.db, accountID, strings.TrimSpace(query), 8)
+		limit := 8
+		if v, ok := p["limit"].(float64); ok && v > 0 {
+			limit = min(100, int(v))
+		}
+		suggestions, err := contacts.Search(ctx, d.db, accountID, strings.TrimSpace(query), limit)
 		if err != nil {
 			return nil, err
 		}
@@ -998,6 +1060,73 @@ func listDirectory(rawPath string, showHidden bool) (map[string]any, error) {
 		"parent":  parent,
 		"places":  places,
 		"entries": list,
+	}, nil
+}
+
+func (d *daemon) fetchAttachmentDetails(ctx context.Context, p map[string]any) (map[string]any, error) {
+	threadID, err := intParam(p, "threadId")
+	if err != nil {
+		threadID, err = intParam(p, "id")
+		if err != nil {
+			return nil, fmt.Errorf("missing threadId")
+		}
+	}
+	cachedPath, cleanName, err := d.ensureAttachmentCached(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	st, err := os.Stat(cachedPath)
+	if err != nil {
+		return nil, err
+	}
+	messageID, _ := p["messageId"].(string)
+	attachmentID, _ := p["attachmentId"].(string)
+	filename, _ := p["filename"].(string)
+	mimeType := ""
+	if detail, derr := d.repo.GetThread(ctx, threadID); derr == nil {
+		for _, m := range detail.Messages {
+			if messageID != "" && m.ProviderMessageID != messageID {
+				continue
+			}
+			for _, a := range m.Attachments {
+				if (attachmentID != "" && a.AttachmentID == attachmentID) ||
+					(filename != "" && a.Filename == filename) ||
+					sanitizeAttachmentFilename(a.Filename) == cleanName {
+					if messageID == "" {
+						messageID = m.ProviderMessageID
+					}
+					if attachmentID == "" {
+						attachmentID = a.AttachmentID
+					}
+					mimeType = a.MimeType
+					break
+				}
+			}
+			if mimeType != "" {
+				break
+			}
+		}
+	}
+	if mimeType == "" {
+		mimeType = mime.TypeByExtension(strings.ToLower(filepath.Ext(cleanName)))
+	}
+	if mimeType == "" {
+		if f, ferr := os.Open(cachedPath); ferr == nil {
+			buf := make([]byte, 512)
+			n, _ := f.Read(buf)
+			_ = f.Close()
+			if n > 0 {
+				mimeType = http.DetectContentType(buf[:n])
+			}
+		}
+	}
+	return map[string]any{
+		"path":         cachedPath,
+		"filename":     cleanName,
+		"mimeType":     mimeType,
+		"size":         st.Size(),
+		"messageId":    messageID,
+		"attachmentId": attachmentID,
 	}, nil
 }
 

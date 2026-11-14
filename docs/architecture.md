@@ -1,14 +1,13 @@
-# dankmail architecture
+# Dux Mail architecture
 
-dankmail is a multi-account mail **notifier with triage**, not a mail
-client: read, mark, archive, trash, snooze, short reply. Anything richer
-(attachments, HTML, folders, filters) opens the provider's webmail via
-deep link. The architecture is deliberately modeled on
+Dux Mail (`dux-mail`, formerly `dankmail`) is a multi-account mail **notifier, triage controller, and local MCP server**, not a bloated traditional mail
+client: read, mark, archive, trash, snooze, compose, reply (in plain text, Markdown, or sanitized HTML), and delegate triage or drafting to AI agents.
+The architecture is deliberately modeled on
 [dankcalendar](https://github.com/AvengeMedia/dankcalendar): a Go daemon
-(`dmail`) owning sync, notifications, a unix-socket IPC and a
-localhost-only HTTP API, plus a Quickshell/QML UI that is just a view
+(`dmail`) owning sync, notifications, a unix-socket IPC (`duxmail.sock` + `dankmail.sock` compatibility alias), a `stdio` MCP server (`dmail mcp`), and a
+localhost-only HTTP API, plus a Quickshell/QML UI that is a pure view
 over the daemon. Closing the window hides it; sync keeps running
-(systemd user unit, `graphical-session.target`).
+(systemd user unit, `graphical-session.target`), and `dmail run` operates headlessly when no Wayland/X11 session is present.
 
 ## Providers and capabilities
 

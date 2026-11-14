@@ -9,20 +9,20 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/arqueon/dankmail/core/ent/migrate"
+	"github.com/arqueon/dux-mail/core/ent/migrate"
 	"github.com/google/uuid"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
-	"github.com/arqueon/dankmail/core/ent/account"
-	"github.com/arqueon/dankmail/core/ent/contact"
-	"github.com/arqueon/dankmail/core/ent/message"
-	"github.com/arqueon/dankmail/core/ent/notifyrule"
-	"github.com/arqueon/dankmail/core/ent/pendingop"
-	"github.com/arqueon/dankmail/core/ent/secret"
-	"github.com/arqueon/dankmail/core/ent/thread"
+	"github.com/arqueon/dux-mail/core/ent/account"
+	"github.com/arqueon/dux-mail/core/ent/contact"
+	"github.com/arqueon/dux-mail/core/ent/message"
+	"github.com/arqueon/dux-mail/core/ent/notifyrule"
+	"github.com/arqueon/dux-mail/core/ent/pendingop"
+	"github.com/arqueon/dux-mail/core/ent/secret"
+	"github.com/arqueon/dux-mail/core/ent/thread"
 
 	stdsql "database/sql"
 )

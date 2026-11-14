@@ -1,7 +1,8 @@
-// Package mailmime builds the plain-text MIME messages dankmail sends:
-// threaded replies and minimal compositions. It is shared by the Gmail
-// provider (raw message for users.messages.send) and the future IMAP/SMTP
-// provider. Pure functions, no I/O.
+// Package mailmime builds the MIME messages Dux Mail sends: threaded replies,
+// drafts, and rich compositions (plain text, Markdown-rendered HTML, or
+// explicit HTML with automatic multipart/alternative plain-text fallback).
+// Shared by Gmail, Microsoft Graph, and IMAP/SMTP. Pure functions, no I/O
+// except reading local attachment files when Path is set.
 package mailmime
 
 import (
@@ -9,17 +10,16 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"html"
 	"mime"
 	"mime/quotedprintable"
 	"net/http"
 	"net/mail"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strings"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/mailtext"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 var (
@@ -92,10 +92,10 @@ func BuildReply(orig provider.MessageDelta, from string, d provider.ReplyDraft) 
 		}
 		h.add("References", refs)
 	}
-	return assembleWithAttachments(h, d.Body, d.Attachments)
+	return assembleMessage(h, d.Body, d.HTMLBody, d.Format, d.Attachments)
 }
 
-// BuildCompose constructs a new MIME message (with optional Cc, Bcc, HTML links, and attachments).
+// BuildCompose constructs a new MIME message (plain text, Markdown, or HTML, with optional Cc, Bcc, and attachments).
 func BuildCompose(from string, d provider.ComposeDraft) ([]byte, error) {
 	to := dedupe(d.To)
 	cc := dedupe(excludeAll(d.Cc, to))
@@ -115,7 +115,7 @@ func BuildCompose(from string, d provider.ComposeDraft) ([]byte, error) {
 		h.add("Bcc", formatAddrList(bcc))
 	}
 	h.add("Subject", encodeHeader(d.Subject))
-	return assembleWithAttachments(h, d.Body, d.Attachments)
+	return assembleMessage(h, d.Body, d.HTMLBody, d.Format, d.Attachments)
 }
 
 // BuildDraft constructs a MIME message for a draft (recipients may be empty).
@@ -141,34 +141,12 @@ func BuildDraft(from string, d provider.DraftSave) ([]byte, error) {
 		h.add("In-Reply-To", id)
 		h.add("References", id)
 	}
-	return assembleWithAttachments(h, d.Body, d.Attachments)
+	return assembleMessage(h, d.Body, d.HTMLBody, d.Format, d.Attachments)
 }
 
 type headerList struct{ kv [][2]string }
 
 func (h *headerList) add(k, v string) { h.kv = append(h.kv, [2]string{k, v}) }
-
-var (
-	reMdLink   = regexp.MustCompile(`\[([^\]]+)\]\((https?://[^\s()]+|mailto:[^\s()]+)\)`)
-	reBold     = regexp.MustCompile(`\*\*([^*\n]+)\*\*`)
-	reCodeSpan = regexp.MustCompile("`([^`\n]+)`")
-)
-
-func hasRichFormatting(body string) bool {
-	return reMdLink.MatchString(body) || reBold.MatchString(body) || reCodeSpan.MatchString(body)
-}
-
-func renderSimpleHTML(body string) string {
-	escaped := html.EscapeString(strings.ReplaceAll(body, "\r\n", "\n"))
-	escaped = reMdLink.ReplaceAllString(escaped, `<a href="$2">$1</a>`)
-	escaped = reBold.ReplaceAllString(escaped, `<strong>$1</strong>`)
-	escaped = reCodeSpan.ReplaceAllString(escaped, `<code>$1</code>`)
-	paragraphs := strings.Split(escaped, "\n\n")
-	for i, p := range paragraphs {
-		paragraphs[i] = "<p>" + strings.ReplaceAll(p, "\n", "<br>\r\n") + "</p>"
-	}
-	return "<!DOCTYPE html><html><body>" + strings.Join(paragraphs, "\r\n") + "</body></html>"
-}
 
 func stripMarkdownLinksForPlain(body string) string {
 	return reMdLink.ReplaceAllStringFunc(body, func(m string) string {
@@ -183,6 +161,30 @@ func stripMarkdownLinksForPlain(body string) string {
 	})
 }
 
+func resolveOutgoingBodies(body, htmlBody, format string) (plainText, htmlDoc string, isMultipart bool) {
+	fmtMode := strings.ToLower(strings.TrimSpace(format))
+	if fmtMode == "html" && strings.TrimSpace(htmlBody) == "" && strings.TrimSpace(body) != "" {
+		htmlBody = body
+		body = ""
+	}
+	if strings.TrimSpace(htmlBody) != "" {
+		htmlDoc = SanitizeOutgoingHTML(htmlBody)
+		if strings.TrimSpace(body) != "" {
+			plainText = stripMarkdownLinksForPlain(body)
+		} else {
+			plainText = mailtext.HTMLToText(htmlDoc)
+		}
+		return plainText, htmlDoc, true
+	}
+	if fmtMode == "plain" {
+		return body, "", false
+	}
+	if fmtMode == "markdown" || HasMarkdownFormatting(body) {
+		return stripMarkdownLinksForPlain(body), RenderMarkdownHTML(body), true
+	}
+	return body, "", false
+}
+
 func writeTextPart(buf *bytes.Buffer, contentType, text string) error {
 	fmt.Fprintf(buf, "Content-Type: %s; charset=UTF-8\r\n", contentType)
 	buf.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
@@ -193,18 +195,18 @@ func writeTextPart(buf *bytes.Buffer, contentType, text string) error {
 	return w.Close()
 }
 
-func writeBodyEntity(buf *bytes.Buffer, body string) error {
-	if !hasRichFormatting(body) {
-		return writeTextPart(buf, "text/plain", body)
+func writeBodyEntity(buf *bytes.Buffer, plainText, htmlDoc string, isMultipart bool) error {
+	if !isMultipart {
+		return writeTextPart(buf, "text/plain", plainText)
 	}
-	altBoundary := "dankmail-alt-boundary-9f8e7d6c"
+	altBoundary := "duxmail-alt-boundary-9f8e7d6c"
 	fmt.Fprintf(buf, "Content-Type: multipart/alternative; boundary=%q\r\n\r\n", altBoundary)
 	fmt.Fprintf(buf, "--%s\r\n", altBoundary)
-	if err := writeTextPart(buf, "text/plain", stripMarkdownLinksForPlain(body)); err != nil {
+	if err := writeTextPart(buf, "text/plain", plainText); err != nil {
 		return err
 	}
 	fmt.Fprintf(buf, "\r\n--%s\r\n", altBoundary)
-	if err := writeTextPart(buf, "text/html", renderSimpleHTML(body)); err != nil {
+	if err := writeTextPart(buf, "text/html", htmlDoc); err != nil {
 		return err
 	}
 	fmt.Fprintf(buf, "\r\n--%s--\r\n", altBoundary)
@@ -241,9 +243,10 @@ func resolveAttachment(a provider.AttachmentFile) (filename, mimeType string, da
 	return filename, mimeType, data, nil
 }
 
-func assembleWithAttachments(h headerList, body string, attachments []provider.AttachmentFile) ([]byte, error) {
-	if len(attachments) == 0 && !hasRichFormatting(body) {
-		return assemble(h, body)
+func assembleMessage(h headerList, body, htmlBody, format string, attachments []provider.AttachmentFile) ([]byte, error) {
+	plainText, htmlDoc, isMultipart := resolveOutgoingBodies(body, htmlBody, format)
+	if len(attachments) == 0 && !isMultipart {
+		return assemble(h, plainText)
 	}
 	var buf bytes.Buffer
 	for _, kv := range h.kv {
@@ -251,15 +254,15 @@ func assembleWithAttachments(h headerList, body string, attachments []provider.A
 	}
 	buf.WriteString("MIME-Version: 1.0\r\n")
 	if len(attachments) == 0 {
-		if err := writeBodyEntity(&buf, body); err != nil {
+		if err := writeBodyEntity(&buf, plainText, htmlDoc, isMultipart); err != nil {
 			return nil, err
 		}
 		return buf.Bytes(), nil
 	}
-	mixBoundary := "dankmail-mix-boundary-1a2b3c4d"
+	mixBoundary := "duxmail-mix-boundary-1a2b3c4d"
 	fmt.Fprintf(&buf, "Content-Type: multipart/mixed; boundary=%q\r\n\r\n", mixBoundary)
 	fmt.Fprintf(&buf, "--%s\r\n", mixBoundary)
-	if err := writeBodyEntity(&buf, body); err != nil {
+	if err := writeBodyEntity(&buf, plainText, htmlDoc, isMultipart); err != nil {
 		return nil, err
 	}
 	for _, att := range attachments {

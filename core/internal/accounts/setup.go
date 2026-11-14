@@ -26,7 +26,7 @@ func GmailSetupSteps() []SetupStep {
 	return []SetupStep{
 		{
 			Title:       "Create a Google Cloud project",
-			Description: "Pick any name (e.g. \"dankmail\"). You'll only do this once.",
+			Description: "Pick any name (e.g. \"dux-mail\"). You'll only do this once.",
 			URL:         "https://console.cloud.google.com/projectcreate",
 			URLLabel:    "Open Google Cloud Console",
 		},
@@ -35,30 +35,30 @@ func GmailSetupSteps() []SetupStep {
 			Description: "With the new project selected, click \"Enable\" on the Gmail API page.",
 			URL:         "https://console.cloud.google.com/apis/library/gmail.googleapis.com",
 			URLLabel:    "Enable Gmail API",
-			Note:        "Ignore the \"Create credentials\" button the console shows afterwards — it steers you toward a service account or API key, which dankmail cannot use. The right credential is an OAuth client ID (Desktop app), created in the later steps after the consent screen is configured.",
+			Note:        "Ignore the \"Create credentials\" button the console shows afterwards — it steers you toward a service account or API key, which Dux Mail cannot use. The right credential is an OAuth client ID (Desktop app), created in the later steps after the consent screen is configured.",
 		},
 		{
 			Title:       "Enable the People API",
-			Description: "Enable the People API so the two read-only contacts permissions requested by dankmail can feed compose autocomplete. Correspondents found in cached mail are also suggested.",
+			Description: "Enable the People API so the two read-only contacts permissions requested by Dux Mail can feed compose autocomplete. Correspondents found in cached mail are also suggested.",
 			URL:         "https://console.cloud.google.com/apis/library/people.googleapis.com",
 			URLLabel:    "Enable People API",
 		},
 		{
 			Title:       "Configure the Google Auth Platform",
-			Description: "Click \"Get started\" on the overview page. App name: anything (e.g. \"dankmail\"). User support email: your own address. Audience: \"External\". Then agree and finish the initial configuration.",
+			Description: "Click \"Get started\" on the overview page. App name: anything (e.g. \"Dux Mail\"). User support email: your own address. Audience: \"External\". Then agree and finish the initial configuration.",
 			URL:         "https://console.cloud.google.com/auth/overview",
 			URLLabel:    "Open Google Auth Platform",
 		},
 		{
-			Title:       "Declare the permissions dankmail uses",
-			Description: "On Data Access, add gmail.modify, gmail.send, contacts.readonly and contacts.other.readonly. These must match the permissions requested during sign-in; dankmail never asks for the unrestricted mail.google.com scope.",
+			Title:       "Declare the permissions Dux Mail uses",
+			Description: "On Data Access, add gmail.modify, gmail.send, contacts.readonly and contacts.other.readonly. These must match the permissions requested during sign-in; Dux Mail never asks for the unrestricted mail.google.com scope.",
 			URL:         "https://console.cloud.google.com/auth/scopes",
 			URLLabel:    "Open Data Access",
 			Note:        "Mail modification and sending power triage and replies. Both contacts permissions are read-only and only power recipient suggestions.",
 		},
 		{
 			Title:       "Add yourself as a test user",
-			Description: "On the Audience page, under \"Test users\" click \"Add users\" and enter the Gmail address you want dankmail to watch. Only test users can sign in while the app is unpublished.",
+			Description: "On the Audience page, under \"Test users\" click \"Add users\" and enter the Gmail address you want Dux Mail to watch. Only test users can sign in while the app is unpublished.",
 			URL:         "https://console.cloud.google.com/auth/audience",
 			URLLabel:    "Open Audience page",
 		},
@@ -71,10 +71,10 @@ func GmailSetupSteps() []SetupStep {
 		},
 		{
 			Title:       "Publish the app (skip the 7-day token expiry)",
-			Description: "On the Audience page click \"Publish app\" and confirm. Google expires the tokens of testing-mode apps every 7 days, which would make dankmail ask you to re-authenticate weekly. Do NOT submit for verification — for personal use it isn't needed.",
+			Description: "On the Audience page click \"Publish app\" and confirm. Google expires the tokens of testing-mode apps every 7 days, which would make Dux Mail ask you to re-authenticate weekly. Do NOT submit for verification — for personal use it isn't needed.",
 			URL:         "https://console.cloud.google.com/auth/audience",
 			URLLabel:    "Open Audience page",
-			Note:        "After publishing, the Google consent screen shows \"Google hasn't verified this app\" — click Advanced, then \"Go to dankmail (unsafe)\" and continue. That warning is expected for a personal unverified app and only appears during consent.",
+			Note:        "After publishing, the Google consent screen shows \"Google hasn't verified this app\" — click Advanced, then \"Go to Dux Mail (unsafe)\" and continue. That warning is expected for a personal unverified app and only appears during consent.",
 		},
 	}
 }

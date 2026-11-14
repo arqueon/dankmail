@@ -21,8 +21,8 @@ Item {
     // The SNI item id is read from the application name at registration
     // time, so rename before the icon first becomes visible.
     Component.onCompleted: {
-        Qt.application.name = "dank-mail";
-        Qt.application.displayName = "Dank Mail";
+        Qt.application.name = "dux-mail";
+        Qt.application.displayName = "Dux Mail";
         tray.visible = true;
     }
 
@@ -30,9 +30,9 @@ Item {
         id: tray
         visible: false
         tooltip: DankMailService.unreadTotal > 0
-            ? "Dank Mail — " + DankMailService.unreadTotal + " " + I18n.tr("unread", "tray tooltip")
-            : "Dank Mail"
-        icon.source: Qt.resolvedUrl("../assets/dankmail-tray.svg")
+            ? "Dux Mail — " + DankMailService.unreadTotal + " " + I18n.tr("unread", "tray tooltip")
+            : "Dux Mail"
+        icon.source: Qt.resolvedUrl("../assets/duxmail-tray.svg")
 
         onActivated: reason => {
             switch (reason) {
@@ -45,7 +45,7 @@ Item {
 
         menu: Platform.Menu {
             Platform.MenuItem {
-                text: I18n.tr("Open Dank Mail", "tray menu")
+                text: I18n.tr("Open Dux Mail", "tray menu")
                 onTriggered: root.showWindow()
             }
 
@@ -73,7 +73,7 @@ Item {
             }
 
             Platform.MenuItem {
-                text: I18n.tr("Stop dankmail completely", "tray menu")
+                text: I18n.tr("Stop Dux Mail completely", "tray menu")
                 onTriggered: DankMailService.quit()
             }
         }

@@ -1,6 +1,6 @@
 # Gmail synchronization and quota limits
 
-DankMail paces Gmail requests by their documented quota cost. Each account's
+Dux Mail paces Gmail requests by their documented quota cost. Each account's
 provider uses a shared budget of 2,400 units per minute (40 units/second), below
 Google's 6,000-unit per-user/per-project limit. A full thread costs 40 units.
 The headroom accommodates another desktop using the same OAuth project;

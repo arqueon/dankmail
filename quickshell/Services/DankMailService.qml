@@ -28,7 +28,7 @@ Singleton {
         if (env && env !== "")
             return env;
         const runtime = Quickshell.env("XDG_RUNTIME_DIR");
-        return (runtime && runtime !== "" ? runtime : "/tmp") + "/dankmail.sock";
+        return (runtime && runtime !== "" ? runtime : "/tmp") + "/duxmail.sock";
     }
 
     property bool connected: false
@@ -778,6 +778,10 @@ Singleton {
                 params.attachments = extra.attachments;
             if (extra.draftId && extra.draftId !== "")
                 params.draftId = extra.draftId;
+            if (extra.htmlBody && extra.htmlBody !== "")
+                params.htmlBody = extra.htmlBody;
+            if (extra.format && extra.format !== "")
+                params.format = extra.format;
         }
         sendRequest("ops.compose", params, resp => {
             if (resp.error)
@@ -802,6 +806,10 @@ Singleton {
                 params.attachments = extra.attachments;
             if (extra.draftId && extra.draftId !== "")
                 params.draftId = extra.draftId;
+            if (extra.htmlBody && extra.htmlBody !== "")
+                params.htmlBody = extra.htmlBody;
+            if (extra.format && extra.format !== "")
+                params.format = extra.format;
         }
         sendRequest("ops.reply", params, resp => {
             if (resp.error)

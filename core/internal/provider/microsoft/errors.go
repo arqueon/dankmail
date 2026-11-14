@@ -7,7 +7,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/arqueon/dankmail/core/errdefs"
+	"github.com/arqueon/dux-mail/core/errdefs"
 )
 
 // graphError is an HTTP-level failure from the Graph API.

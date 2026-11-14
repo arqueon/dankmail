@@ -1,6 +1,26 @@
 # Changelog
 
-All notable changes to **DankMail** (`dmail` daemon, Quickshell UI, and the `dankmailUnread` DankMaterialShell companion) are documented in this file.
+All notable changes to **Dux Mail** (`dux-mail`, formerly **DankMail** — `dmail` daemon, `dmail mcp` server, Quickshell UI, and the `dankmailUnread` / **Dux Mail Unread** Dux Shell companion) are documented in this file.
+
+## [0.5.0] - 2026-11-13
+
+### Added
+- **Renamed to Dux Mail (`dux-mail`) with zero-breakage migration**:
+  - Renamed application branding, desktop entry (`org.arqueon.duxmail.desktop`), icons (`duxmail.svg`, `duxmail-tray.svg`), Go module (`github.com/arqueon/dux-mail/core`), repository (`arqueon/dux-mail`), and AUR packages (`dux-mail`, `dux-mail-git`, `dms-shell-plugin-dux-mail` with `provides`/`conflicts`/`replaces` for `dankmail*`).
+  - Preserved `dmail` binary, `dmail.service`, and internal DMS widget ID `"dankmailUnread"`, with automatic fallback to existing `~/.config/dankmail`, `~/.local/share/dankmail`, keyring service `dankmail`, and a `dankmail.sock -> duxmail.sock` socket symlink.
+- **Native Model Context Protocol server (`dmail mcp`) & headless agent backend**:
+  - Added `dmail mcp` (`stdio` JSON-RPC 2.0, protocol `2024-11-05`) exposing 27 tools across accounts, local/remote search, thread & message inspection, silent attachment fetching/saving, triage operations, contacts, drafts, and sending, with `--mode full` (default), `draft`, `draft-strict`, and `readonly` permission profiles.
+  - Wrapped untrusted message bodies, snippets, and attachment text previews in `<untrusted_email_content>` / `<untrusted_attachment_content>` tags and ensured zero secret/token exposure over IPC or MCP.
+  - Added daemon auto-start in `dmail mcp` and headless mode in `dmail run` (skipping Quickshell `qs` launch when `WAYLAND_DISPLAY` and `DISPLAY` are unset, e.g., over SSH).
+  - Added silent `attachments.fetch` IPC (`base64` / cache path + automatic UTF-8 `textPreview` for text/Markdown/CSV/JSON/XML/HTML attachments) alongside interactive `attachments.open` and `attachments.saveAs`.
+  - Added server-side full-history `SearchRemote` (`provider.RemoteSearcher`) for **Microsoft Graph** (`$search` KQL with message-to-conversation grouping) and **IMAP** (`UID SEARCH CHARSET UTF-8 TEXT` with `ASCII` fallback and thread grouping), completing parity with Gmail remote search.
+- **Rich Markdown & HTML email sending, draft formatting toolbar, and `dmail send` CLI**:
+  - Upgraded `core/internal/mailmime` with full Markdown-to-HTML rendering (headings `#..######`, bold, italic, strikethrough `~~`, links, nested bulleted/numbered lists, blockquotes, inline & fenced code blocks, horizontal dividers, and aligned pipe tables) and `SanitizeOutgoingHTML` for custom `htmlBody` payloads (stripping scripts/iframes/forms/event handlers/`javascript:` URLs and auto-distilling a `text/plain` fallback when `body` is omitted).
+  - Added `htmlBody` and `format` (`auto` | `markdown` | `html` | `plain`) across `ops.compose`, `ops.reply`, `ops.forward`, `drafts.save`, local `drafts.json` persistence (preserving local Markdown source across Gmail `MergeRemote` syncs), and MCP compose/reply/forward/draft tools.
+  - Added `dmail send` CLI (`--account`, `--to`, `--cc`, `--bcc`, `--subject`, `--body`, `--body-file`, `--html`, `--html-file`, `--format`, `--attach`).
+  - Upgraded `ComposeModal`, inline quick reply in `TriageWindow`, and the **Drafts** detail pane with a full Markdown formatting toolbar, `Markdown` / `HTML` / `Plain text` mode selector, sanitized rich preview, format badges, and one-click **Send** from saved drafts.
+- **Compact filterable account dots in the DMS bar companion**:
+  - Replaced the vertical per-account text rows in `dms-plugin/DankmailWidget.qml` with compact `20×20` color-coded filterable dots with unread hover tooltips, matching the desktop triage window.
 
 ## [0.4.1] - 2026-11-12
 

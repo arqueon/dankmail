@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/arqueon/dankmail/core/internal/provider"
+	"github.com/arqueon/dux-mail/core/internal/provider"
 )
 
 const self = "Rubén <ruben@example.org>"
@@ -292,5 +292,96 @@ func TestBuildComposeWithCcBccLinksAndAttachments(t *testing.T) {
 	}
 	if !strings.Contains(s, "Content-Disposition: attachment;") || !strings.Contains(s, "notas.txt") {
 		t.Errorf("expected attachment part for notas.txt, got:\n%s", s)
+	}
+}
+
+func TestBuildComposeFullMarkdownBlocksAndTables(t *testing.T) {
+	md := strings.Join([]string{
+		"# Weekly Report",
+		"",
+		"Summary with **bold**, *italic*, ~~obsolete~~, and `v0.5.0`.",
+		"",
+		"- First bullet",
+		"  - Nested bullet",
+		"- Second bullet",
+		"",
+		"1. Step one",
+		"2. Step two",
+		"",
+		"> Quoted context",
+		"",
+		"```bash",
+		"dmail mcp",
+		"```",
+		"",
+		"| Service | Count |",
+		"| :--- | ---: |",
+		"| Dux Mail | 42 |",
+		"",
+		"---",
+	}, "\n")
+	raw, err := BuildCompose(self, provider.ComposeDraft{
+		To:      []string{"ada@example.com"},
+		Subject: "Markdown Report",
+		Body:    md,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unwrapped := strings.ReplaceAll(strings.ReplaceAll(string(raw), "=\r\n", ""), "=3D", "=")
+	for _, want := range []string{
+		"multipart/alternative",
+		"<h1 ", "Weekly Report</h1>",
+		"<strong>bold</strong>",
+		"<em>italic</em>",
+		"<del>obsolete</del>",
+		"<code ", "v0.5.0</code>",
+		"<ul ", "Nested bullet",
+		"<ol ", "Step two",
+		"<blockquote ", "Quoted context",
+		"<pre ", "dmail mcp</code></pre>",
+		"<table ", "text-align:right;\">42</td>",
+		"<hr ",
+	} {
+		if !strings.Contains(unwrapped, want) {
+			t.Errorf("missing %q in rendered MIME:\n%s", want, unwrapped)
+		}
+	}
+}
+
+func TestBuildComposeExplicitHTMLSanitizesAndGeneratesPlainFallback(t *testing.T) {
+	raw, err := BuildCompose(self, provider.ComposeDraft{
+		To:       []string{"ada@example.com"},
+		Subject:  "Rich HTML",
+		HTMLBody: `<div style="padding:12px;background:#eef6ff"><h2>Update</h2><p>Click <a href="https://example.org" onclick="alert(1)">here</a> or <a href="javascript:evil()">bad</a>.</p><script>steal()</script></div>`,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unwrapped := strings.ReplaceAll(strings.ReplaceAll(string(raw), "=\r\n", ""), "=3D", "=")
+	if !strings.Contains(unwrapped, "multipart/alternative") {
+		t.Fatalf("expected multipart/alternative:\n%s", unwrapped)
+	}
+	if strings.Contains(unwrapped, "<script") || strings.Contains(unwrapped, "onclick") || strings.Contains(unwrapped, "javascript:") {
+		t.Fatalf("expected dangerous tags/attributes/schemes stripped:\n%s", unwrapped)
+	}
+	if !strings.Contains(unwrapped, "<h2>Update</h2>") || !strings.Contains(unwrapped, "Content-Type: text/plain") {
+		t.Fatalf("expected clean HTML + plain-text fallback:\n%s", unwrapped)
+	}
+}
+
+func TestBuildComposePlainFormatSuppressesMarkdownHTML(t *testing.T) {
+	raw, err := BuildCompose(self, provider.ComposeDraft{
+		To:      []string{"ada@example.com"},
+		Subject: "Strict Plain",
+		Body:    "**literal asterisks** and - dash",
+		Format:  "plain",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	s := string(raw)
+	if strings.Contains(s, "multipart/alternative") || strings.Contains(s, "text/html") {
+		t.Fatalf("Format=plain should emit pure text/plain, got:\n%s", s)
 	}
 }

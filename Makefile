@@ -1,11 +1,11 @@
-# Root Makefile for dankmail.
+# Root Makefile for Dux Mail (dux-mail).
 # Orchestrates the Go core build and local installation of the binary,
 # quickshell config, icon, desktop entry, and systemd user unit.
-# Structure mirrors dankcalendar's Makefile.
+# Structure mirrors dux-calendar's Makefile.
 
 BINARY_NAME=dmail
-SHELL_NAME=dankmail
-ICON_NAME=dankmail
+SHELL_NAME=duxmail
+ICON_NAME=duxmail
 CORE_DIR=core
 BUILD_DIR=$(CORE_DIR)/bin
 PREFIX ?= /usr/local
@@ -21,7 +21,7 @@ SYSTEMD_USER_DIR=$(USER_CONFIG_HOME)/systemd/user
 SHELL_DIR=quickshell
 SHELL_INSTALL_DIR=$(DATA_DIR)/quickshell/$(SHELL_NAME)
 ASSETS_DIR=assets
-DESKTOP_ID=org.arqueon.dankmail
+DESKTOP_ID=org.arqueon.duxmail
 
 DMS_PLUGIN_DIR=dms-plugin
 DMS_PLUGIN_ID=dankmailUnread
@@ -70,6 +70,7 @@ install-shell:
 install-icon:
 	@echo "Installing icon..."
 	@install -D -m 644 $(SHELL_DIR)/assets/$(ICON_NAME).svg $(DESTDIR)$(ICON_DIR)/$(ICON_NAME).svg
+	@ln -sf $(ICON_NAME).svg $(DESTDIR)$(ICON_DIR)/dankmail.svg
 	@if [ -z "$(DESTDIR)" ]; then gtk-update-icon-cache -q $(DATA_DIR)/icons/hicolor 2>/dev/null || true; fi
 
 install-desktop:
@@ -98,9 +99,9 @@ install-dms-plugin:
 install: install-bin install-shell install-icon install-desktop
 	@echo ""
 	@echo "Installation complete."
-	@echo "Launch with 'dmail show' or the Dank Mail desktop entry."
+	@echo "Launch with 'dmail show' or the Dux Mail desktop entry."
 	@echo "Optional: 'make install-systemd' then 'systemctl --user enable --now dmail'."
-	@echo "Optional: 'make install-dms-plugin' for the DankMaterialShell bar widget."
+	@echo "Optional: 'make install-dms-plugin' for the Dux Shell / DankMaterialShell bar widget."
 
 uninstall-bin:
 	@rm -f $(INSTALL_DIR)/$(BINARY_NAME)
@@ -109,11 +110,11 @@ uninstall-shell:
 	@rm -rf $(SHELL_INSTALL_DIR)
 
 uninstall-icon:
-	@rm -f $(ICON_DIR)/$(ICON_NAME).svg
+	@rm -f $(ICON_DIR)/$(ICON_NAME).svg $(ICON_DIR)/dankmail.svg
 	@gtk-update-icon-cache -q $(DATA_DIR)/icons/hicolor 2>/dev/null || true
 
 uninstall-desktop:
-	@rm -f $(APPLICATIONS_DIR)/$(DESKTOP_ID).desktop
+	@rm -f $(APPLICATIONS_DIR)/$(DESKTOP_ID).desktop $(APPLICATIONS_DIR)/org.arqueon.dankmail.desktop
 	@update-desktop-database -q $(APPLICATIONS_DIR) 2>/dev/null || true
 
 uninstall-systemd:

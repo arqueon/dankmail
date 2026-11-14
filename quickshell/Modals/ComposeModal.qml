@@ -31,6 +31,7 @@ FloatingWindow {
     property string activeRecipientField: "to"
     property var suggestions: []
     property var attachments: []
+    property string formatMode: "markdown"
     property bool previewMode: false
     property bool showLinkBar: false
     property bool sending: false
@@ -51,6 +52,7 @@ FloatingWindow {
         activeRecipientField = "to";
         suggestions = [];
         attachments = [];
+        formatMode = "markdown";
         previewMode = false;
         showLinkBar = false;
         sending = false;
@@ -91,8 +93,17 @@ FloatingWindow {
             "size": a.size || 0,
             "path": a.path || ""
         }));
+        if (d.format === "plain") {
+            formatMode = "plain";
+            bodyInput.text = d.body || "";
+        } else if (d.format === "html" || (d.htmlBody && d.htmlBody !== "" && (!d.body || d.body === ""))) {
+            formatMode = "html";
+            bodyInput.text = d.htmlBody || d.body || "";
+        } else {
+            formatMode = "markdown";
+            bodyInput.text = d.body || "";
+        }
         subjectField.text = d.subject || "";
-        bodyInput.text = d.body || "";
         visible = true;
         bodyInput.forceActiveFocus();
     }
@@ -210,6 +221,60 @@ FloatingWindow {
         bodyInput.forceActiveFocus();
     }
 
+    function cycleHeading() {
+        const pos = bodyInput.cursorPosition;
+        const full = bodyInput.text;
+        const lineStart = full.lastIndexOf("\n", Math.max(0, pos - 1)) + 1;
+        let lineEnd = full.indexOf("\n", lineStart);
+        if (lineEnd === -1)
+            lineEnd = full.length;
+        const line = full.substring(lineStart, lineEnd);
+        let nextLine = line;
+        if (line.startsWith("### "))
+            nextLine = line.substring(4);
+        else if (line.startsWith("## "))
+            nextLine = "### " + line.substring(3);
+        else if (line.startsWith("# "))
+            nextLine = "## " + line.substring(2);
+        else
+            nextLine = "# " + line;
+        const delta = nextLine.length - line.length;
+        bodyInput.text = full.substring(0, lineStart) + nextLine + full.substring(lineEnd);
+        bodyInput.cursorPosition = Math.max(lineStart, pos + delta);
+        bodyInput.forceActiveFocus();
+    }
+
+    function insertCodeBlock() {
+        const start = bodyInput.selectionStart;
+        const end = bodyInput.selectionEnd;
+        const full = bodyInput.text;
+        const selected = start !== end ? full.substring(start, end) : "code";
+        const lead = (start > 0 && full[start - 1] !== "\n") ? "\n" : "";
+        const replacement = lead + "```\n" + selected + "\n```\n";
+        bodyInput.text = full.substring(0, start) + replacement + full.substring(end);
+        bodyInput.cursorPosition = start + replacement.length;
+        bodyInput.forceActiveFocus();
+    }
+
+    function insertTableTemplate() {
+        const pos = bodyInput.cursorPosition;
+        const full = bodyInput.text;
+        const lead = (pos > 0 && full[pos - 1] !== "\n") ? "\n\n" : "";
+        const tpl = lead + "| Column 1 | Column 2 |\n| --- | --- |\n| Value 1 | Value 2 |\n";
+        bodyInput.text = full.substring(0, pos) + tpl + full.substring(pos);
+        bodyInput.cursorPosition = pos + tpl.length;
+        bodyInput.forceActiveFocus();
+    }
+
+    function cycleFormatMode() {
+        if (formatMode === "markdown")
+            formatMode = "html";
+        else if (formatMode === "html")
+            formatMode = "plain";
+        else
+            formatMode = "markdown";
+    }
+
     function openLinkBar() {
         showLinkBar = !showLinkBar;
         if (showLinkBar) {
@@ -253,6 +318,7 @@ FloatingWindow {
         savingDraft = true;
         error = "";
         statusNotice = "";
+        const isHtml = formatMode === "html";
         DankMailService.saveDraft({
             "id": draftId,
             "account": accountId,
@@ -263,7 +329,9 @@ FloatingWindow {
             "cc": ccRecipients,
             "bcc": bccRecipients,
             "subject": subjectField.text,
-            "body": bodyInput.text,
+            "body": isHtml ? "" : bodyInput.text,
+            "htmlBody": isHtml ? bodyInput.text : "",
+            "format": formatMode === "plain" ? "plain" : (isHtml ? "html" : "markdown"),
             "attachments": attachments
         }, resp => {
             modal.savingDraft = false;
@@ -300,7 +368,8 @@ FloatingWindow {
         sending = true;
         error = "";
         statusNotice = "";
-        DankMailService.compose(accountId, recipients, subjectField.text, bodyInput.text, resp => {
+        const isHtml = formatMode === "html";
+        DankMailService.compose(accountId, recipients, subjectField.text, isHtml ? "" : bodyInput.text, resp => {
             modal.sending = false;
             if (resp.error) {
                 modal.error = resp.error;
@@ -311,7 +380,9 @@ FloatingWindow {
             "cc": ccRecipients,
             "bcc": bccRecipients,
             "attachments": attachments,
-            "draftId": draftId
+            "draftId": draftId,
+            "htmlBody": isHtml ? bodyInput.text : "",
+            "format": formatMode === "plain" ? "plain" : (isHtml ? "html" : "auto")
         });
     }
 
@@ -712,76 +783,143 @@ FloatingWindow {
         // Formatting, Link, and Attachment Toolbar.
         RowLayout {
             Layout.fillWidth: true
-            spacing: Theme.spacingXS
+            spacing: 2
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
+                iconName: "title"
+                onEntered: composeTooltip.show(this, I18n.tr("Heading", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("<h2>", "</h2>", I18n.tr("Heading", "compose")) : modal.cycleHeading()
+            }
+
+            DankActionButton {
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "format_bold"
-                onClicked: modal.wrapSelection("**", "**", I18n.tr("bold", "compose"))
+                onEntered: composeTooltip.show(this, I18n.tr("Bold (Ctrl+B)", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("<strong>", "</strong>", I18n.tr("bold", "compose")) : modal.wrapSelection("**", "**", I18n.tr("bold", "compose"))
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "format_italic"
-                onClicked: modal.wrapSelection("*", "*", I18n.tr("italic", "compose"))
+                onEntered: composeTooltip.show(this, I18n.tr("Italic (Ctrl+I)", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("<em>", "</em>", I18n.tr("italic", "compose")) : modal.wrapSelection("*", "*", I18n.tr("italic", "compose"))
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
+                iconName: "format_strikethrough"
+                onEntered: composeTooltip.show(this, I18n.tr("Strikethrough", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("<del>", "</del>", I18n.tr("text", "compose")) : modal.wrapSelection("~~", "~~", I18n.tr("text", "compose"))
+            }
+
+            DankActionButton {
+                visible: modal.formatMode === "markdown"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "add_link"
                 iconColor: modal.showLinkBar ? Theme.primary : Theme.surfaceText
+                onEntered: composeTooltip.show(this, I18n.tr("Insert link (Ctrl+K)", "compose"), "top")
+                onExited: composeTooltip.hide(this)
                 onClicked: modal.openLinkBar()
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode === "markdown"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "format_list_bulleted"
+                onEntered: composeTooltip.show(this, I18n.tr("Bullet list", "compose"), "top")
+                onExited: composeTooltip.hide(this)
                 onClicked: modal.insertLinePrefix("- ")
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode === "markdown"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "format_list_numbered"
+                onEntered: composeTooltip.show(this, I18n.tr("Numbered list", "compose"), "top")
+                onExited: composeTooltip.hide(this)
                 onClicked: modal.insertLinePrefix("1. ")
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "format_quote"
-                onClicked: modal.insertLinePrefix("> ")
+                onEntered: composeTooltip.show(this, I18n.tr("Quote", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("<blockquote>", "</blockquote>", I18n.tr("text", "compose")) : modal.insertLinePrefix("> ")
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "code"
-                onClicked: modal.wrapSelection("`", "`", "code")
+                onEntered: composeTooltip.show(this, I18n.tr("Inline code", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("<code>", "</code>", "code") : modal.wrapSelection("`", "`", "code")
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                visible: modal.formatMode === "markdown"
+                buttonSize: 28
+                iconSize: 17
+                iconName: "terminal"
+                onEntered: composeTooltip.show(this, I18n.tr("Code block", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.insertCodeBlock()
+            }
+
+            DankActionButton {
+                visible: modal.formatMode === "markdown"
+                buttonSize: 28
+                iconSize: 17
+                iconName: "table_chart"
+                onEntered: composeTooltip.show(this, I18n.tr("Insert table", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.insertTableTemplate()
+            }
+
+            DankActionButton {
+                visible: modal.formatMode !== "plain"
+                buttonSize: 28
+                iconSize: 17
                 iconName: "horizontal_rule"
-                onClicked: modal.wrapSelection("\n---\n", "", "")
+                onEntered: composeTooltip.show(this, I18n.tr("Horizontal divider", "compose"), "top")
+                onExited: composeTooltip.hide(this)
+                onClicked: modal.formatMode === "html" ? modal.wrapSelection("\n<hr>\n", "", "") : modal.wrapSelection("\n---\n", "", "")
             }
 
             Rectangle {
+                visible: modal.formatMode !== "plain"
                 width: 1
                 height: 18
                 color: Theme.outlineLight
             }
 
             DankActionButton {
-                buttonSize: 30
-                iconSize: 18
+                buttonSize: 28
+                iconSize: 17
                 iconName: "attach_file"
                 iconColor: modal.attachments.length > 0 ? Theme.primary : Theme.surfaceText
+                onEntered: composeTooltip.show(this, I18n.tr("Attach file", "compose"), "top")
+                onExited: composeTooltip.hide(this)
                 onClicked: filePicker.open()
             }
 
@@ -790,6 +928,33 @@ FloatingWindow {
             }
 
             StyledRect {
+                implicitWidth: Math.ceil(formatModeLabel.contentWidth) + Theme.spacingM * 2
+                implicitHeight: 28
+                Layout.preferredWidth: implicitWidth
+                Layout.preferredHeight: 28
+                radius: 14
+                color: modal.formatMode === "plain" ? Theme.surfaceContainerHigh : Theme.secondaryContainer
+
+                StyledText {
+                    id: formatModeLabel
+                    anchors.centerIn: parent
+                    text: modal.formatMode === "html" ? I18n.tr("HTML", "compose") : (modal.formatMode === "plain" ? I18n.tr("Plain text", "compose") : I18n.tr("Markdown", "compose"))
+                    wrapMode: Text.NoWrap
+                    elide: Text.ElideNone
+                    font.pixelSize: Theme.fontSizeSmall
+                    color: modal.formatMode === "plain" ? Theme.surfaceTextMedium : Theme.onSecondaryContainer
+                }
+
+                StateLayer {
+                    stateColor: Theme.primary
+                    onEntered: composeTooltip.show(parent, I18n.tr("Switch format: Markdown (HTML), custom HTML, or Plain text", "compose"), "top")
+                    onExited: composeTooltip.hide(parent)
+                    onClicked: modal.cycleFormatMode()
+                }
+            }
+
+            StyledRect {
+                visible: modal.formatMode !== "plain"
                 implicitWidth: Math.ceil(previewToggleLabel.contentWidth) + Theme.spacingM * 2
                 implicitHeight: 28
                 Layout.preferredWidth: implicitWidth
@@ -943,7 +1108,7 @@ FloatingWindow {
 
                 TextEdit {
                     id: bodyInput
-                    visible: !modal.previewMode
+                    visible: !modal.previewMode || modal.formatMode === "plain"
                     width: parent.width
                     height: Math.max(implicitHeight, parent.height)
                     wrapMode: TextEdit.Wrap
@@ -951,7 +1116,7 @@ FloatingWindow {
                     selectByMouse: true
                     color: Theme.surfaceText
                     selectionColor: Theme.primarySelected
-                    font.family: Theme.fontFamily
+                    font.family: modal.formatMode === "html" ? Theme.monoFontFamily : Theme.fontFamily
                     font.pixelSize: Theme.fontSizeMedium
 
                     Keys.onPressed: event => {
@@ -963,14 +1128,14 @@ FloatingWindow {
 
                     StyledText {
                         visible: bodyInput.text === "" && !bodyInput.activeFocus
-                        text: I18n.tr("Write your message… Ctrl+Enter sends", "compose")
+                        text: modal.formatMode === "html" ? I18n.tr("Write HTML body… Ctrl+Enter sends", "compose") : I18n.tr("Write your message… Ctrl+Enter sends", "compose")
                         color: Theme.surfaceTextAlpha
                     }
                 }
 
                 TextEdit {
                     id: bodyPreview
-                    visible: modal.previewMode
+                    visible: modal.previewMode && modal.formatMode !== "plain"
                     width: parent.width
                     readOnly: true
                     selectByMouse: true
@@ -980,11 +1145,14 @@ FloatingWindow {
                     selectionColor: Theme.primarySelected
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeMedium
-                    text: BodyFormatter.format(bodyInput.text, {
-                        linkColor: String(Theme.primary),
-                        quoteColor: String(Theme.surfaceTextMedium),
-                        linkLabel: I18n.tr("Link", "message body")
-                    })
+                    text: modal.formatMode === "html"
+                        ? BodyFormatter.sanitizeDraftHtml(bodyInput.text)
+                        : BodyFormatter.format(bodyInput.text, {
+                            linkColor: String(Theme.primary),
+                            quoteColor: String(Theme.surfaceTextMedium),
+                            linkLabel: I18n.tr("Link", "message body"),
+                            markdownItalics: true
+                        })
                     onLinkActivated: link => {
                         const clean = BodyFormatter.unwrapUrl ? BodyFormatter.unwrapUrl(link) : link;
                         if (BodyFormatter.safeUrl(clean))
@@ -1095,5 +1263,9 @@ FloatingWindow {
                 }
             }
         }
+    }
+
+    DankTooltip {
+        id: composeTooltip
     }
 }
